@@ -12,6 +12,10 @@
 ### ChAMP: updated methylation analysis pipeline for Illumina BeadChips
 ### doi: 10.1093/bioinformatics/btx513
 
+library(wateRmelon); library(methylumi);library(FDb.InfiniumMethylation.hg19);library(minfi); library(maxprobes); library(tidyverse);library(ggplot2)
+library(tidyverse); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi)
+
+
 
 ### set working directory to filepath that contains the data of interest
 ### this folder should contain the raw red and green signal .idat files and a CSV file of the targets
@@ -56,8 +60,8 @@ write.csv(list, "/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/memo
 
 myLoad <- champ.load(testDir, arraytype = "EPIC", method = "minfi")
 
-myLoad <- champ.load(directory = my_dir,
-           method="ChAMP",                #### method: "ChAMP" or "minfi", has to be minfi if you want to run functional normalization
+myLoad2 <- champ.load(directory = my_dir,
+           method="minfi",                #### method: "ChAMP" or "minfi", has to be minfi if you want to run functional normalization
            methValue="B",
            autoimpute=TRUE,
            filterDetP=TRUE,
@@ -74,6 +78,7 @@ myLoad <- champ.load(directory = my_dir,
            force=FALSE,
            arraytype="EPIC")
 
+CpG.GUI(arraytype = "EPIC")
 
 ################################################################################################################################
 
@@ -89,7 +94,7 @@ saveRDS(EPIC.manifest.hg19, file = "EPIC.manifest.hg19.RDATA")
 
 saveRDS(multi.hit, file = "multi.hit.RDATA")
 
-saveRDS(myLoad, file = "myLoad.RDATA")
+saveRDS(myLoad2, file = "myLoad.RDATA")
 
 saveRDS(probe.features, file = "probe.features.RDATA")
 
@@ -114,6 +119,79 @@ setwd(mypath)
 
 
 ################################################################################################################################
+
+champ.QC()
+
+QC.GUI()
+
+### normalize data, chose nethod "SWAN" or functional normalization
+### BMIQ is the standard normalization method
+### to plot BMIQ: myNorm <- champ.norm(plotBMIQ=TRUE)
+### this will save PDF of density curves
+
+myNorm <- champ.norm(beta = myLoad$beta,
+                     rgSet = myLoad$rgSet,
+                     method ="FunctionalNormalization",
+                     arraytype = "EPIC")                        ### does not work with this dataset
+
+myNorm <- champ.norm(beta = myLoad$beta,
+                     rgSet = myLoad$rgSet,
+                     method ="BMIQ",
+                     arraytype = "EPIC")                        ### bmiq worked, domt know why
+
+
+
+champ.SVD()
+
+################################################################################################################################
+
+### identify DMPs
+
+champ.DMP(arraytype = "EPIC")                   ### no significant DMPs with BH adjusted p val of 0.05
+
+myDMP<- champ.DMP(arraytype = "EPIC",
+          adjust.method = "none")               ### worked, no p val adjustement
+
+
+### visualize DMPs
+
+DMP.GUI()
+
+setwd("/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/") ### where do you want to save DMPs
+
+saveRDS(myDMP, myDMP.RDATA)
+
+
+################################################################################################################################
+
+### identify DMRs
+
+myDMR <- champ.DMR(arraytype = "EPIC")          no significant DMPs with BH adjusted p val of 0.05
+
+myDMR <- champ.DMR(arraytype = "EPIC",
+                   method = "Bumphunter",
+                   adjPvalDmr = "none",
+                   cores = 4)
+
+DMR.GUI()
+
+################################################################################################################################
+
+### identify GSEA
+
+
+myGSEA <- champ.ebGSEA(arraytype = "EPIC",
+                       adjust.method = "none"
+                       )
+
+
+
+
+
+
+
+
+
 
 
 
