@@ -137,7 +137,7 @@ myNorm <- champ.norm(beta = myLoad$beta,
 myNorm <- champ.norm(beta = myLoad$beta,
                      rgSet = myLoad$rgSet,
                      method ="BMIQ",
-                     arraytype = "EPIC")                        ### bmiq worked, domt know why
+                     arraytype = "EPIC")                        ### bmiq worked, dont know why
 
 
 
@@ -166,7 +166,7 @@ saveRDS(myDMP, myDMP.RDATA)
 
 ### identify DMRs
 
-myDMR <- champ.DMR(arraytype = "EPIC")          no significant DMPs with BH adjusted p val of 0.05
+myDMR <- champ.DMR(arraytype = "EPIC")          #no significant DMPs with BH adjusted p val of 0.05
 
 myDMR <- champ.DMR(arraytype = "EPIC",
                    method = "Bumphunter",
@@ -175,14 +175,35 @@ myDMR <- champ.DMR(arraytype = "EPIC",
 
 DMR.GUI()
 
+
 ################################################################################################################################
 
 ### identify GSEA
 
 
-myGSEA <- champ.ebGSEA(arraytype = "EPIC",
-                       adjust.method = "none"
-                       )
+myGSEA <- champ.ebGSEA(arraytype = "EPIC")          ### not working
+
+
+### default test
+myGSEA <- champ.GSEA(arraytype = "EPIC",
+                     cores = 4)
+
+
+GSEA <- as.data.frame(myGSEA$DMP)
+
+
+### gOmeth method
+myGSEA2 <- champ.GSEA(arraytype = "EPIC",
+                      method = "gometh",            ### Note that gometh method would count numbers of CpGs in each genes and correct this bias.
+                     cores = 4)
+
+GSEA2 <- as.data.frame(myGSEA2$DMP)
+
+### ebayes method
+myGSEA3 <- champ.GSEA(arraytype = "EPIC",
+                      method = "ebayes",            ### fails... might be because of multiple conditions...
+                      pheno = pd_samp,              ### didnt help/didnt affect error mesage
+                      cores = 4)
 
 
 
@@ -190,11 +211,16 @@ myGSEA <- champ.ebGSEA(arraytype = "EPIC",
 
 
 
+class(myLoad$pd$Sample_Group)
+
+myLoad[pd$Sample_Group] <- as.factor(myLoad[pd$Sample_Group])
 
 
+#myLoad <- myLoad %>% 
 
-
-
-
-
-
+mutate((myLoad$pd$Sample_Group) = (as.factor(myLoad$pd$Sample_Group, levels = c("Baseline", 
+                                                                    "Acute", 
+                                                                    "7wk_Loading",
+                                                                    "7wk_Unloading",
+                                                                    "7wk_Reloading"))))
+pd_samp<- as.factor(myLoad$pd$Sample_Group)
