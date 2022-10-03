@@ -12,8 +12,12 @@
 ### ChAMP: updated methylation analysis pipeline for Illumina BeadChips
 ### doi: 10.1093/bioinformatics/btx513
 
+
+### extra functions https://github.com/YuanTian1991/ChAMP-Script
+
 library(wateRmelon); library(methylumi);library(FDb.InfiniumMethylation.hg19);library(minfi); library(maxprobes); library(tidyverse);library(ggplot2)
-library(tidyverse); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi)
+library(tidyverse); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi);
+library(reshape2)
 
 
 
@@ -143,6 +147,23 @@ myNorm <- champ.norm(beta = myLoad$beta,
 
 champ.SVD()
 
+
+
+################################################################################################################################
+
+### visualize normalization
+
+
+
+
+
+densityPlot((myNorm), sampGroups=myLoad$pd$Sample_Group,
+            main="Normalized", legend=TRUE)
+densityPlot(myLoad$beta, sampGroups=myLoad$pd$Sample_Group,
+            main="Not-Normalized", legend=TRUE)
+
+
+
 ################################################################################################################################
 
 ### identify DMPs
@@ -160,6 +181,8 @@ DMP.GUI()
 setwd("/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/") ### where do you want to save DMPs
 
 saveRDS(myDMP, myDMP.RDATA)
+
+
 
 
 ################################################################################################################################
@@ -181,8 +204,6 @@ DMR.GUI()
 ### identify GSEA
 
 
-myGSEA <- champ.ebGSEA(arraytype = "EPIC")          ### not working
-
 
 ### default test
 myGSEA <- champ.GSEA(arraytype = "EPIC",
@@ -200,27 +221,62 @@ myGSEA2 <- champ.GSEA(arraytype = "EPIC",
 GSEA2 <- as.data.frame(myGSEA2$DMP)
 
 ### ebayes method
-myGSEA3 <- champ.GSEA(arraytype = "EPIC",
-                      method = "ebayes",            ### fails... might be because of multiple conditions...
-                      pheno = pd_samp,              ### didnt help/didnt affect error mesage
-                      cores = 4)
+
+############
+
+### filtering bVals to the samples i want
 
 
+bVals <- as.data.frame(myNorm)
+
+pd <- as.data.frame(myLoad$pd)
+
+names <- (paste(pd$Slide, pd$Array, sep = "_"))
+
+colnames(bVals) <- names
 
 
+pd %>% 
+        mutate(colnames = paste(Slide, Array, sep = "_")) %>% 
+        filter(Sample_Group %in% c("Baseline", "7wk_Loading")) -> pd1       ### add sample_groups you want to keep
 
 
-
-class(myLoad$pd$Sample_Group)
-
-myLoad[pd$Sample_Group] <- as.factor(myLoad[pd$Sample_Group])
+bVals[pd1$colnames] -> f_bVals
 
 
-#myLoad <- myLoad %>% 
+#myGSEA3 <- champ.GSEA(beta = f_bVals,
+#                      DMP = myDMP$Baseline_to_7wk_Loading,
+#                      DMR = myDMR,
+#                      arraytype = "EPIC",
+#                      method = "ebayes",            ### fails with multiple comparison groups
+#                      pheno = pd1$Sample_Group,
+#                      cores = 8)
 
-mutate((myLoad$pd$Sample_Group) = (as.factor(myLoad$pd$Sample_Group, levels = c("Baseline", 
-                                                                    "Acute", 
-                                                                    "7wk_Loading",
-                                                                    "7wk_Unloading",
-                                                                    "7wk_Reloading"))))
-pd_samp<- as.factor(myLoad$pd$Sample_Group)
+myGSEA3 <- champ.ebGSEA(beta = f_bVals,
+                      arraytype = "EPIC",            ### fails with multiple comparison groups
+                      pheno = pd1$Sample_Group,
+                      cores = 8)
+
+GSEA <- myGSEA3[["GSEA"]][["Rank(AUC)"]]
+################################################################################################################################
+################################################################################################################################
+################################################################################################################################
+
+### map GSEA to GO and KEGG
+
+data("go.sets.hs")
+data("go.subs.hs")
+
+data("kegg.sets.hs")
+data("sigmet.idx.hs")
+BiocManager::install("GIGSEA")
+library(GIGSEA)
+MSigDB.KEGG.Pathway
+################################################################################################################################
+
+## cth correction based on blood methylation profiles
+
+
+myRefbase <- champ.refbase(beta = f_bVals,
+                           arraytype = "EPIC")
+
