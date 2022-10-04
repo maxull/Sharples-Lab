@@ -148,7 +148,6 @@ myNorm <- champ.norm(beta = myLoad$beta,
 champ.SVD()
 
 
-
 ################################################################################################################################
 
 ### visualize normalization
@@ -194,10 +193,14 @@ myDMR <- champ.DMR(arraytype = "EPIC")          #no significant DMPs with BH adj
 myDMR <- champ.DMR(arraytype = "EPIC",
                    method = "Bumphunter",
                    adjPvalDmr = "none",
+                   compare.group = c("Baseline", "7wk_Loading"),
                    cores = 4)
 
 DMR.GUI()
 
+setwd("/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/") ### where do you want to save DMRs
+
+saveRDS(myDMR, myDMP.RDATA)
 
 ################################################################################################################################
 
@@ -207,6 +210,7 @@ DMR.GUI()
 
 ### default test
 myGSEA <- champ.GSEA(arraytype = "EPIC",
+                     DMP = myDMP[["Baseline_to_7wk_Loading"]],
                      cores = 4)
 
 
@@ -215,8 +219,10 @@ GSEA <- as.data.frame(myGSEA$DMP)
 
 ### gOmeth method
 myGSEA2 <- champ.GSEA(arraytype = "EPIC",
+                      DMP = myDMP[["Baseline_to_7wk_Loading"]],
                       method = "gometh",            ### Note that gometh method would count numbers of CpGs in each genes and correct this bias.
-                     cores = 4)
+                      adjPval = "none",
+                      cores = 4)
 
 GSEA2 <- as.data.frame(myGSEA2$DMP)
 
@@ -257,7 +263,7 @@ myGSEA3 <- champ.ebGSEA(beta = f_bVals,
                       pheno = pd1$Sample_Group,
                       cores = 8)
 
-GSEA <- myGSEA3[["GSEA"]][["Rank(AUC)"]]
+GSEA <- as.data.frame(myGSEA3[["GSEA"]][["Rank(AUC)"]])
 ################################################################################################################################
 ################################################################################################################################
 ################################################################################################################################
@@ -269,9 +275,18 @@ data("go.subs.hs")
 
 data("kegg.sets.hs")
 data("sigmet.idx.hs")
+
 BiocManager::install("GIGSEA")
-library(GIGSEA)
+library(GIGSEA);library(tibble)
 MSigDB.KEGG.Pathway
+
+GSEA <- rownames_to_column(GSEA, "TERM")
+
+df <- geneSet2Net(GSEA$TERM, geneset = myGSEA3$EnrichGene) 
+
+# works, but still not mapped to pathway overview, or list of mosti significant pathways etc. 
+
+
 ################################################################################################################################
 
 ## cth correction based on blood methylation profiles
