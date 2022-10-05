@@ -1,6 +1,6 @@
 ################################################################
 ###                                                          ###
-### Gene Set Enrichment analysis                             ###
+### Gene Set Enrichment analysis of cancer                   ###
 ###                                                          ###
 ################################################################
 
@@ -17,7 +17,7 @@
 
 library(wateRmelon); library(methylumi);library(FDb.InfiniumMethylation.hg19);library(minfi); library(maxprobes); library(tidyverse);library(ggplot2)
 library(tidyverse); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi);
-library(reshape2)
+library(reshape2); library(GEOquery)
 
 
 
@@ -29,15 +29,19 @@ library(reshape2)
 mypath <- getwd()
 
 #############################################################
-### unzipping of zip files when downloading from GEO database (change file paths)
+### download and unzipping of zip files when downloading from GEO database (change file paths)
 
-path <- "C:/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/memory_of_hypertrophy_data/GSE114763_RAW.tar"
+GSE = getGEO("GSE213029")
 
-untar(path, exdir = "C:/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/memory_of_hypertrophy_data/untared")
+GSE <- GSE[[1]]
+
+path <- "C:/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/Cancer data/GSE213029_RAW.tar"
+
+untar(path, exdir = "C:/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/Cancer data/untared")
 
 
 
-my_dir <- "/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/memory_of_hypertrophy_data/untared"
+my_dir <- "/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/Cancer data/untared"
 
 zip_file <- list.files(path = my_dir, pattern = "*.gz", full.names = TRUE)
 
@@ -65,22 +69,22 @@ write.csv(list, "/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/memo
 myLoad <- champ.load(testDir, arraytype = "EPIC", method = "minfi")
 
 myLoad2 <- champ.load(directory = my_dir,
-           method="minfi",                #### method: "ChAMP" or "minfi", has to be minfi if you want to run functional normalization
-           methValue="B",
-           autoimpute=TRUE,
-           filterDetP=TRUE,
-           ProbeCutoff=0,
-           SampleCutoff=0.1,
-           detPcut=0.01,
-           filterBeads=TRUE,
-           beadCutoff=0.05,
-           filterNoCG=TRUE,
-           filterSNPs=TRUE,
-           population=NULL,
-           filterMultiHit=TRUE,
-           filterXY=TRUE,
-           force=FALSE,
-           arraytype="EPIC")
+                      method="minfi",                #### method: "ChAMP" or "minfi", has to be minfi if you want to run functional normalization
+                      methValue="B",
+                      autoimpute=TRUE,
+                      filterDetP=TRUE,
+                      ProbeCutoff=0,
+                      SampleCutoff=0.1,
+                      detPcut=0.01,
+                      filterBeads=TRUE,
+                      beadCutoff=0.05,
+                      filterNoCG=TRUE,
+                      filterSNPs=TRUE,
+                      population=NULL,
+                      filterMultiHit=TRUE,
+                      filterXY=TRUE,
+                      force=FALSE,
+                      arraytype="EPIC")
 
 CpG.GUI(arraytype = "EPIC")
 
@@ -170,8 +174,7 @@ densityPlot(myLoad$beta, sampGroups=myLoad$pd$Sample_Group,
 champ.DMP(arraytype = "EPIC")                   ### no significant DMPs with BH adjusted p val of 0.05
 
 myDMP<- champ.DMP(arraytype = "EPIC",
-          adjust.method = "none",
-          adjPVal = 0.05)               ### worked, no p val adjustement
+                  adjust.method = "none")               ### worked, no p val adjustement
 
 
 ### visualize DMPs
@@ -260,9 +263,9 @@ bVals[pd1$colnames] -> f_bVals
 #                      cores = 8)
 
 myGSEA3 <- champ.ebGSEA(beta = f_bVals,
-                      arraytype = "EPIC",            ### fails with multiple comparison groups
-                      pheno = pd1$Sample_Group,
-                      cores = 8)
+                        arraytype = "EPIC",            ### fails with multiple comparison groups
+                        pheno = pd1$Sample_Group,
+                        cores = 8)
 
 GSEA <- as.data.frame(myGSEA3[["GSEA"]][["Rank(AUC)"]])
 ################################################################################################################################
@@ -286,7 +289,7 @@ GSEA <- rownames_to_column(GSEA, "TERM")
 df <- geneSet2Net(GSEA$TERM, geneset = myGSEA3$EnrichGene) 
 
 # works, but still not mapped to pathway overview, or list of mosti significant pathways etc. 
-# map "statistic from gtResults to kegg and GO pathways
+
 
 ################################################################################################################################
 
@@ -296,11 +299,3 @@ df <- geneSet2Net(GSEA$TERM, geneset = myGSEA3$EnrichGene)
 myRefbase <- champ.refbase(beta = f_bVals,
                            arraytype = "EPIC")
 
-
-
-btoa <- myDMP[["Baseline_to_Acute"]]
-
-GSEA2 <- myGSEA2[["DMP"]]
-
-df <- myGSEA3[["GSEA"]][["Rank(AUC)"]]
-df2 <-  myGSEA3[["gtResult"]]
