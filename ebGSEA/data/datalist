@@ -1,0 +1,5 @@
+MSigDB-28Feb14-data: listEZ.lv listG.lv listclassALL.v
+SampleCpG: allCpG.v sampleCpG.v
+dualmap450kEID: map450ktoEID.lv mapEIDto450k.lv
+dualmap850kEID: map850ktoEID.lv mapEIDto850k.lv
+ebgseaDATA: dataSMK.m phenoSMK.v

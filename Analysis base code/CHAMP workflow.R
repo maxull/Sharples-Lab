@@ -265,6 +265,7 @@ myGSEA3 <- champ.ebGSEA(beta = f_bVals,
                       cores = 8)
 
 GSEA <- as.data.frame(myGSEA3[["GSEA"]][["Rank(AUC)"]])
+GSEA_sig <- as.data.frame(myGSEA3[["GSEA"]][["Rank(P)"]])
 ################################################################################################################################
 ################################################################################################################################
 ################################################################################################################################
@@ -293,7 +294,7 @@ df <- geneSet2Net(GSEA$TERM, geneset = myGSEA3$EnrichGene)
 ## cth correction based on blood methylation profiles
 
 
-myRefbase <- champ.refbase(beta = f_bVals,
+myRefbase <- champ.refbase(beta = f_bVals,                      ### returns b-vals adjusted for 5 main cellpopulations identified
                            arraytype = "EPIC")
 
 
@@ -304,3 +305,34 @@ GSEA2 <- myGSEA2[["DMP"]]
 
 df <- myGSEA3[["GSEA"]][["Rank(AUC)"]]
 df2 <-  myGSEA3[["gtResult"]]
+df <- myGSEA3[["EnrichGene"]]
+ebGSEA <- myGSEA3[["GSEA"]]
+
+df1 <- as.data.frame(myGSEA3[["EnrichGene"]][["chr5q23"]])
+
+
+################################################################################################################################
+################################################################################################################################
+
+library(plyr)
+library(R.utils)
+library(ebGSEA)
+install.packages("githubinstall")
+library(githubinstall)
+gh_install_packages("aet21/ebGSEA")
+
+gh_suggest("ebGSEA")
+
+
+my_dir <- "/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/memory_of_hypertrophy_data/untared"
+
+zip_file <- list.files(path = my_dir, pattern = "*.gz", full.names = TRUE)
+
+ldply(.data = zip_file, .fun = gunzip)
+
+
+gunzip("C:/Users/maxul/Downloads/ebGSEA_0.1.0.tar.gz")
+
+
+untar("C:/Users/maxul/Downloads/ebGSEA_0.1.0.tar", exdir = mypath)
+

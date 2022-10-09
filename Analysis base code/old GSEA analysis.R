@@ -175,6 +175,11 @@ view(gobpdf3$greater)                           ### view more expressed GO pathw
 data("kegg.sets.hs")
 data("sigmet.idx.hs")   ### smaller subset dataset that contains only signalling and metabolic pathways
 
+# data("sig.idx.hs")    ### which elements in kg.sets are signaling pathways
+# data("met.idx.hs")    ### which elements in kg.sets are metabolism pathways
+# data("dise.idx.hs")    ### which elements in kg.sets are disease pathways
+
+
 kegg.subset = kegg.sets.hs[sigmet.idx.hs]       ### this now contains only the subset kegg pathwyas
 
 ### only signalling and metabolic pathways
