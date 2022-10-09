@@ -10,7 +10,7 @@
 
 install.packages("BiocManager")
 
-BiocManager::install("minfi")
+BiocManager::install("minfi", force = TRUE)
 
 BiocManager::install("FDb.InfiniumMethylation.hg19")
 
@@ -39,6 +39,8 @@ BiocManager::install("ChAMP")
 BiocManager::install("DMRcate")
 
 BiocManager::install("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+
+BiocManager::install("IlluminaHumanMethylationEPICanno.ilm10b2.hg19")
 
 BiocManager::install("org.Hs.eg.db")
 

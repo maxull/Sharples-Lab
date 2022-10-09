@@ -298,6 +298,8 @@ myRefbase <- champ.refbase(beta = f_bVals,                      ### returns b-va
                            arraytype = "EPIC")
 
 
+## random data views
+
 
 btoa <- myDMP[["Baseline_to_Acute"]]
 
@@ -314,25 +316,14 @@ df1 <- as.data.frame(myGSEA3[["EnrichGene"]][["chr5q23"]])
 ################################################################################################################################
 ################################################################################################################################
 
-library(plyr)
-library(R.utils)
-library(ebGSEA)
-install.packages("githubinstall")
-library(githubinstall)
-gh_install_packages("aet21/ebGSEA")
+BiocManager::install("org.Hs.eg.db")
+BiocManager::install("AnnotationDbi")
+library(org.Hs.eg.db)
+library(AnnotationDbi)
+library(gageData)
+columns(org.Hs.eg.db)
+data("kegg.sets.hs")
 
-gh_suggest("ebGSEA")
-
-
-my_dir <- "/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/memory_of_hypertrophy_data/untared"
-
-zip_file <- list.files(path = my_dir, pattern = "*.gz", full.names = TRUE)
-
-ldply(.data = zip_file, .fun = gunzip)
-
-
-gunzip("C:/Users/maxul/Downloads/ebGSEA_0.1.0.tar.gz")
-
-
-untar("C:/Users/maxul/Downloads/ebGSEA_0.1.0.tar", exdir = mypath)
-
+doGT(pheno.v = pd1, 
+     data.m = f_bVals,
+     array = "850k")

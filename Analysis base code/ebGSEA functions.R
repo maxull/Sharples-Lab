@@ -189,12 +189,12 @@ doGT <- function(pheno.v,data.m,model=c("linear"),array=c("450k","850k"),ncores=
         if(array=="450k"){
                 message(" Mapping 450k probes to genes... ")
                 data("dualmap450kEID");
-                subsets <- mclapply(mapEIDto450k.lv,intersect,rownames(data.m),mc.cores = ncores);
+                subsets <- lapply(mapEIDto450k.lv,intersect,rownames(data.m),mc.cores = ncores);
                 message(" Done ")
         }else {
                 message(" Mapping EPIC probes to genes... ")
                 data("dualmap850kEID");
-                subsets <- mclapply(mapEIDto850k.lv,intersect,rownames(data.m),mc.cores = ncores);
+                subsets <- mclapply(mapEIDto850k.lv,intersect,rownames(data.m),mc.cores = 1);
                 message(" Done ")
         }
         nrep.v <- unlist(lapply(subsets,length));
