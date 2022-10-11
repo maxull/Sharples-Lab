@@ -10,7 +10,7 @@
 
 install.packages("BiocManager")
 
-BiocManager::install("minfi", force = TRUE)
+BiocManager::install("minfi")
 
 BiocManager::install("FDb.InfiniumMethylation.hg19")
 
@@ -57,6 +57,10 @@ devtools::install_github("markgene/maxprobes")
 BiocManager::install("SummarizedExperiment")
 
 BiocManager::install("MEAT")
+
+BiocManager::install("maxprobes")
+
+BiocManager::install("m")
 
 
 ###

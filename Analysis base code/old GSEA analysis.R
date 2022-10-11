@@ -136,7 +136,6 @@ df3$ENTREZ = mapIds(org.Hs.eg.db,
                     keytype ="ALIAS",
                     multiVals = "first")
 
-
 ############################################################
 ###
 ### map out logFC to GO pathway
@@ -214,6 +213,11 @@ tmp = sapply(keggresids, function(pid) pathview(gene.data = foldchange, pathway.
 
 
 
+###############################################################
+
+
+
+keggres = gage(exprs = df$logFC, gsets = kegg.subset, same.dir = TRUE)
 
 
 

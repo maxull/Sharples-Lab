@@ -15,7 +15,7 @@
 
 ### extra functions https://github.com/YuanTian1991/ChAMP-Script
 
-library(wateRmelon); library(methylumi);library(FDb.InfiniumMethylation.hg19);library(minfi); library(maxprobes); library(tidyverse);library(ggplot2)
+library(wateRmelon); library(methylumi);library(FDb.InfiniumMethylation.hg19);library(minfi); library(tidyverse);library(ggplot2)
 library(tidyverse); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi);
 library(reshape2)
 
@@ -327,3 +327,36 @@ data("kegg.sets.hs")
 doGT(pheno.v = pd1, 
      data.m = f_bVals,
      array = "850k")
+
+
+################################################################################################################################
+# manually do global test
+
+doGT <- function(pheno.v,data.m,model=c("linear"),array=c("450k","850k"),ncores=4){
+        if(array=="450k"){
+                message(" Mapping 450k probes to genes... ")
+                data("dualmap450kEID");
+                subsets <- lapply(mapEIDto450k.lv,intersect,rownames(data.m),mc.cores = ncores);
+                message(" Done ")
+        }else {
+                message(" Mapping EPIC probes to genes... ")
+                data("dualmap850kEID");
+                subsets <- mclapply(mapEIDto850k.lv,intersect,rownames(data.m),mc.cores = 1);
+                message(" Done ")
+        }
+        nrep.v <- unlist(lapply(subsets,length));
+        selG.idx <- which(nrep.v>0);
+        message(" Running Global Test... ")
+        gt.o <- gt(response=pheno.v,alternative=t(data.m),model=model,directional = FALSE, standardize = FALSE, permutations = 0, subsets=subsets[selG.idx],trace=F);
+        message(" Done ")
+        resGT.m <- as.matrix(result(gt.o));
+        tmp.s <- sort(resGT.m[,2],decreasing=TRUE,index.return=TRUE);
+        sresGT.m <- resGT.m[tmp.s$ix,];
+        return(sresGT.m);
+}
+
+BiocManager::install("globaltest")
+
+library(globaltest)
+
+
