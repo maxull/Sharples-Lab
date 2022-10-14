@@ -179,4 +179,45 @@ class(d3$Sample_Group)
 d3$Sample_Group <- as.factor(d3$Sample_Group)
 
 
+#################################################################################
 
+# ivar input til for loop
+
+array <- rownames_to_column(CGtoGENE2)
+
+array2 <- left_join(array, df, by = "rowname")
+
+array2 <- array2 %>% 
+        na.omit()
+
+#df %>% 
+#        filter(rowname == "cg00001510")      # missing values in array 2... why are they missing? follow up
+
+
+
+#for (i in 1: length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)){
+#index <- which(array2$ENTREZ == uniquecg[i,])
+#z <- array2[index,]
+#mygenes[[i]] <- z[,-1:-2]
+#}
+
+### funker men mangler å gi listene navnet til genene
+
+mygenes <- list()
+
+
+
+for (i in 1: length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)){
+        index <- which(array2$ENTREZ == uniquecg[i,])
+        z <- array2[index,]
+        mygenes[[(as.character(uniquecg[i,]))]] <- t(z[,-1:-2])
+        print(i)
+}
+
+### works, however it returns some empty lists -> datafiltering beforehand should ensure that there are no empty lists! 
+
+gene1 <- CGtoGENE2 %>% 
+        filter(ENTREZ == "1947") %>% 
+        rownames_to_column()
+
+left_join(gene1, df, by = "rowname") -> g1
