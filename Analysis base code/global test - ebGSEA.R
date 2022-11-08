@@ -147,36 +147,7 @@ pd_gt <- pd_gt[,-1]
 
 
 
-d <- as.data.frame(d)
 
-
-
-d <- t(g1)
-
-
-
-d2 <- left_join(d, pd_gt, by = "colnames")
-
-d2 %>% 
-        aov(cg00000029  ~Sample_Group, data = .) %>% 
-        summary()
-
-
-
-
-cpgs <-rownames(g1)
-
-
-
-d3 <- d2[,-1]
-
-lm(.~as.factor(Sample_Group), data = d3)
-anova(mod)
-
-
-class(d3$Sample_Group)
-
-d3$Sample_Group <- as.factor(d3$Sample_Group)
 
 
 #################################################################################
@@ -221,3 +192,29 @@ gene1 <- CGtoGENE2 %>%
         rownames_to_column()
 
 left_join(gene1, df, by = "rowname") -> g1
+
+
+### i made new for loop that made the correct subsets, but its not saved... make again, should make output: mygenes2
+
+colnames(f_bVals) <- a
+
+
+
+
+
+globalt <- gt(a ~., subsets = submygenes, data = t(f_bVals))
+
+### test gt
+submygenes <- mygenes[3:12]
+
+
+nrep.v <- unlist(submygenes, length)
+selG.idx <- which(nrep.v>0)
+a <- pd_gt$Sample_Group
+b<- t(f_bVals)
+
+
+gt.o <- gt(response = a, alternative = b, subsets = mygenes2)
+
+#funker ikke
+
