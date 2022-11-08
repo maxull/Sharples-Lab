@@ -202,8 +202,21 @@ colnames(f_bVals) <- a
 
 
 
-globalt <- gt(a ~., subsets = submygenes, data = t(f_bVals))
+globalt <- gt(a ~., subsets = submygenes, data = t(f_bVals)) # doesn't work
 
+
+
+
+
+# test one gene
+
+one_gene <- as.data.frame(mygenes[[1]])
+one_gene$timepoint <- a
+
+###doesnt work
+
+
+globalt <- gt(one_gene$timepoint~1, timepoint ~. , data = one_gene, model = "linear")   # doesnt work
 ### test gt
 submygenes <- mygenes[3:12]
 
