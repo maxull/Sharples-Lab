@@ -155,7 +155,7 @@ plot_grid(p1,p2,p3,p4,p5,p6, ncol = 3, nrow = 2, common.legend = TRUE, legend = 
 
 ### save the plot
 
-ggsave("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/ISOM/isom_plot.png", 
+ggsave("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/isom_plot.png", 
        plot = isom_plot,
        units = "px",
        dpi = 600,
