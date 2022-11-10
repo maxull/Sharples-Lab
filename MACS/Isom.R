@@ -6,7 +6,7 @@
 #----------------------------------------------------------------
 
 
-library(ggplot2); library(tidyverse); library(readxl);library(cowplot); library(tidyr)
+library(ggplot2); library(tidyverse); library(readxl);library(cowplot); library(tidyr); library(lubridate); library(ggpubr)
 
 # get a list of files in the end folder
 
@@ -45,33 +45,134 @@ for (i in 1: length(myfiles)){
 # now add the string of torque max data to a column in isom_df
 
 isom_df <- isom_df %>% 
-        mutate(t_max = t_max)
+        mutate(t_max = as.numeric(t_max))
 
-# recode date to familiarization, baseline, post
 
-isom_df %>% 
-        mutate(day = substr(date, 1,2),
-               month = substr(date, 4,5)) %>% 
-        group_by(FP) %>% 
-        mutate(timepoint = if(((month == min(month)) & (day == min(day)))){print("Familiarization")})
-                       
+#change date to date format
+
+isom_df <- isom_df %>% 
+        mutate(date = dmy(date))
+
+# recode each participants unique date to timepoint
+
+
+        
+for (i in unique(isom_df$FP)) {
+
+# i==isom_df$FP
+
+a <-unique(isom_df$date[isom_df$FP==i])
+        
+for (l in 1:length(a)) {
+        logical <- isom_df$FP == i & isom_df$date == a[l]
+        isom_df$timepoint[logical] = l
+        
+}
+
+
+}  
+
+
+################################################################################3
+
+### add a list of your timepoints
+
+timepoints = c("Familiarization","Baseline","Post")
+
 
 
 # plot torque max grouped by participant, date, angle for extension
 
-isom_df %>% 
-        filter(reps == "3" & angle == 30) %>% 
-        ggplot(aes(date, t_max, group = FP, color = FP))+
+p1 <- isom_df %>% 
+        filter(reps == "3" & angle == "30") %>% 
+        ggplot(aes(x = as.factor(timepoint), y = t_max, group = FP, color = FP))+
+        geom_point(show.legend = FALSE)+
+        geom_line(show.legend = FALSE)+
+        scale_x_discrete(labels=timepoints)+
+        theme(axis.title.x = element_blank())+
+        labs(title = "30° peak torque (ext)",
+             y = "Torque (Nm)")
+        
+
+p2 <- isom_df %>% 
+        filter(reps == "3" & angle == "60") %>% 
+        ggplot(aes(x = as.factor(timepoint), y = t_max, group = FP, color = FP))+
+        geom_point(show.legend = FALSE)+
+        geom_line(show.legend = FALSE)+
+        scale_x_discrete(labels=timepoints)+
+        theme(axis.title.x = element_blank(),
+              axis.title.y = element_blank())+
+        labs(title = "60° peak torque (ext)",
+             y = "Torque (Nm)")
+        
+
+p3 <- isom_df %>% 
+        filter(reps == "3" & angle == "90") %>% 
+        ggplot(aes(x = as.factor(timepoint), y = t_max, group = FP, color = FP))+
         geom_point()+
-        geom_line()
+        geom_line()+
+        scale_x_discrete(labels=timepoints)+
+        theme(axis.title.x = element_blank(),
+              axis.title.y = element_blank())+
+        labs(title = "90° peak torque (ext)",
+             y = "Torque (Nm)")
+
+p4 <- isom_df %>% 
+        filter(reps == "1" & angle == "30") %>% 
+        ggplot(aes(x = as.factor(timepoint), y = t_max, group = FP, color = FP))+
+        geom_point(show.legend = FALSE)+
+        geom_line(show.legend = FALSE)+
+        scale_x_discrete(labels=timepoints)+
+        theme(axis.title.x = element_blank())+
+        labs(title = "30° peak torque (flex)",
+             y = "Torque (Nm)")
+
+p5 <- isom_df %>% 
+        filter(reps == "1" & angle == "60") %>% 
+        ggplot(aes(x = as.factor(timepoint), y = t_max, group = FP, color = FP))+
+        geom_point(show.legend = FALSE)+
+        geom_line(show.legend = FALSE)+
+        scale_x_discrete(labels=timepoints)+
+        theme(axis.title.x = element_blank(),
+              axis.title.y = element_blank())+
+        labs(title = "60° peak torque (flex)",
+             y = "Torque (Nm)")
+
+p6 <- isom_df %>% 
+        filter(reps == "1" & angle == "90") %>% 
+        ggplot(aes(x = as.factor(timepoint), y = t_max, group = FP, color = FP))+
+        geom_point()+
+        geom_line()+
+        scale_x_discrete(labels=timepoints)+
+        theme(axis.title.x = element_blank(),
+              axis.title.y = element_blank())+
+        labs(title = "90° peak torque (flex)",
+             y = "Torque (Nm)")
+
+isom_plot <- ggarrange(p1,p2,p3,p4,p5,p6, ncol = 3, nrow = 2, common.legend = TRUE, legend = "bottom")
+
+plot_grid(p1,p2,p3,p4,p5,p6, ncol = 3, nrow = 2, common.legend = TRUE, legend = "bottom")
+
+### save the plot
+
+ggsave("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/ISOM/isom_plot.png", 
+       plot = isom_plot,
+       units = "px",
+       dpi = 600,
+       bg = "white")
+
+############################################################################################33
+
+### plot with facet grid instead
 
 
-# to do
 
-# recode dates to timepoints fam, baseline, post
-# plot all angles both extension and flection
-
-
-
-
-
+isom_df %>% 
+        ggplot(aes(x = as.factor(timepoint), y = t_max, group = FP, color = FP))+
+        geom_point()+
+        geom_line()+
+        scale_x_discrete(labels=timepoints)+
+        labs(title = "90° peak torque (flex)",
+             y = "Torque (Nm)")+
+        facet_grid(reps~angle)
+        
