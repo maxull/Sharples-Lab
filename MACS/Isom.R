@@ -59,8 +59,6 @@ isom_df <- isom_df %>%
         
 for (i in unique(isom_df$FP)) {
 
-# i==isom_df$FP
-
 a <-unique(isom_df$date[isom_df$FP==i])
         
 for (l in 1:length(a)) {
@@ -83,23 +81,29 @@ timepoints = c("Familiarization","Baseline","Post")
 
 # plot torque max grouped by participant, date, angle for extension
 
-p1 <- isom_df %>% 
+
+#p1 <- 
+isom_df %>% 
         filter(reps == "3" & angle == "30") %>% 
-        ggplot(aes(x = as.factor(timepoint), y = t_max, group = FP, color = FP))+
-        geom_point(show.legend = FALSE)+
-        geom_line(show.legend = FALSE)+
+        ggplot(aes(x = as.factor(timepoint), y = t_max))+
+        geom_boxplot()+
+        geom_point(aes(group = FP, color = FP),show.legend = FALSE)+
+        geom_line(aes(group = FP, color = FP),show.legend = FALSE)+
         scale_x_discrete(labels=timepoints)+
+        theme_bw()+
         theme(axis.title.x = element_blank())+
         labs(title = "30° peak torque (ext)",
              y = "Torque (Nm)")
         
 
-p2 <- isom_df %>% 
+p2 <- 
+isom_df %>% 
         filter(reps == "3" & angle == "60") %>% 
-        ggplot(aes(x = as.factor(timepoint), y = t_max, group = FP, color = FP))+
-        geom_point(show.legend = FALSE)+
-        geom_line(show.legend = FALSE)+
-        scale_x_discrete(labels=timepoints)+
+        ggplot(aes(x = as.factor(timepoint), y = t_max))+
+        geom_boxplot()+
+        geom_point(aes(group = FP, color = FP),show.legend = FALSE)+
+        geom_line(aes(group = FP, color = FP),show.legend = FALSE)+
+                scale_x_discrete(labels=timepoints)+
         theme(axis.title.x = element_blank(),
               axis.title.y = element_blank())+
         labs(title = "60° peak torque (ext)",
@@ -175,4 +179,27 @@ isom_df %>%
         labs(title = "90° peak torque (flex)",
              y = "Torque (Nm)")+
         facet_grid(reps~angle)
-        
+
+
+
+# plot 1 with mean and error bars
+
+
+# i like this plot stile
+
+isom_df %>% 
+        filter(reps == "3" & angle == "30") %>% 
+        ggplot(aes(x = as.factor(timepoint), y = t_max))+
+        geom_point(position = position_dodge(width = 0.1),
+                    aes(color = FP))+
+        geom_line(aes(group = FP, color = FP),
+                  alpha = 0.5, position = position_dodge(width = 0.1))+
+        geom_errorbar(aes(ymin = mean(t_max) - sd(t_max), ymax = mean(t_max) + sd(t_max)), width = .2)+
+        geom_point(aes(y = mean(t_max)),
+                   size = 3)+
+        geom_line(aes(y = mean(t_max), group = mean(t_max)))+
+        scale_x_discrete(labels = timepoints)+
+        #theme_classic()+
+        theme(axis.title.x = element_blank())+
+        labs(title = "30° peak torque (ext)",
+             y = "Torque (Nm)")
