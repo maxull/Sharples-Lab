@@ -200,10 +200,47 @@ colnames(f_bVals) <- a
 
 
 
+########################################################################
+### create mygenes2 list again
+
+
+mygenes3 <- list()
+
+for (i in 1:length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)) {
+        index <- which(array$ENTREZ == uniquecg[i,])
+        z <- array[index,]
+        mygenes3[[(as.character(uniquecg[i,]))]] <- z$rowname
+        print(i)
+        
+}
+
+
+# for loop successful
+# now it is based on array, wich still includes NAs
+# array2 contains no NAs
+# run loop on array 2, and remove all lists that contain less than 3 cpg sites
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+####################################################################################
+
+
+
+
 
 
 globalt <- gt(a ~., subsets = submygenes, data = t(f_bVals)) # doesn't work
-
 
 
 
