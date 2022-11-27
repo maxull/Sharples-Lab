@@ -220,7 +220,9 @@ for (i in 1:length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)) {
 # array2 contains no NAs
 # run loop on array 2, and remove all lists that contain less than 3 cpg sites
 
-
+getwd()
+setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/")
+save.image(file = "gt_workspace.RData")
 
 
 
