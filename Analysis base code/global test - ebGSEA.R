@@ -207,8 +207,8 @@ colnames(f_bVals) <- a
 mygenes3 <- list()
 
 for (i in 1:length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)) {
-        index <- which(array$ENTREZ == uniquecg[i,])
-        z <- array[index,]
+        index <- which(array2$ENTREZ == uniquecg[i,])
+        z <- array2[index,]
         mygenes3[[(as.character(uniquecg[i,]))]] <- z$rowname
         print(i)
         
@@ -224,16 +224,48 @@ getwd()
 setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/")
 save.image(file = "gt_workspace.RData")
 
+mygenes4 = mygenes3
+
+
+for (i in 1:(length(mygenes3))) {
+        x <- length(mygenes3[[i]])
+        if(x<3){
+                mygenes3[i] <- NULL
+        }
+        print(i)
+}
+
+
+# save removed lists in new list
+shortgenes <- list()
+shortgenes2 <- list()
+
+
+for (i in 1:(length(mygenes3))) {
+        x <- length(mygenes3[[i]])
+        if(x<3){
+                shortgenes[[(as.character(uniquecg[i,]))]] <- mygenes3[[i]]
+                mygenes3[i] <- NULL
+        }
+        print(i)
+}
+
+
+for (i in 1:(length(mygenes4))) {
+        x <- length(mygenes4[[i]])
+        if(x<3){
+                shortgenes[[i]] <- mygenes4[[i]]
+                mygenes4[i] <- NULL
+        }
+        print(i)
+}
 
 
 
 
+shortgenes["100616112"]
 
-
-
-
-
-
+mygenes3[["100616112"]]
 
 ####################################################################################
 
