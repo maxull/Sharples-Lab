@@ -230,7 +230,7 @@ mygenes4 = mygenes3
 for (i in 1:(length(mygenes3))) {
         x <- length(mygenes3[[i]])
         if(x<3){
-                mygenes3[i] <- NULL
+        y <- append(i)
         }
         print(i)
 }
@@ -245,7 +245,6 @@ for (i in 1:(length(mygenes3))) {
         x <- length(mygenes3[[i]])
         if(x<3){
                 shortgenes[[(as.character(uniquecg[i,]))]] <- mygenes3[[i]]
-                mygenes3[i] <- NULL
         }
         print(i)
 }
