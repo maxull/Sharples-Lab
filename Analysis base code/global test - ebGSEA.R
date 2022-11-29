@@ -152,7 +152,7 @@ pd_gt <- pd_gt[,-1]
 
 #################################################################################
 
-# ivar input til for loop
+# array of cpgs and gene names
 
 array <- rownames_to_column(CGtoGENE2)
 
@@ -161,55 +161,17 @@ array2 <- left_join(array, df, by = "rowname")
 array2 <- array2 %>% 
         na.omit()
 
-#df %>% 
-#        filter(rowname == "cg00001510")      # missing values in array 2... why are they missing? follow up
-
-
-
-#for (i in 1: length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)){
-#index <- which(array2$ENTREZ == uniquecg[i,])
-#z <- array2[index,]
-#mygenes[[i]] <- z[,-1:-2]
-#}
-
-### funker men mangler å gi listene navnet til genene
-
-mygenes <- list()
-
-
-
-for (i in 1: length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)){
-        index <- which(array2$ENTREZ == uniquecg[i,])
-        z <- array2[index,]
-        mygenes[[(as.character(uniquecg[i,]))]] <- t(z[,-1:-2])
-        print(i)
-}
-
-### works, however it returns some empty lists -> datafiltering beforehand should ensure that there are no empty lists! 
-
-gene1 <- CGtoGENE2 %>% 
-        filter(ENTREZ == "1947") %>% 
-        rownames_to_column()
-
-left_join(gene1, df, by = "rowname") -> g1
-
-
-### i made new for loop that made the correct subsets, but its not saved... make again, should make output: mygenes2
-
-colnames(f_bVals) <- a
-
-
 
 ########################################################################
 ### create mygenes2 list again
 
 
-mygenes3 <- list()
+mygenes <- list()
 
 for (i in 1:length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)) {
         index <- which(array2$ENTREZ == uniquecg[i,])
         z <- array2[index,]
-        mygenes3[[(as.character(uniquecg[i,]))]] <- z$rowname
+        mygenes[[(as.character(uniquecg[i,]))]] <- z$rowname
         print(i)
         
 }
@@ -224,47 +186,37 @@ getwd()
 setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/")
 save.image(file = "gt_workspace.RData")
 
-mygenes4 = mygenes3
-
-
-for (i in 1:(length(mygenes3))) {
-        x <- length(mygenes3[[i]])
-        if(x<3){
-        y <- append(i)
-        }
-        print(i)
-}
+mygenes2 = mygenes
 
 
 # save removed lists in new list
 shortgenes <- list()
-shortgenes2 <- list()
 
 
-for (i in 1:(length(mygenes3))) {
-        x <- length(mygenes3[[i]])
-        if(x<3){
-                shortgenes[[(as.character(uniquecg[i,]))]] <- mygenes3[[i]]
-        }
-        print(i)
-}
-
-
-for (i in 1:(length(mygenes4))) {
-        x <- length(mygenes4[[i]])
-        if(x<3){
-                shortgenes[[i]] <- mygenes4[[i]]
-                mygenes4[i] <- NULL
+for (i in rev(1:(length(mygenes2)))) {
+        x <- length(mygenes2[[i]])
+        if(x<3){                                                                ### filter out genes with less than 3 cpgs
+                shortgenes[[(as.character(uniquecg[i,]))]] <- mygenes2[[i]]     ### list of filtered 
+                mygenes2[i] <- NULL
         }
         print(i)
 }
 
 
 
+# example of global test output, run via ebGSEA function. however it is missing direction of the change/statistic
 
-shortgenes["100616112"]
+gtResults <- myGSEA3[["gtResult"]]
 
-mygenes3[["100616112"]]
+
+#convert f_bVals to expressionSet
+
+
+
+library(Biobase)
+
+bVals<-new("ExpressionSet", exprs=as.matrix(f_bVals))
+
 
 ####################################################################################
 
@@ -273,7 +225,19 @@ mygenes3[["100616112"]]
 
 
 
-globalt <- gt(a ~., subsets = submygenes, data = t(f_bVals)) # doesn't work
+globalt <- gt(a ~., subsets = mygenes2, data = bVals) # doesn't work
+
+    
+
+
+
+
+
+
+gt_KEGG <- gtKEGG(a, bVals, probe2entrez = "eg", annotation = "org.Hs.eg.db")
+
+
+gtKEGG(a, bVals, annotation = "org.Hs.eg.db", p.adjust = "BH")
 
 
 
