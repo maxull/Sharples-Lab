@@ -6,7 +6,7 @@
 #----------------------------------------------------------------
 
 
-library(ggplot2); library(tidyverse); library(readxl);library(cowplot); library(gtsummary)
+library(ggplot2); library(tidyverse); library(readxl);library(cowplot); library(doBy); library(ggsignif); library(scales)
 
 dexa_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/DEXA/DEXA_data.xlsx")
 
@@ -26,8 +26,9 @@ dexa_data %>%
 
 dexa_data %>% 
         na.omit() %>% 
-        ggplot(aes(x = Timepoint, y = `Mager(g)_Legs`, color = FP))+
+        ggplot(aes(x = Timepoint, y = `Mager(g)_Legs`, color = FP, group = FP))+
         geom_point()+
+        geom_line()+
         theme_bw()
 
 
@@ -113,24 +114,93 @@ tbl_1 <- data1 %>%
 
 #################################################################################
 
+# plot dexa data change %
+df_change <- lean_dexa_change %>% 
+        na.omit()
+
+
+#absolute_change <- 
+        lean_dexa_change %>%
+        na.omit() %>% 
+        group_by(measure) %>% 
+        summarise(mean_change_gram = mean(change_gram),
+                  sd_change_gram = sd(change_gram),
+                  mean_percent = mean(percent_change),
+                  sd_percent = sd(percent_change)) %>% 
+        ggplot(aes(x = measure, y = mean_change_gram))+
+        geom_point(size = 2)+
+        geom_errorbar(aes(ymin = (mean_change_gram - sd_change_gram),
+                          ymax = (mean_change_gram + sd_change_gram)), width = 0.2)+
+        geom_point(data = lean_dexa_change, aes(x = measure, y = change_gram, color = FP))+
+        theme_classic()
+
+
+#percent_change <- 
+df_percent <- lean_dexa_change %>%
+        na.omit() %>% 
+        group_by(measure) %>% 
+        summarise(mean_change_gram = mean(change_gram)/100,
+                  sd_change_gram = sd(change_gram)/100,
+                  mean_percent = mean(percent_change)/100,
+                  sd_percent = sd(percent_change)/100) %>% 
+        mutate(measure = factor(measure, levels = c("lean_arms", "lean_legs", "lean_left_leg", "lean_right_leg", "lean_total")))
+
+        
+#p1 <- 
+ggplot(df_percent, aes(x = measure, y = mean_percent))+
+        geom_point(size = 2)+
+        geom_errorbar(data = df_percent, aes(ymin = (mean_percent - sd_percent),
+                          ymax = (mean_percent + sd_percent)), width = 0.2)+
+        geom_text(data = df_percent, aes(label = paste0(format(round(mean_percent*100, 2), nsmall = 2),"%"), fontface = "bold", hjust = -0.3))+
+        geom_point(data = df_change, aes(x = measure, y = percent_change/100, color = FP), size = 2)+
+        theme_classic(base_size = 15)+
+        scale_y_continuous(labels = percent,
+                           limits = c(0,0.13),
+                           expand = c(0,0))+
+        #geom_hline(yintercept = 0, linetype = 2, size = 1.5)+
+        theme(axis.title.x = element_blank(),
+              axis.ticks.x = element_blank(),
+              axis.line.x = element_blank(),
+              axis.text.x = element_text(size = 15, angle = 45, hjust = 0.9),
+              plot.title = element_text(size = 15))+
+        labs(y = "% change",
+             title = "DEXA")
+
+
+p1 + geom_text(data = df_change, aes(label = paste0(format(round(percent_change*100, 2), nsmall = 2),"%"), hjust = -0.3))
 
 
 
-t_dexa %>% 
-        ggplot(aes(Measurement, value, group = FP, color = FP))+
-        geom_point(position = position_dodge(width = 0.2))+
-        geom_line(position = position_dodge(width = 0.2))+
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
-### filter just legs, lean mass
 
-t_dexa %>% 
-        filter(Measurement %in% c("Mager(g)_Left_Leg",
-                                "Mager(g)_Right_Leg")) %>% 
-        ggplot(aes(Measurement, value, group = Timepoint, color = FP))+
-        geom_point(position = position_dodge(width = 0.2))+
-        geom_line(position = position_dodge(width = 0.2))+
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+
-        scale_x_discrete(labels = c("Left Leg", "Right Leg"))+
-        ylab("Lean mass (g)")
+
+
+ar <- lab_df %>% 
+        mutate(Timepoint = factor(Timepoint, levels = c("pre", "post")),
+               Condition = factor(Condition)) %>% 
+        group_by(Gene, Timepoint,Condition) %>% 
+        summarise(mean = mean(foldchange),
+                  sd = sd(foldchange)) %>%
+        filter(Gene == "AR",
+               Timepoint == "post") %>% 
+        mutate(mean = mean - 1) %>% 
+        ggplot(aes(x = Condition, y = mean))+
+        geom_point(size = 2)+
+        geom_text(aes(label = c("+121%", "+117%")), hjust = -0.5)+
+        geom_errorbar(aes(ymin = (mean - sd),
+                          ymax = (mean + sd)), width = 0.2)+
+        scale_y_continuous(labels = percent,
+                           limits = c(0,1.5))+
+        geom_hline(yintercept = 0, linetype = 2, size = 1.5)+
+        theme_classic(base_size = 15)+
+        theme(axis.title.x = element_blank(),
+              axis.ticks.x = element_blank(),
+              axis.line.x = element_blank(),
+              axis.text.x = element_text(size = 15),
+              plot.title = element_text(size = 15))+
+        labs(y = "AR % change",
+             title = "AR gene expression after acute resistance exercise")+
+        geom_signif(comparisons = list(c("40% - 20 Rep", "80% - 10 Rep")),
+                    annotations = "p = 0.95",
+                    tip_length = 0.01)
 
