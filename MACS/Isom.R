@@ -370,17 +370,7 @@ df_ext <- isom_df %>%
                change_60 = ((post_60 - baseline_60)/baseline_60)*100,
                change_90 = ((post_90 - baseline_90)/baseline_90)*100,)
 
-df_flex <- isom_df %>%
-        select(1,4,5,6,8,9) %>% 
-        filter(timepoint >= 2) %>%
-        mutate(timepoint = ifelse(timepoint == 2 , "baseline" , "post")) %>% 
-        filter(reps == 1) %>% 
-        mutate(names = paste(timepoint, angle, sep = "_")) %>% 
-        select(FP, names, t_max) %>% 
-        pivot_wider(names_from = names, values_from = t_max) %>% 
-        mutate(change_30 = ((post_30 - baseline_30)/baseline_30)*100,
-               change_60 = ((post_60 - baseline_60)/baseline_60)*100,
-               change_90 = ((post_90 - baseline_90)/baseline_90)*100,)
+
 
 
 # plot % change from baseline
@@ -395,11 +385,117 @@ df_ext_change <- df_ext %>%
         filter(test == c("change_30", "change_60", "change_90")) %>% 
         separate(test, into = c("timepoint", "angle"))
 
-df_ext_2 %>% 
-        ggplot(aes(x = timepoint, y = results, color = FP))+
-        geom_point()+
-        geom_line(aes(color = FP))+
-        facet_wrap(~angle)
+
+
+
+# % change extension plot
+
+
+
+isom_df2 <- df_ext_2 %>% 
+        pivot_wider(names_from = timepoint, values_from = results) %>% 
+        mutate(change = post - baseline,
+               percent_change = (change/baseline)*100) 
+
+isom_percent <- isom_df2 %>% 
+        na.omit() %>% 
+        group_by(angle) %>% 
+        summarise(mean_change = mean(change),
+                  sd_change = sd(change),
+                  mean_percent = mean(percent_change),
+                  sd_percent = sd(percent_change))
+        
+        
+
+
+ext_plot <- ggplot(data = isom_percent, aes(x = angle, y = mean_percent/100))+
+        geom_point(size = 2)+
+        geom_errorbar(data = isom_percent, aes(ymin = ((mean_percent - sd_percent)/100),
+                                             ymax = ((mean_percent + sd_percent)/100)), width = 0.2)+
+        geom_text(data = isom_percent, aes(label = paste0(format(round(mean_percent, 2), nsmall = 2),"%"), fontface = "bold", hjust = -0.3))+
+        geom_point(data = isom_df2, aes(x = angle, y = percent_change/100, color = FP), size = 2)+
+        theme_classic(base_size = 15)+
+        scale_y_continuous(labels = percent,
+                           limits = c(-0.5,1),
+                           expand = c(0,0))+
+        geom_hline(yintercept = 0, alpha = 0.5, size = 1)+
+        theme(axis.title.x = element_blank(),
+                axis.ticks.x = element_blank(),
+              axis.line.x = element_blank(),
+              axis.text.x = element_text(size = 15, vjust = 8),
+              plot.title = element_text(size = 15),
+              legend.position = "none")+
+        labs(y = "% change",
+             title = "ISOM extention")
+                
+
+
+
+# % flex plot
+
+df_flex <- isom_df %>%
+        select(1,4,5,6,8,9) %>% 
+        filter(timepoint >= 2) %>%
+        mutate(timepoint = ifelse(timepoint == 2 , "baseline" , "post")) %>% 
+        filter(reps == 1) %>% 
+        mutate(names = paste(timepoint, angle, sep = "_")) %>% 
+        select(FP, names, t_max) %>% 
+        pivot_wider(names_from = names, values_from = t_max) %>% 
+        mutate(change_30 = ((post_30 - baseline_30)/baseline_30)*100,
+               change_60 = ((post_60 - baseline_60)/baseline_60)*100,
+               change_90 = ((post_90 - baseline_90)/baseline_90)*100,)
+
+df_flex_2 <- df_flex %>% 
+        pivot_longer(cols = 2:10, names_to = "test", values_to = "results") %>% 
+        filter(test != c("change_30", "change_60", "change_90")) %>% 
+        separate(test, into = c("timepoint", "angle"))
+
+
+
+df_flex_3 <- df_flex_2 %>% 
+        pivot_wider(names_from = timepoint, values_from = results) %>% 
+        mutate(change = post - baseline,
+               percent_change = (change/baseline)*100) %>% 
+        filter(baseline > 20)           ### remove outlier
+
+isom_percent_flex <- df_flex_3 %>% 
+        na.omit() %>% 
+        group_by(angle) %>% 
+        summarise(mean_change = mean(change),
+                  sd_change = sd(change),
+                  mean_percent = mean(percent_change),
+                  sd_percent = sd(percent_change))
+
+
+flex_plot <- ggplot(data = isom_percent_flex, aes(x = angle, y = mean_percent/100))+
+        geom_point(size = 2)+
+        geom_errorbar(data = isom_percent_flex, aes(ymin = ((mean_percent - sd_percent)/100),
+                                               ymax = ((mean_percent + sd_percent)/100)), width = 0.2)+
+        geom_text(data = isom_percent_flex, aes(label = paste0(format(round(mean_percent, 2), nsmall = 2),"%"), fontface = "bold", hjust = -0.3))+
+        geom_point(data = df_flex_3, aes(x = angle, y = percent_change/100, color = FP), size = 2)+
+        theme_classic(base_size = 15)+
+        scale_y_continuous(labels = percent,
+                           limits = c(-0.5,1),
+                           expand = c(0,0))+
+        geom_hline(yintercept = 0, alpha = 0.5, size = 1)+
+        theme(axis.title.x = element_blank(),
+              axis.ticks.x = element_blank(),
+              axis.line.x = element_blank(),
+              axis.text.x = element_text(size = 15, vjust = 8),
+              plot.title = element_text(size = 15),
+              legend.position = "none",
+              axis.title.y = element_blank())+
+        labs(title = "ISOM flection")
+
+
+# plot extention and flection together
+
+isom_plot <- plot_grid(ext_plot, flex_plot, ncol = 2)
+
+
+
+
+
         
 df_flex_2 <- df_flex %>% 
         pivot_longer(cols = 2:10, names_to = "test", values_to = "results") %>% 

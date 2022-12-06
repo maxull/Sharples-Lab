@@ -146,7 +146,7 @@ df_percent <- lean_dexa_change %>%
         mutate(measure = factor(measure, levels = c("lean_arms", "lean_legs", "lean_left_leg", "lean_right_leg", "lean_total")))
 
         
-#p1 <- 
+dexa_plot <- 
 ggplot(df_percent, aes(x = measure, y = mean_percent))+
         geom_point(size = 2)+
         geom_errorbar(data = df_percent, aes(ymin = (mean_percent - sd_percent),
@@ -162,8 +162,11 @@ ggplot(df_percent, aes(x = measure, y = mean_percent))+
               axis.ticks.x = element_blank(),
               axis.line.x = element_blank(),
               axis.text.x = element_text(size = 15, angle = 45, hjust = 0.9),
-              plot.title = element_text(size = 15))+
+              plot.title = element_text(size = 15),
+              legend.position = "none")+
         labs(y = "% change",
              title = "DEXA")
 
 
+
+plot_grid(isom_plot, dexa_plot, ncol = 1)
