@@ -21,7 +21,6 @@ csa_df <- list()
 for (i in 1:length(sheets)) {
         x <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/CSA/MACS_CSA.xlsx", sheet = i)
         csa_df[[i]] <- as.data.frame(x)
-        names
         print(i)
 }
 
