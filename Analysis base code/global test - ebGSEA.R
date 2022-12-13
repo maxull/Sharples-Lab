@@ -265,3 +265,32 @@ gt.o <- gt(response = a, alternative = b, subsets = mygenes2)
 
 #funker ikke
 
+
+
+##########################################################################
+#######################################################################
+#############################################################################
+
+### chatGPT løsning
+
+# Load libraries
+library(tidyverse)
+library(limma)
+
+# Load the data
+data <- read.csv("methylation_data.csv")
+
+# Create the model matrix
+design <- model.matrix(~group, data)
+
+# Fit the model
+fit <- lmFit(data, design)
+
+# Perform the global test
+globalTest <- eBayes(fit, contrast=c(-1,1))
+
+# Extract the p-values
+pvals <- topTable(globalTest, coef=2, n=nrow(data))$P.Value
+
+# Print the p-values
+print(pvals)
