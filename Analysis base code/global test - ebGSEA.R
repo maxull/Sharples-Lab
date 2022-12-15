@@ -22,6 +22,8 @@ BiocManager::install("IlluminaHumanMethylationEPICanno.ilm10b2.hg19")
 
 BiocManager::install("IlluminaHumanMethylationEPICanno.ilm10b2.hg19")
 
+BiocManager::install("ebGSEA")
+
 
 library(wateRmelon); library(methylumi);library(FDb.InfiniumMethylation.hg19);library(minfi); library(tidyverse);library(ggplot2)
 library(tidyverse); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi);
@@ -273,6 +275,39 @@ gt.o <- gt(response = a, alternative = b, subsets = mygenes2)
 
 ### chatGPT løsning
 
+
+# prepare one gene dataset for chatGPT solution
+
+gene1 <- as.data.frame(mygenes2[["5934"]]) %>% 
+        select(cpgs = 1)
+
+
+df <- rownames_to_column(f_bVals, var = "cpgs")
+head(df)
+
+gene_df <- merge(gene1, df, by.x = "cpgs", by.y = "cpgs", all.x = TRUE)
+
+rownames(gene_df) <- gene_df$cpgs
+        
+gene_df1<- gene_df %>% 
+        select(!1) %>% 
+        t() %>% 
+        as.data.frame() %>% 
+        rownames_to_column()
+
+gene_df2 <- merge(gene_df1, pd_gt, by.x = "rowname", by.y = "colnames")
+
+data <- gene_df2 %>% 
+        select(group = Sample_Group, 2:29)
+
+
+data2 <- data %>% 
+        select(2:29)
+
+rownames(data2) <- data$group
+
+
+
 # Load libraries
 library(tidyverse)
 library(limma)
@@ -284,13 +319,53 @@ data <- read.csv("methylation_data.csv")
 design <- model.matrix(~group, data)
 
 # Fit the model
-fit <- lmFit(data, design)
+fit <- lmFit(t(data2), design)
 
 # Perform the global test
-globalTest <- eBayes(fit, contrast=c(-1,1))
+globalTest <- eBayes(fit)
 
 # Extract the p-values
 pvals <- topTable(globalTest, coef=2, n=nrow(data))$P.Value
 
 # Print the p-values
 print(pvals)
+
+
+
+eBayes(fit)
+
+
+topTable(globalTest, n = Inf)
+
+dim(globalTest)
+names(globalTest)
+volcanoplot(globalTest)
+plotMD(globalTest)
+
+
+
+
+gt(response = (as.numeric(as.factor(data$group))-1), alternative = data2, model = "logistic", direction = FALSE, permutations = 0)
+
+
+
+data3 = data2
+
+data3$group = (as.numeric(as.factor(data$group))-1)
+
+x = colnames(data2)
+
+y = data3 %>% 
+        mutate(average = rowMeans(data3)) %>% 
+        group_by(group) %>% 
+        summarize(mean = mean(average))
+
+z <- y$mean        
+
+z[2]-z[1]
+
+
+
+
+
+
