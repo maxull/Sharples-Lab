@@ -343,11 +343,11 @@ volcanoplot(globalTest)
 plotMD(globalTest)
 
 
-
+# run gt on gene 1
 
 gt(response = (as.numeric(as.factor(data$group))-1), alternative = data2, model = "logistic", direction = FALSE, permutations = 0)
 
-
+# works
 
 data3 = data2
 
@@ -362,10 +362,29 @@ y = data3 %>%
 
 z <- y$mean        
 
-z[2]-z[1]
+# 0 = 7wk_loading, 
+# 1 = baseline
+
+# 0-1
+z[1]-z[2]
 
 
 
+# run gt on all subsets
+
+gt_results <- gt(response = (as.numeric(as.factor(data$group))-1), alternative = t(f_bVals), model = "logistic", direction = FALSE, permutations = 0, subsets = mygenes2)
+
+gt_results_df <- as.data.frame(gt_results@result)
+
+# worked wohoooo
 
 
+summary(gt_results)
+
+z.score(gt_results)
+
+covariates(gt_results[[2]])
+
+subjects(gt_results[[2]])
+sort(gt_results)
 
