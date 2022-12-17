@@ -374,15 +374,30 @@ z[1]-z[2]
 
 gt_results <- gt(response = (as.numeric(as.factor(data$group))-1), alternative = t(f_bVals), model = "logistic", direction = FALSE, permutations = 0, subsets = mygenes2)
 
-gt_results_df <- as.data.frame(gt_results@result)
+gt_results_df <- as.data.frame(gt_results@result) %>% 
+        rownames_to_column(var = "gene")
 
 # worked wohoooo
 
 
 summary(gt_results)
 
-z.score(gt_results)
+z_score <- as.data.frame(z.score(gt_results)) %>% # use z-score to determine direction of methylation regulation
+        mutate(direction = if_else(z.score(gt_results)<0, "hypo", "hyper")) %>% 
+        rownames_to_column(var = "gene") %>% 
+        select(1,3)
+        
+gt_merged <- merge(gt_results_df, z_score, by = "gene")
 
+table(unlist(z_score$direction)) # unfiltered counts of hyper and hypo methylated genes
+
+
+gt_merged_flt <- gt_merged %>% 
+        filter(`p-value`< 0.05)
+
+table(unlist(gt_merged_flt$direction))
+
+        
 covariates(gt_results[[2]])
 
 subjects(gt_results[[2]])
