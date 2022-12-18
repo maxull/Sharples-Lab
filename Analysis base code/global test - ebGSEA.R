@@ -24,6 +24,8 @@ BiocManager::install("IlluminaHumanMethylationEPICanno.ilm10b2.hg19")
 
 BiocManager::install("ebGSEA")
 
+BiocManager::install("ENmix")
+
 
 library(wateRmelon); library(methylumi);library(FDb.InfiniumMethylation.hg19);library(minfi); library(tidyverse);library(ggplot2)
 library(tidyverse); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi);
@@ -211,63 +213,6 @@ for (i in rev(1:(length(mygenes2)))) {
 gtResults <- myGSEA3[["gtResult"]]
 
 
-#convert f_bVals to expressionSet
-
-
-
-library(Biobase)
-
-bVals<-new("ExpressionSet", exprs=as.matrix(f_bVals))
-
-
-####################################################################################
-
-
-
-
-
-
-globalt <- gt(a ~., subsets = mygenes2, data = bVals) # doesn't work
-
-    
-
-
-
-
-
-
-gt_KEGG <- gtKEGG(a, bVals, probe2entrez = "eg", annotation = "org.Hs.eg.db")
-
-
-gtKEGG(a, bVals, annotation = "org.Hs.eg.db", p.adjust = "BH")
-
-
-
-
-# test one gene
-
-one_gene <- as.data.frame(mygenes[[1]])
-one_gene$timepoint <- a
-
-###doesnt work
-
-
-globalt <- gt(one_gene$timepoint~1, timepoint ~. , data = one_gene, model = "linear")   # doesnt work
-### test gt
-submygenes <- mygenes[3:12]
-
-
-nrep.v <- unlist(submygenes, length)
-selG.idx <- which(nrep.v>0)
-a <- pd_gt$Sample_Group
-b<- t(f_bVals)
-
-
-gt.o <- gt(response = a, alternative = b, subsets = mygenes2)
-
-#funker ikke
-
-
 
 ##########################################################################
 #######################################################################
@@ -375,7 +320,7 @@ z[1]-z[2]
 gt_results <- gt(response = (as.numeric(as.factor(data$group))-1), alternative = t(f_bVals), model = "logistic", direction = FALSE, permutations = 0, subsets = mygenes2)
 
 gt_results_df <- as.data.frame(gt_results@result) %>% 
-        rownames_to_column(var = "gene")
+        rownames_to_column(var = "entrezid")
 
 # worked wohoooo
 
@@ -384,10 +329,10 @@ summary(gt_results)
 
 z_score <- as.data.frame(z.score(gt_results)) %>% # use z-score to determine direction of methylation regulation
         mutate(direction = if_else(z.score(gt_results)<0, "hypo", "hyper")) %>% 
-        rownames_to_column(var = "gene") %>% 
+        rownames_to_column(var = "entrezid") %>% 
         select(1,3)
         
-gt_merged <- merge(gt_results_df, z_score, by = "gene")
+gt_merged <- merge(gt_results_df, z_score, by = "entrezid")
 
 table(unlist(z_score$direction)) # unfiltered counts of hyper and hypo methylated genes
 
@@ -403,3 +348,71 @@ covariates(gt_results[[2]])
 subjects(gt_results[[2]])
 sort(gt_results)
 
+
+# z score df
+
+z_b <- as.data.frame(z.score(gt_results)) %>% 
+        rownames_to_column(var = "entrezid")
+
+gt_bvals <- as.data.frame(merge(gt_results_df, z_b, by = "entrezid"))
+
+saveRDS(gt_mvals, file = "/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/gt_mvals.RDATA")
+
+################################################################################
+###
+### run global test on M-values 
+
+library(ENmix)
+
+m_vals <- B2M(f_bVals)
+
+gt_results_m <- gt(response = (as.numeric(as.factor(data$group))-1), alternative = t(m_vals), model = "logistic", direction = FALSE, permutations = 0, subsets = mygenes2)
+
+gt_results_mdf <- as.data.frame(gt_results_m@result) %>% 
+        rownames_to_column(var = "entrezid")
+
+z_score_m <- as.data.frame(z.score(gt_results_m)) %>% # use z-score to determine direction of methylation regulation
+        mutate(direction = if_else(z.score(gt_results_m)<0, "hypo", "hyper")) %>% 
+        rownames_to_column(var = "entrezid") %>% 
+        select(1,3)
+
+gt_merged_m <- merge(gt_results_mdf, z_score_m, by = "entrezid")
+
+table(unlist(z_score_m$direction)) # unfiltered counts of hyper and hypo methylated genes
+
+gt_merged_flt_m <- gt_merged_m %>% 
+        filter(`p-value`< 0.05)
+
+table(unlist(gt_merged_flt_m$direction))
+
+# create df of gt results with z score
+
+z_m <- as.data.frame(z.score(gt_results_m)) %>% 
+        rownames_to_column(var = "entrezid")
+
+gt_mvals <- as.data.frame(merge(gt_results_mdf, z_m, by = "entrezid"))
+
+
+##############################################################################################################
+
+### add alias gene names and save to files
+
+gene_names <- MatchGeneName %>% 
+        select(entrezid = V3, alias = V2 )
+
+GT_bvals <- merge(gt_bvals, gene_names, by = "entrezid") %>% 
+        select(1,8,2:7)
+
+GT_mvals <- merge(gt_mvals, gene_names, by = "entrezid") %>% 
+        select(1,8,2:7)
+
+saveRDS(GT_mvals, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/GT_mvals.RDATA")
+saveRDS(GT_bvals, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/GT_bvals.RDATA")
+
+saveRDS(gt_results, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/gt_results_b.RDATA" )
+saveRDS(gt_results_m, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/gt_results_m.RDATA" )
+
+
+
+write.csv(GT_mvals, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/GT_mvals.csv")
+write.csv(GT_bvals, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/GT_bvals.csv")
