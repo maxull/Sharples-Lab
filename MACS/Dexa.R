@@ -15,7 +15,7 @@ dexa_data %>%
         na.omit() %>% 
         ggplot(aes(Height, Weight, color = FP))+
         geom_point(size = 2)+
-        theme_bw()
+        theme_classic()
 
 dexa_data %>% 
         na.omit() %>% 
@@ -50,7 +50,7 @@ df <- dexa_data %>%
         mutate(lean_total_change = (.[[3]]-.[[2]]),
                lean_arms_change = (.[[5]]-.[[4]]),
                lean_legs_change = (.[[7]]-.[[6]]),
-               lean_left_leg_change = (.[[9]]-.[[8]]),
+               lean_left_leg_change = (.[[9]]-.[[8]]),             #this variable is change
                lean_right_leg_change = (.[[11]]-.[[10]]),
                "lean_right_leg_change_%" =  (((.[[11]]-.[[10]])/.[[10]])*100),
                "lean_total_change_%" =  (((.[[3]]-.[[2]])/.[[2]])*100),
