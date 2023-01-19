@@ -416,3 +416,11 @@ saveRDS(gt_results_m, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master
 
 write.csv(GT_mvals, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/GT_mvals.csv")
 write.csv(GT_bvals, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/GT_bvals.csv")
+
+
+
+
+############################################################################################################
+
+### read patways data
+install
