@@ -477,7 +477,7 @@ UBR5 %>%
 
 library(heatmaply)
 
-mat <- as.matrix(head(f_bVals, n = 1000))
+mat <- as.matrix(head(f_bVals, n = 100000))
 
 heatmaply(mat,
           dendrogram = "none",
@@ -501,4 +501,5 @@ p <- heatmaply(mat,
                heatmap_layers = theme(axis.line=element_blank())
 )
 
+heatmap(mat, Colv = NA, Rowv = NA)    # heatmap without clustering works, but give no info...
 

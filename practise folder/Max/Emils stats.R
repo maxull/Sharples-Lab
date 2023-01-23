@@ -1,6 +1,6 @@
 # emils stats
 
-library(readxl); library(ggplot2); library(multcomp)
+library(readxl); library(ggplot2); library(multcomp); library(tidyverse)
 
 
 kroppsvekt <- read_excel("/Users/maxul/Downloads/Pre_kroppsvekt.xlsx")
@@ -25,11 +25,24 @@ summary(post_test)
 
 mod <- lm(`Total supine Force (N)`~Age + Vekt, data = abs_df)
 
-
-
 summary(mod)
 
 
+mod2 <- lm(abs_df$`Total 90deg Force (N)` ~ Age + Vekt, data = abs_df)
+
+summary(mod2)
+
+
+mod3 <- lm(abs_df$`Total Force CF (N)` ~ Age + Vekt, data = abs_df)
+
+summary(mod3)
+
+mod3 <- lm(abs_df$`Total Force CF (N)` ~ Position, data = abs_df)
+
+
 abs_df %>% 
-        ggplot(aes(x = Vekt, y = `Total supine Force (N)`))+
+        ggplot(aes(x = Position, y = `Total Force CF (N)`))+
         geom_point()
+
+r2 <- (cor(x = abs_df$Vekt, abs_df$`Total Force CF (N)`)^2)
+
