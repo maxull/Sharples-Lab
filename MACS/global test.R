@@ -72,7 +72,7 @@ for (i in 1:length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)) {
 }
 
 
-# filter elements woth less than 3 element
+# filter elements with less than 3 element
 
 mygenes2 = mygenes
 shortgenes = list()
@@ -141,10 +141,4 @@ globalt <- gt(a ~., subsets = mygenes2, data = t(f_bVals)) # doesn't work/runs f
 subset <- head(mygenes2, n = 3)
 
 globalt <- gt(a ~., subsets = subset, data = t(f_bVals)) 
-
-
-
-
-
-
 
