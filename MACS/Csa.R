@@ -67,10 +67,7 @@ ggplot(data = mean_df2, aes(x = muscle, y = mean/100))+
         geom_text(data = mean_df2, aes(label = paste0(format(round(mean, 2), nsmall = 2),"%")), fontface = "bold", hjust = -0.3)+
         geom_point(data = df2, aes(y = change/100, color = FP), size = 2)+
         theme_classic(base_size = 15)+
-        scale_y_continuous(labels = percent)
-        
-        
-        scale_y_continuous(labels = percent,
+        scale_y_continuous(,
                            limits = c(0,0.3),
                            expand = c(0,0))+
         geom_hline(yintercept = 0, alpha = 0.5, size = 1)+
