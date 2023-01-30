@@ -67,23 +67,50 @@ ggplot(data = mean_df2, aes(x = muscle, y = mean/100))+
         geom_text(data = mean_df2, aes(label = paste0(format(round(mean, 2), nsmall = 2),"%")), fontface = "bold", hjust = -0.3)+
         geom_point(data = df2, aes(y = change/100, color = FP), size = 2)+
         theme_classic(base_size = 15)+
-        scale_y_continuous(,
+        scale_y_continuous(labels = scales::percent,
                            limits = c(0,0.3),
                            expand = c(0,0))+
         geom_hline(yintercept = 0, alpha = 0.5, size = 1)+
         theme(axis.title.x = element_blank(),
               axis.ticks.x = element_blank(),
               axis.line.x = element_blank(),
-              axis.text.x = element_text(size = 15, vjust = 8),
+              axis.text.x = element_text(size = 15, vjust = 0),
               plot.title = element_text(size = 15),
               legend.position = "none")+
         labs(y = "% change",
              title = "CSA")
         
 
+########################################################################
 
+### correlate CSA change and dexa left leg change
+### load lean_dexa_change from dexa script
 
+lean_dexa_change %>% 
+        na.omit() %>% 
+        filter(measure == "lean_left_leg") %>% 
+        select(1, "lean_left_leg_change" = 4)-> dexa_change_df
 
+df2 %>% 
+        select(1,2,7) %>% 
+        pivot_wider(values_from = change, names_from = muscle)-> csa_change
+
+corr_dexa_csa <- merge(dexa_change_df, csa_change, by = "FP")
+        
+corr_dexa_csa %>% 
+        ggplot(aes(x=lean_left_leg_change, y = RF))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        annotate(geom = "text", label = (cor(corr_dexa_csa$lean_left_leg_change, corr_dexa_csa$RF)),
+                 x = 10, y = 30)
+
+corr_dexa_csa %>% 
+        ggplot(aes(x=lean_left_leg_change, y = VL))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        annotate(geom = "text", label = (cor(corr_dexa_csa$lean_left_leg_change, corr_dexa_csa$VL)),
+                 x = 10, y = 27)+
+        geom_text(data = corr_dexa_csa, aes(label = FP), hjust = -0.1)
 
 
 
