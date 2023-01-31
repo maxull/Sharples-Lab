@@ -147,10 +147,13 @@ csa_data %>%
         geom_point()+
         expand_limits(y = 0)
 
-#### create mean and sd line and point chart for participant MACS_001
+#### create mean and sd line and point chart for participant
+
+for (i in unique(df$FP)) {
         
-p1 <- csa_data %>%
-        filter(FP == "MACS_001") %>% 
+
+p1 <- df %>%
+        filter(FP == (i)) %>% 
         group_by(timepoint, muscle) %>% 
         summarise(mean = mean(cm2),
                   sd = sd(cm2)) %>% 
@@ -158,17 +161,18 @@ p1 <- csa_data %>%
         ggplot(aes(x = timepoint, y = mean, group = muscle))+
         geom_errorbar(aes(ymin = (mean-sd),
                           ymax = (mean+sd)),
-                      width = 0.2)+
-        geom_point()+
-        geom_line()+
+                      width = 0.2, size = 1.2)+
+        geom_point(size = 2)+
+        geom_line(size = 1.2)+
         theme_classic()+
         labs(y = "cm^2 (mean ± sd)",
              x = "",
-             title = "MACS_001 RF")+
-        theme(axis.title.y = element_text(face = "bold"))
+             title = "Rectus femoris")+
+        theme(axis.title.y = element_text(face = "bold"))+
+        geom_text(aes(label = paste(round(mean, digits = 2),"cm^2"), y = mean+sd, vjust = -1))
         
-p2 <- csa_data %>%
-        filter(FP == "MACS_001") %>% 
+p2 <- df %>%
+        filter(FP == (i)) %>% 
         group_by(timepoint, muscle) %>% 
         summarise(mean = mean(cm2),
                   sd = sd(cm2)) %>% 
@@ -176,17 +180,23 @@ p2 <- csa_data %>%
         ggplot(aes(x = timepoint, y = mean, group = muscle))+
         geom_errorbar(aes(ymin = (mean-sd),
                           ymax = (mean+sd)),
-                      width = 0.2)+
-        geom_point()+
-        geom_line()+
+                      width = 0.2, size = 1.2)+
+        geom_point(size = 2)+
+        geom_line(size = 1.2)+
         theme_classic()+
         labs(y = "",
              x = "",
-             title = "MACS_001 VL")
+             title = "Vastus lateralis")+
+        geom_text(aes(label = paste(round(mean, digits = 2),"cm^2"), y = mean+sd, vjust = -1))
 
-plot_grid(p1, p2, ncol = 2)
+p3 <- plot_grid(p1, p2, ncol = 2)
 
+ggsave(filename  = paste("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/CSA/", (i),".png", sep = ""), 
+       plot = p3,
+       units = "cm",
+       height = 27,
+       width = 25)
+print(i)
 
-
-
+}
 
