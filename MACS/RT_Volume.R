@@ -8,14 +8,43 @@
 
 library(ggplot2); library(tidyverse); library(readxl);library(cowplot); library(doBy)
 
-RT_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/RT/MACS_001.xlsx")
+RT_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/RT/MACS_001.xlsx", na = "NA")
 
 RT_data %>% 
-        tail(15) %>% 
-        ggplot(aes(x = Week, y = `Leg ekstensjon`))+
-        geom_point(size=2)+
-        geom_line()+
+        ggplot(aes(x = Session, y = Leg_ekstensjon))+
+        geom_point(size=2, aes(color = FP))+
         geom_smooth(method = "lm")
+
+
+RT_mean <- RT_data %>% 
+        na.omit() %>% 
+        filter(v_total != 0) %>% 
+        group_by(Session) %>% 
+        summarise(mean = mean(v_total),
+                  sd = sd(v_total))
+
+RT_data %>% 
+        filter(v_total != 0) %>% 
+        na.omit() -> RT_df
+        
+
+
+ggplot(data = RT_mean, aes(x = Session, y = mean))+
+        geom_point(size = 3)+
+        geom_errorbar(data = RT_mean, aes(ymin = mean-sd,
+                                          ymax = mean+sd), width = 0.2, size = 1.2)+
+        geom_line(size = 1.2)+
+        geom_point(data = RT_df, aes(y = v_total),alpha = 0.2, size = 2)+
+        geom_line(data = RT_df, aes(y = v_total, group = FP), alpha = 0.2, size = 1.22)+
+        scale_y_continuous(expand = c(0,0),
+                           limits = c(0,(max(RT_df$v_total))),
+                           n.breaks = 10)+
+        scale_x_continuous(n.breaks = 16)+
+        theme_classic()
+
+
+
+
 
 ### without familiarization week
 
@@ -155,10 +184,9 @@ ggsave("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/isom_plot.png",
 
 # plot only leg volume
 
-# mean and sd is mean across all timepoints... fix this
+# mean and sd is mean across all timepoints
 
-mean_RT <- summaryBy(v_total ~Week, data = RT_data, FUN = c(mean, sd)) %>% 
-        filter(Week >= 3)
+
 
 mean_RT <- RT_data %>% 
         group_by(Week) %>% 

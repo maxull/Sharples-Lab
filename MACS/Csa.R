@@ -112,7 +112,13 @@ corr_dexa_csa %>%
                  x = 10, y = 27)+
         geom_text(data = corr_dexa_csa, aes(label = FP), hjust = -0.1)
 
-
+corr_dexa_csa %>% 
+        ggplot(aes(x=RF, y = VL))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        annotate(geom = "text", label = (cor(corr_dexa_csa$RF, corr_dexa_csa$VL)),
+                 x = 10, y = 27)+
+        geom_text(data = corr_dexa_csa, aes(label = FP), hjust = -0.1)
 
 
 
