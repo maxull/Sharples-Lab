@@ -127,26 +127,6 @@ corr_dexa_csa %>%
 
 ################################################################################
 
-### plotted MACS_001 data
-
-csa_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/CSA/MACS_CSA.xlsx")
-
-
-### plot RF
-
-csa_data %>%
-        filter(muscle == "RF") %>% 
-        ggplot(aes(x = timepoint, y = cm2))+ 
-        geom_boxplot()+
-        expand_limits(y = 0)
-
-csa_data %>%
-        filter(muscle == "VL") %>% 
-        ggplot(aes(x = timepoint, y = cm2))+ 
-        geom_boxplot()+
-        geom_point()+
-        expand_limits(y = 0)
-
 #### create mean and sd line and point chart for participant
 
 for (i in unique(df$FP)) {
