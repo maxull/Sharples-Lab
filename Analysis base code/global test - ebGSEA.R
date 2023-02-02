@@ -28,7 +28,7 @@ BiocManager::install("ENmix")
 
 
 library(wateRmelon); library(methylumi);library(FDb.InfiniumMethylation.hg19);library(minfi); library(tidyverse);library(ggplot2)
-library(tidyverse); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi);
+library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi);
 library(reshape2)
 
 mypath <- getwd()
@@ -423,4 +423,51 @@ write.csv(GT_bvals, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/G
 ############################################################################################################
 
 ### read patways data
-install
+
+
+
+
+############################################################################3
+
+### visualize global test per gene
+
+
+##### check if UBR5 exists in the annEPIC annotation data
+
+gtResults %>% 
+        rownames_to_column() %>% 
+        filter(rowname == "UBR5")
+
+# global test from champ package includes 42 CpG sites for UBR5
+
+annEPIC$UCSC_RefGene_Name %>% 
+        as.data.frame() %>% 
+        filter(. == "UBR5")
+
+MatchGeneName %>% 
+        filter(V2 == "UBR5")
+
+# isolate df og UBR5 cpgs
+
+UBR5 <- mygenes$'51366' %>% 
+        as.data.frame() %>% 
+        mutate(condition = as.data.frame(a)) %>%
+        pivot_longer(names_to = "cpg", values_to = "b_val", cols = '6297':'600991' ) %>% 
+        arrange(as.numeric(cpg))
+
+UBR5_lvl <- unique(UBR5$cpg)
+
+UBR5$cpg <- factor(UBR5$cpg, levels = UBR5_lvl)
+
+# visualize globa test of UBR5 gene
+        
+UBR5 %>% 
+        ggplot(aes(x = cpg, y = b_val, color = condition$a, group = condition$a))+
+        geom_point()+
+        geom_smooth(method = "loess")+
+        theme_classic()+
+        theme(axis.text.x = element_text(angle = 90))
+
+
+
+

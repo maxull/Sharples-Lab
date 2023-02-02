@@ -67,28 +67,58 @@ ggplot(data = mean_df2, aes(x = muscle, y = mean/100))+
         geom_text(data = mean_df2, aes(label = paste0(format(round(mean, 2), nsmall = 2),"%")), fontface = "bold", hjust = -0.3)+
         geom_point(data = df2, aes(y = change/100, color = FP), size = 2)+
         theme_classic(base_size = 15)+
-        scale_y_continuous(labels = percent)
-        
-        
-        scale_y_continuous(labels = percent,
+        scale_y_continuous(labels = scales::percent,
                            limits = c(0,0.3),
                            expand = c(0,0))+
         geom_hline(yintercept = 0, alpha = 0.5, size = 1)+
         theme(axis.title.x = element_blank(),
               axis.ticks.x = element_blank(),
               axis.line.x = element_blank(),
-              axis.text.x = element_text(size = 15, vjust = 8),
+              axis.text.x = element_text(size = 15, vjust = 0),
               plot.title = element_text(size = 15),
               legend.position = "none")+
         labs(y = "% change",
              title = "CSA")
         
 
+########################################################################
 
+### correlate CSA change and dexa left leg change
+### load lean_dexa_change from dexa script
 
+lean_dexa_change %>% 
+        na.omit() %>% 
+        filter(measure == "lean_left_leg") %>% 
+        select(1, "lean_left_leg_change" = 4)-> dexa_change_df
 
+df2 %>% 
+        select(1,2,7) %>% 
+        pivot_wider(values_from = change, names_from = muscle)-> csa_change
 
+corr_dexa_csa <- merge(dexa_change_df, csa_change, by = "FP")
+        
+corr_dexa_csa %>% 
+        ggplot(aes(x=lean_left_leg_change, y = RF))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        annotate(geom = "text", label = (cor(corr_dexa_csa$lean_left_leg_change, corr_dexa_csa$RF)),
+                 x = 10, y = 30)
 
+corr_dexa_csa %>% 
+        ggplot(aes(x=lean_left_leg_change, y = VL))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        annotate(geom = "text", label = (cor(corr_dexa_csa$lean_left_leg_change, corr_dexa_csa$VL)),
+                 x = 10, y = 27)+
+        geom_text(data = corr_dexa_csa, aes(label = FP), hjust = -0.1)
+
+corr_dexa_csa %>% 
+        ggplot(aes(x=RF, y = VL))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        annotate(geom = "text", label = (cor(corr_dexa_csa$RF, corr_dexa_csa$VL)),
+                 x = 10, y = 27)+
+        geom_text(data = corr_dexa_csa, aes(label = FP), hjust = -0.1)
 
 
 
@@ -97,30 +127,13 @@ ggplot(data = mean_df2, aes(x = muscle, y = mean/100))+
 
 ################################################################################
 
-### plotted MACS_001 data
+#### create mean and sd line and point chart for participant
 
-csa_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/CSA/MACS_CSA.xlsx")
-
-
-### plot RF
-
-csa_data %>%
-        filter(muscle == "RF") %>% 
-        ggplot(aes(x = timepoint, y = cm2))+ 
-        geom_boxplot()+
-        expand_limits(y = 0)
-
-csa_data %>%
-        filter(muscle == "VL") %>% 
-        ggplot(aes(x = timepoint, y = cm2))+ 
-        geom_boxplot()+
-        geom_point()+
-        expand_limits(y = 0)
-
-#### create mean and sd line and point chart for participant MACS_001
+for (i in unique(df$FP)) {
         
-p1 <- csa_data %>%
-        filter(FP == "MACS_001") %>% 
+
+p1 <- df %>%
+        filter(FP == (i)) %>% 
         group_by(timepoint, muscle) %>% 
         summarise(mean = mean(cm2),
                   sd = sd(cm2)) %>% 
@@ -128,17 +141,18 @@ p1 <- csa_data %>%
         ggplot(aes(x = timepoint, y = mean, group = muscle))+
         geom_errorbar(aes(ymin = (mean-sd),
                           ymax = (mean+sd)),
-                      width = 0.2)+
-        geom_point()+
-        geom_line()+
+                      width = 0.2, size = 1.2)+
+        geom_point(size = 2)+
+        geom_line(size = 1.2)+
         theme_classic()+
         labs(y = "cm^2 (mean ± sd)",
              x = "",
-             title = "MACS_001 RF")+
-        theme(axis.title.y = element_text(face = "bold"))
+             title = "Rectus femoris")+
+        theme(axis.title.y = element_text(face = "bold"))+
+        geom_text(aes(label = paste(round(mean, digits = 2),"cm^2"), y = mean+sd, vjust = -1))
         
-p2 <- csa_data %>%
-        filter(FP == "MACS_001") %>% 
+p2 <- df %>%
+        filter(FP == (i)) %>% 
         group_by(timepoint, muscle) %>% 
         summarise(mean = mean(cm2),
                   sd = sd(cm2)) %>% 
@@ -146,17 +160,23 @@ p2 <- csa_data %>%
         ggplot(aes(x = timepoint, y = mean, group = muscle))+
         geom_errorbar(aes(ymin = (mean-sd),
                           ymax = (mean+sd)),
-                      width = 0.2)+
-        geom_point()+
-        geom_line()+
+                      width = 0.2, size = 1.2)+
+        geom_point(size = 2)+
+        geom_line(size = 1.2)+
         theme_classic()+
         labs(y = "",
              x = "",
-             title = "MACS_001 VL")
+             title = "Vastus lateralis")+
+        geom_text(aes(label = paste(round(mean, digits = 2),"cm^2"), y = mean+sd, vjust = -1))
 
-plot_grid(p1, p2, ncol = 2)
+p3 <- plot_grid(p1, p2, ncol = 2)
 
+ggsave(filename  = paste("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/CSA/", (i),".png", sep = ""), 
+       plot = p3,
+       units = "cm",
+       height = 27,
+       width = 25)
+print(i)
 
-
-
+}
 
