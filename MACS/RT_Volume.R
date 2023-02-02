@@ -8,7 +8,7 @@
 
 library(ggplot2); library(tidyverse); library(readxl);library(cowplot); library(doBy)
 
-RT_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/RT/MACS_001.xlsx", na = "NA")
+RT_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/RT/RT_data.xlsx", na = "NA")
 
 RT_data %>% 
         ggplot(aes(x = Session, y = Leg_ekstensjon))+
