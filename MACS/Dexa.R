@@ -6,30 +6,10 @@
 #----------------------------------------------------------------
 
 
-library(ggplot2); library(tidyverse); library(readxl);library(cowplot); library(doBy); library(ggsignif); library(scales)
+library(ggplot2); library(tidyverse); library(readxl);library(cowplot); library(doBy); library(ggsignif); library(scales); library(gtsummary)
 
 dexa_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/DEXA/DEXA_data.xlsx")
 
-
-dexa_data %>% 
-        na.omit() %>% 
-        ggplot(aes(Height, Weight, color = FP))+
-        geom_point(size = 2)+
-        theme_classic()
-
-dexa_data %>% 
-        na.omit() %>% 
-        ggplot(aes(x = Timepoint, y = `Mager(g)_Total`, color = FP))+
-        geom_point()+
-        theme_bw()
-
-
-dexa_data %>% 
-        na.omit() %>% 
-        ggplot(aes(x = Timepoint, y = `Mager(g)_Legs`, color = FP, group = FP))+
-        geom_point()+
-        geom_line()+
-        theme_bw()
 
 
 ###### plot left and right leg on same plot
@@ -38,9 +18,6 @@ dexa_data %>%
         na.omit() %>% 
         pivot_longer(cols = 7:16, names_to = "Measurement")-> t_dexa
 
-dexa_data %>% 
-        pivot_wider(names_from = Timepoint, values_from = 7:16)
-    
 
 
 df <- dexa_data %>% 
@@ -73,32 +50,17 @@ df3 <- df %>%
 lean_dexa_change <- merge(df3, df2, by = c("FP", "measure"))
 
 
-df4 <- t_dexa %>% 
-        select(1,3,7,8) %>% 
-        pivot_wider(names_from = Timepoint, values_from = value) %>% 
-        filter(FP == "MACS_001") %>% 
-        head(5) %>% 
-        slice(2:5,1) %>% 
-        select(1,2,3,4)
-
-df5 <- lean_dexa_change %>% 
-        head(5)
 
 
 #########################################################################3
 #option to use tbl_summary to create table
 
 
-t_dexa %>% 
-        select(1,3,7,gram = 8) %>% 
-        filter(FP == "MACS_001",
-               Measurement == m_df[1:5]) %>% 
-        tbl_summary(by = "Timepoint")
-
-dexa_data %>% 
-        select(1,3,7:11) %>% 
+lean_dexa_change %>%  
         filter(FP == "MACS_001") %>% 
-        tbl_summary(by = "Timepoint")
+        pivot_longer(names_to = "change", values_to = "value", cols = 3:4) %>% 
+        tbl_summary(by = change,
+                    statistic = value~"{mean}")
 
 
 
