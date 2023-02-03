@@ -10,10 +10,6 @@ library(ggplot2); library(tidyverse); library(readxl);library(cowplot); library(
 
 RT_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/RT/RT_data.xlsx", na = "NA")
 
-RT_data %>% 
-        ggplot(aes(x = Session, y = Leg_ekstensjon))+
-        geom_point(size=2, aes(color = FP))+
-        geom_smooth(method = "lm")
 
 
 RT_mean <- RT_data %>% 
@@ -36,13 +32,13 @@ ggplot(data = RT_df, aes(x = Session-2, y  = v_total))+
         geom_errorbar(data = RT_mean, aes(x = Session-2, ymin = (mean-sd), ymax = (mean+sd)), inherit.aes = FALSE, width = 0.2, size = 1.1)+
         geom_line(data = RT_mean, aes(y = mean), size = 1.2)+
         scale_y_continuous(expand = c(0,0),
-                           limits = c(0,(max(RT_df$v_total))),
+                           limits = c(0,27500),
                            n.breaks = 10)+
         scale_x_continuous(n.breaks = 16)+
         theme_classic()+
         labs(y = "Volume load (KG*REPS*SETS)",
              x = "Training session")+
-        geom_text(data = RT_mean, aes(label = as.integer(mean), x = Session-2, y = mean-sd), inherit.aes = FALSE, vjust = 3)
+        geom_text(data = RT_mean, aes(label = as.integer(mean), x = Session-2, y = mean-sd), inherit.aes = FALSE, vjust = 3, size = 3)
 
 
 
