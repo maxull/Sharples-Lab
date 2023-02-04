@@ -180,3 +180,32 @@ print(i)
 
 }
 
+
+####################################################################
+
+### calculate cv within each timepoint and from T1 to T2
+
+
+df %>% 
+        group_by(FP, timepoint, muscle) %>% 
+        summarise(cv = sd(cm2)/mean(cm2)*100) %>% 
+        group_by(muscle) %>% 
+        summarise(mean_cv = mean(cv))
+
+#       muscle     mean_cv
+#       1 RF        1.78
+#       2 VL        1.52
+
+df2 %>% 
+        select(1:4) %>% 
+        pivot_longer(names_to = "timepoint", values_to = "cm2", cols = 3:4) %>% 
+        group_by(FP, muscle) %>% 
+        summarise(cv = sd(cm2)/mean(cm2)*100) %>% 
+        group_by(muscle) %>% 
+        summarise(mean_cv = mean(cv))
+
+#       muscle     mean_cv
+#       1 RF        1.31
+#       2 VL        1.22
+
+

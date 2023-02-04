@@ -25,22 +25,26 @@ RT_data %>%
         
 
 
-ggplot(data = RT_df, aes(x = Session-2, y  = v_total))+
+p1 <- ggplot(data = RT_df, aes(x = Session-2, y  = v_total))+
         geom_point(alpha = 0.2, size = 2)+
         geom_line(data = RT_df, aes(y = v_total, group = FP, color = FP), alpha = 0.2, size = 1.2)+
         geom_point(data = RT_mean, aes(x = Session-2, y = mean), size = 3)+
-        geom_errorbar(data = RT_mean, aes(x = Session-2, ymin = (mean-sd), ymax = (mean+sd)), inherit.aes = FALSE, width = 0.2, size = 1.1)+
+        geom_errorbar(data = RT_mean, aes(x = Session-2, ymin = (mean-sd), ymax = (mean+sd)), inherit.aes = FALSE, width = 0.2, size = 1)+
         geom_line(data = RT_mean, aes(y = mean), size = 1.2)+
         scale_y_continuous(expand = c(0,0),
                            limits = c(0,27500),
                            n.breaks = 10)+
-        scale_x_continuous(n.breaks = 16)+
+        scale_x_continuous(n.breaks = 16,
+                           expand = c(0.03,0))+
         theme_classic()+
         labs(y = "Volume load (KG*REPS*SETS)",
              x = "Training session")+
-        geom_text(data = RT_mean, aes(label = as.integer(mean), x = Session-2, y = mean-sd), inherit.aes = FALSE, vjust = 3, size = 3)
+        geom_text(data = RT_mean, aes(label = as.integer(mean), x = Session-2, y = mean-sd), inherit.aes = FALSE, vjust = 3, size = 3)+
+        theme(legend.title = element_blank())
 
-
+ggsave(p1, filename = "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/RT/Volume load.png", 
+       dpi = 400,
+       units = "px",width = 4000, height = 2000)
 
 ###############################################################################################
 
