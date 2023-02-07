@@ -62,7 +62,7 @@ mean_df2 <- df2 %>%
 
 ggplot(data = mean_df2, aes(x = muscle, y = mean/100))+
         geom_point(size = 2)+
-        geom_errorbar(data = mean_df2, aes(ymin = ((mean/100)-(sd/100)),
+        geom_errorbar(data = mean_df2, aes(miny = ((mean/100)-(sd/100)),
                                            ymax = ((mean/100)+(sd/100))), width = 0.2)+
         geom_text(data = mean_df2, aes(label = paste0(format(round(mean, 2), nsmall = 2),"%")), fontface = "bold", hjust = -0.3)+
         geom_point(data = df2, aes(y = change/100, color = FP), size = 2)+

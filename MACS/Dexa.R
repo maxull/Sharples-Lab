@@ -10,8 +10,6 @@ library(ggplot2); library(tidyverse); library(readxl);library(cowplot); library(
 
 dexa_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/DEXA/DEXA_data.xlsx")
 
-
-
 ###### plot left and right leg on same plot
 
 dexa_data %>% 
