@@ -61,15 +61,16 @@ mean_df2 <- df2 %>%
                   sd = sd(change))
 
 ggplot(data = mean_df2, aes(x = muscle, y = mean/100))+
-        geom_point(size = 2)+
-        geom_errorbar(data = mean_df2, aes(miny = ((mean/100)-(sd/100)),
+        geom_point(size = 3)+
+        geom_errorbar(data = mean_df2, aes(ymin = ((mean/100)-(sd/100)),
                                            ymax = ((mean/100)+(sd/100))), width = 0.2)+
         geom_text(data = mean_df2, aes(label = paste0(format(round(mean, 2), nsmall = 2),"%")), fontface = "bold", hjust = -0.3)+
         geom_point(data = df2, aes(y = change/100, color = FP), size = 2)+
         theme_classic(base_size = 15)+
         scale_y_continuous(labels = scales::percent,
                            limits = c(0,0.3),
-                           expand = c(0,0))+
+                           expand = c(0,0),
+                           n.breaks = 6)+
         geom_hline(yintercept = 0, alpha = 0.5, size = 1)+
         theme(axis.title.x = element_blank(),
               axis.ticks.x = element_blank(),

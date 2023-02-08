@@ -115,18 +115,14 @@ ggplot(df_percent, aes(x = measure, y = mean_percent))+
         geom_point(data = df_change, aes(x = measure, y = percent_change/100, color = FP), size = 2)+
         theme_classic(base_size = 15)+
         scale_y_continuous(labels = percent,
-                           limits = c(0,0.13),
+                           limits = c(-0.005,0.13),
                            expand = c(0,0))+
-        #geom_hline(yintercept = 0, linetype = 2, size = 1.5)+
-        theme(axis.title.x = element_blank(),
-              axis.ticks.x = element_blank(),
-              axis.line.x = element_blank(),
-              axis.text.x = element_text(size = 15, angle = 45, hjust = 0.9),
+        theme(axis.text.x = element_text(size = 15, angle = 45, hjust = 0.9),
+              axis.title.x = element_blank(),
               plot.title = element_text(size = 15),
               legend.position = "none")+
         labs(y = "% change",
              title = "DEXA")
-
 
 
 plot_grid(isom_plot, dexa_plot, ncol = 1)

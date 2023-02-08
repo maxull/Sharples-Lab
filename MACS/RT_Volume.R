@@ -42,7 +42,7 @@ p1 <- ggplot(data = RT_df, aes(x = Session-2, y  = v_total))+
         geom_text(data = RT_mean, aes(label = as.integer(mean), x = Session-2, y = mean-sd), inherit.aes = FALSE, vjust = 3, size = 3)+
         theme(legend.title = element_blank())
 
-ggsave(p1, filename = "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/RT/Volume load.png", 
+ggsave(p1, filename = "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Figures//Volume load.png", 
        dpi = 400,
        units = "px",width = 4000, height = 2000)
 
