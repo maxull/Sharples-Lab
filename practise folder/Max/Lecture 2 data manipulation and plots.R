@@ -12,7 +12,7 @@
 library(tidyverse); library(ggplot2); library(readxl)
 
 
-rt_data <- read_excel("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/RT/MACS_001.xlsx")
+rt_data <- read_excel("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/RT/RT_data.xlsx")
 
 
 
