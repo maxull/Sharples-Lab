@@ -12,11 +12,11 @@
 library(tidyverse); library(ggplot2); library(readxl)
 
 
-
-
+# t.test
+################################################################################## 
 # https://crumplab.com/rstatsmethods/articles/Stats1/Lab10_ttest.html
 
-# t.test
+
 
 ?t.test
 
@@ -62,13 +62,23 @@ rt_data %>%
 
 t.test(rt_df$v_total~rt_df$Session, paired = TRUE)
 
+rt_data %>% 
+        na.omit() %>% 
+        filter(Session %in% c(1,16)) %>% 
+        t.test(v_total~Session, paired = TRUE, data = .)
 
+rt_data %>% 
+        na.omit() %>% 
+        filter(Session %in% c(1,16)) %>%
+        ggplot(aes(x = as.factor(Session), y = v_total, group = as.factor(Session)))+
+        geom_boxplot()
 
-
-
+#####
+# correlation
+###################################################################################
 # https://crumplab.com/rstatsmethods/articles/Stats1/Lab11_Correlation.html
 
-# correlation
+
 rt_df %>% 
         select(FP, Session, v_total) %>% 
         mutate(Session = paste("Session", Session, sep = "_")) %>% 
@@ -79,13 +89,15 @@ ggplot(data = rt_df2, aes(x = Session_1, Session_16))+
         geom_smooth(method = "lm", se = FALSE)
 
 
-cor(rt_df2$Session_1, rt_df2$Session_16)
+r2 <- (cor(rt_df2$Session_1, rt_df2$Session_16))^2
 
 
-
+#####
+# simple regression
+###################################################################################
 # https://dhammarstrom.github.io/IDR4000/lesson_12_regressionModels.html
 
-# simple regression
+
 
 # lets look at increase in total volume across sessions
 
@@ -95,14 +107,18 @@ rt_data <- rt_data %>%
         filter(v_total != 0, 
                Session > 2)
 
+?lm
 m1 <- lm(v_total~Session, data = rt_data)
+
+attributes(m1)
+
 
 summary(m1)
 coef(m1)
 confint(m1)
 
 ggplot(data = rt_data, aes(x= Session, y = v_total))+
-        geom_smooth(method = "lm")+
+        geom_smooth(method = "lm", se = FALSE)+
         geom_point()
 
 # assumption checks by plotting the residuals agains the fitted values
@@ -136,8 +152,9 @@ tidy(m1) %>%
               digits = c(NA, 1, 1, 2, 5))
 
 
-
+#####
 # Multiple regression
+###################################################################################
 
 
 # manipulate dataset wider
@@ -174,6 +191,91 @@ plot(fitted(m2),resid(m2))
 
 
 
-library(lme4)
+
+
+#####
+# anova
+###################################################################################
+
+# load data with multiple groups and timepoints
+
+contratrain <- read_excel("/Users/maxul/Documents/Skole/Master 21-22/Master/Contratrain/tr014_ultrasound.xlsx", na = "NA")
+
+# extract only set and change from T1 to T4
+
+contratrain <- contratrain %>% 
+        mutate(change = T4-T1)
+
+# anova change per excercise sets
+
+mod <- aov(change~as.factor(set), data = contratrain)
+
+summary(mod)
+
+plot(fitted(mod), resid(mod))
+
+hist(resid(mod))
+
+attributes(mod)
+
+# which group comparisons are significant
+
+TukeyHSD(mod)
+
+
+#####
+# ancova
+###################################################################################
+
+# https://www.datanovia.com/en/lessons/ancova-in-r/#:~:text=The%20Analysis%20of%20Covariance%20(ANCOVA,two%20or%20more%20independent%20groups.
+
+# An ancova
+#m2 <- lm(change ~ pre + group, data = change.data)
+
+contratrain <- contratrain %>% 
+        mutate(set = as.factor(set))
+
+mod2 <- lm(change ~T1 + set, data = contratrain)
+
+summary(mod2)
+
+hist(resid(mod2))
+
+#####
+# repeated measures anova
+###################################################################################
+
+# continue with dataset from anova
+
+# repeated measures
+
+# visualize first
+
+contratrain %>% 
+        select(1:9) %>% 
+        pivot_longer(names_to = "timepoint", values_to = "value", cols = 6:9) %>% 
+        na.omit() %>% 
+        ggplot(aes(x = timepoint, y = value, color = set))+
+        geom_point()+
+        geom_smooth(method = lm,aes(group = set), se = FALSE)+
+        facet_wrap(~set)
+
+contratrain <- contratrain %>% 
+        mutate(set = as.factor(set))
+
+contratrain %>% 
+        select(1:9) %>% 
+        pivot_longer(names_to = "timepoint", values_to = "value", cols = 6:9) %>% 
+        na.omit() %>%
+        lm(value~timepoint + set, data = .) -> mod3 
+
+summary(mod3)
+
+
+
+#####
+# linear mixed models
+###################################################################################
+library(lme4); library(nlme); library(emmeans)
 
 lmer(v_total ~Session + Weight + 1|FP, data = df)
