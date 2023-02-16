@@ -90,9 +90,11 @@ summary_table %>%
                                              "Included", 
                                              "Excluded", 
                                              "Included"), 
-              caption = "Participant characteristics") %>%
+              caption = "Participant characteristics")%>%
         add_header_above(c(" " = 1, "Female" = 2, "Male" = 2))
 
+#Now we can format this table to look more professional:
+#First we manage the date similar as done previously:
 
 dxa %>%
         ungroup() %>%
@@ -102,30 +104,37 @@ dxa %>%
                   s = sd(value)) %>%
         ungroup() %>%
         mutate(summary = paste0(sprintf("%.1f", m),
-                                " (",
+                                " \u00b1 ",
+                                                        #\u00b1 is the code for +/- symbol
                                 sprintf("%.1f", s), 
-                                ")")) %>%
+                                "")) %>%
         select(sex, include, variable, summary) %>%
-        pivot_wider(id_cols = variable, names_from = c(sex, include), values_from = summary ) %>%
-        # sort the rows -- create a factor level
+        pivot_wider(id_cols = variable, names_from = c(sex, include), values_from = summary )%>%
+        
+        # Then we sort the rows by using a factor level:
+        
         mutate(variable = factor(variable, levels = c("age", "height", "weight", "LBM"))) %>%
-        
-        mutate(Variable = c("Age (yrs)", "Stature (cm)", "Body mass (kg)", "Lean body mass (%)")) %>%
-        
         arrange(variable) %>%
-        
+        mutate(Variable = c("Age (yrs)", "Stature (cm)", "Body mass (kg)", "Lean body mass (%)")) %>%
         select(Variable, female_excl:male_incl) %>%
+        
+        #Then we make our table anew:
         kable(format = "html", col.names = c(" ", 
                                              "Excluded",
                                              "Included", 
                                              "Excluded", 
                                              "Included"), 
               caption = "Table 1. Participant characteristics") %>%
-        add_header_above(c(" " = 1, "Female" = 2, "Male" = 2)) 
+        add_header_above(c(" " = 1, "Female" = 2, "Male" = 2)) %>%
+        footnote(general = "Values are Mean (SD)")%>%
+        #Finally we make the format into a classical paper-like table:
+        
+        kable_classic(full_width = F, html_font = "Cambria")
 
 
+#------------------------
 
-
+library(flextable)
 
 
 
