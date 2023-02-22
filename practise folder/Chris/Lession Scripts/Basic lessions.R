@@ -44,7 +44,7 @@ hypertrophy1 <- read_csv("practise folder/Chris/Data/hypertrophy1.csv")
 
 # DATA WRANGLING AND SUMMARIES
 
-# PIPE [ % ] enables the operation to act sequentially.
+# PIPE [ %>% ] enables the operation to act sequentially.
 # tidyverse is a package that enables dplyr and tidyr which allow read and visualization of data.
 #if this package is not loaded the pipe function will not work!
 
@@ -56,7 +56,7 @@ library(tidyverse)%>%
 library(readxl)%>%
 cyclingstudy <- read_excel("practise folder/Chris/Data/cyclingStudy.xlsx", na ="NA")
 
-cyclingstudy %>% #this essentially takes the dataset and implies "then do=>"
+libcyclingstudy %>% #this essentially takes the dataset and implies "then do=>"
         mutate(sgj.bm = sj.max/weight.T1) %>% # Here we make our new variable, then
         select(subject, group, timepoint, sgj.bm) %>% #Here we select important variables to include when we =>
         print(.) #show our results
@@ -232,7 +232,7 @@ cyclingstudy%>%
 cyclingstudy%>%
         select(subject, timepoint, sj.max)%>%
         pivot_wider(names_from = timepoint, values_from = sj.max)%>%
-        mutate( change =((meso3/pre)-1)*100)%>%
+        mutate(change =((meso3/pre)-1)*100)%>%
         print()
 
 # To save a pipe operation as the one above, we simply assign the operation to an object
@@ -244,4 +244,9 @@ Percent_change <- cyclingstudy%>%
         print()
 
 # Basic lessions cumpleted!
+
+
+# TO Summarize:
+
+
 
