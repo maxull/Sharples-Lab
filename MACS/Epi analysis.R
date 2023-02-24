@@ -16,12 +16,15 @@
 ### extra functions https://github.com/YuanTian1991/ChAMP-Script
 
 library(wateRmelon); library(methylumi);library(FDb.InfiniumMethylation.hg19);library(minfi); library(tidyverse);library(ggplot2)
-library(tidyverse); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi);
+library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi);
 library(reshape2)
 
-library(plyr)
 
-library(R.utils)
+
+
+library(R.utils); library(plyr);library(minfi); library(tidyverse);library(ggplot2); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi)
+
+library(ENmix)
 
 ### set working directory to filepath that contains the data of interest
 ### this folder should contain the raw red and green signal .idat files and a CSV file of the targets
@@ -45,9 +48,16 @@ untar("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GC-AS
 
 ### load data from idat files and filter
 
+# load raw data to compare CPGs
+
+myData <- champ.import(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/raw idat/", 
+                       arraytype = "EPIC")
 
 myLoad <- champ.load(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/raw idat/", 
                      arraytype = "EPIC", method = "minfi")
+
+length(rownames(myData$beta))
+length(rownames(myLoad$beta))
 
 # notes from running champ load
 ####################################################################
@@ -123,6 +133,51 @@ myLoad <- champ.load(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Ma
 CpG.GUI(arraytype = "EPIC")
 
 ####################################################################
+
+# mean and sd raw data
+
+long_beta <- myData$beta %>% 
+        as.data.frame() %>% 
+        pivot_longer(names_to = "FP", values_to = "beta", cols = 1:32)
+
+beta_mean <- long_beta %>% 
+        mutate(FP = ifelse(nchar(FP) < 4, paste(0, FP, sep = ""), FP)) %>%
+        group_by(FP) %>% 
+        summarise(m = mean(beta),
+                  s = sd(beta))
+
+
+
+reso <- 600
+length <- 3.25*reso/72
+
+png(file="C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/Figures/median beta.png",
+    units="in",res=reso,height=length,width=length*2)
+
+
+long_beta %>% 
+        mutate(FP = ifelse(nchar(FP) < 4, paste(0, FP, sep = ""), FP)) %>% 
+        mutate(NR = substr(FP,1,2)) %>% 
+        ggplot(aes(x = FP, y = beta, color = NR))+
+        geom_violin()+
+        geom_boxplot(color = "black", width = 0.2)+
+        theme(axis.text.x = element_text(angle = -90))+
+        labs(title = "Raw beta values")+
+        geom_point(data = beta_mean, aes(x = FP, y = m), inherit.aes = FALSE, size = 3)
+
+dev.off()
+
+long_beta %>% 
+        group_by(FP) %>% 
+        summarise(m = mean(beta),
+                  s = sd(beta))%>% 
+        ggplot(aes(x = FP, y = m))+
+        geom_point()+
+        geom_errorbar(aes(ymin = m-s, ymax = m+s), width = 0.1)
+
+
+
+
 
 ### functional normalization
 
@@ -242,6 +297,23 @@ myDMP2<- champ.DMP(beta = getBeta(myNorm),
           adjPVal = 0.05)               ### worked, no p val adjustement
 
 
+# run DMPs on M vals instead of B vals
+
+
+mvals <- B2M(getBeta(myNorm))
+
+saveRDS(mvals, file = "mvals.RDATA")
+
+
+myDMP3 <- champ.DMP(beta = mvals, 
+                    arraytype = "EPIC")
+
+
+myDMP4 <- champ.DMP(beta = mvals, 
+                    arraytype = "EPIC",
+                    adjust.method = "none",
+                    adjPVal = 0.05)
+
 ### visualize DMPs
 
 DMP.GUI(myDMP[[2]])
@@ -256,7 +328,14 @@ myDMP <- readRDS("myDMP.RDATA")
 
 myDMP2 <- readRDS("myDMP2.RDATA")
 
-####
+#### check number of dmps at different unadjusted pvals 0.05, 0.01, 0.001
+
+myDMP4$BH_to_PH %>% 
+        rownames_to_column(var = "cpg") %>% 
+        as.data.frame() %>% 
+        filter(P.Value < 0.05) %>% 
+        rownames() %>% 
+        length()
 
 # done to here
 
