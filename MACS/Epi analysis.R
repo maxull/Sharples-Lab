@@ -234,6 +234,14 @@ dev.off()
 
 ### run quality control
 
+library(limma)
+library(RColorBrewer)
+
+pal <- brewer.pal(8,"Dark2")
+plotMDS(getM(myNorm), top=1000, gene.selection="common",
+        col=pal[factor(myNorm$Sample_Group)])
+
+
 
 champ.QC()      # default QC on myLoad
 
