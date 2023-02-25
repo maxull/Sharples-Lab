@@ -20,11 +20,11 @@ library(pathview); library(gage); library(gageData); library(ChAMP); library(org
 library(reshape2)
 
 
-
+BiocManager::install("ChAMP")
 
 library(R.utils); library(plyr);library(minfi); library(tidyverse);library(ggplot2); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi)
 
-library(ENmix)
+library(ENmix); library(FedData)
 
 ### set working directory to filepath that contains the data of interest
 ### this folder should contain the raw red and green signal .idat files and a CSV file of the targets
@@ -58,6 +58,7 @@ myLoad <- champ.load(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Ma
 
 length(rownames(myData$beta))
 length(rownames(myLoad$beta))
+length(rownames(getBeta(myNorm)))
 
 # notes from running champ load
 ####################################################################
@@ -183,14 +184,34 @@ long_beta %>%
 
 myNorm <- champ.norm(beta = myLoad$beta,
                      rgSet = myLoad$rgSet,
-                     method ="FunctionalNormalization",
+                     method ="BMIQ",
                      arraytype = "EPIC")
 
 # did not work, have to do it manually
 
-myNorm <- preprocessFunnorm(myLoad$rgSet, nPCs=2, sex = NULL, bgCorr = TRUE,
-                  dyeCorr = TRUE, keepCN = TRUE, ratioConvert = TRUE,
+myNorm_fun <- preprocessFunnorm(myLoad$rgSet, nPCs=2, sex = NULL, bgCorr = TRUE,
+                  dyeCorr = TRUE, keepCN = FALSE, ratioConvert = TRUE,
                   verbose = TRUE)
+
+myNorm_fun@colData@listData[["Sample_Group"]] <- substr_right(myLoad$pd$Sample_Name,2)
+myData$pd$Sample_Group <- substr_right(myLoad$pd$Sample_Name,2)
+myImport = myData
+
+
+myImport$beta <- getBeta(myNorm_fun)
+
+length(rownames(myImport$beta))
+
+densityPlot(myImport$beta, sampGroups=myLoad$pd$Sample_Group,
+            main="Normalized", legend=TRUE)
+        
+flt_beta <- champ.filter(beta = myImport$beta,
+                         pd = myImport$pd,
+                         detP = myImport$detP[rownames(myImport$beta),],
+                         beadcount = myImport$beadcount[rownames(myImport$beta),],
+                         Meth = myImport$Meth[rownames(myImport$beta),],
+                         UnMeth = myImport$UnMeth[rownames(myImport$beta),],
+                         arraytype = "EPIC")
 
 # notes from running champ norm
 ####################################################################
@@ -204,11 +225,10 @@ myNorm <- preprocessFunnorm(myLoad$rgSet, nPCs=2, sex = NULL, bgCorr = TRUE,
 
 ####################################################################
 
-
+champ.QC(beta = flt_beta$beta)
 ### add group in myLoad$pd
 
-install.packages("FedData")
-library(FedData)        # substrRight function
+
 
 myLoad$pd[,4] <- substr_right(myLoad$pd$Sample_Name,2)
 
@@ -240,6 +260,25 @@ library(RColorBrewer)
 pal <- brewer.pal(8,"Dark2")
 plotMDS(getM(myNorm), top=1000, gene.selection="common",
         col=pal[factor(myNorm$Sample_Group)])
+
+
+
+### PCA analysis
+
+# https://bioinfo4all.wordpress.com/2021/01/31/tutorial-6-how-to-do-principal-component-analysis-pca-in-r/
+
+install.packages(c("factoextra", "FactoMineR"))
+
+library(factoextra)
+library(FactoMineR)
+
+flt_beta$beta
+
+pca.data <- PCA(myData$beta, scale.unit = FALSE, graph = FALSE)
+
+
+fviz_eig(pca.data, addlabels = TRUE, ylim = c(0, 100))
+
 
 
 

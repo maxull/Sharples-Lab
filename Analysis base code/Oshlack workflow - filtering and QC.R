@@ -11,7 +11,7 @@
 
 
 
-library("ChAMP"); library(RColorBrewer); library(limma); library(maxprobes)
+library(ChAMP); library(RColorBrewer); library(limma); library(maxprobes)
 
 
 
