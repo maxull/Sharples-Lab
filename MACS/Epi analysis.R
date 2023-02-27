@@ -808,6 +808,59 @@ dmr <- as.data.frame(myDMR_BH_PH$BumphunterDMR)
 
 ### DMR did not work
 
+
+# global test
+
+################################################################################
+
+
+BiocManager::install("globaltest")
+
+library(globaltest)
+
+# prepare subsets
+
+unique_cpg <- list()
+
+unique_gene <- unique(anno$UCSC_RefGene_Name)
+
+
+
+for (i in 1:length(unique_gene)) {
+        
+        index <- which(anno$UCSC_RefGene_Name == unique_gene[i])
+        
+        z <- anno[index,1]
+        
+        unique_cpg[[(as.character(unique_gene[i]))]] <- z
+        
+        
+        print(i)
+}
+
+
+saveRDS(unique_cpg, "unique_cpg.RDATA")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ################################################################################################################################
 
 ### identify GSEA
@@ -929,39 +982,11 @@ library(gageData)
 columns(org.Hs.eg.db)
 data("kegg.sets.hs")
 
-doGT(pheno.v = pd1, 
-     data.m = f_bVals,
-     array = "850k")
 
 
 ################################################################################################################################
-# manually do global test
 
-doGT <- function(pheno.v,data.m,model=c("linear"),array=c("450k","850k"),ncores=4){
-        if(array=="450k"){
-                message(" Mapping 450k probes to genes... ")
-                data("dualmap450kEID");
-                subsets <- lapply(mapEIDto450k.lv,intersect,rownames(data.m),mc.cores = ncores);
-                message(" Done ")
-        }else {
-                message(" Mapping EPIC probes to genes... ")
-                data("dualmap850kEID");
-                subsets <- mclapply(mapEIDto850k.lv,intersect,rownames(data.m),mc.cores = 1);
-                message(" Done ")
-        }
-        nrep.v <- unlist(lapply(subsets,length));
-        selG.idx <- which(nrep.v>0);
-        message(" Running Global Test... ")
-        gt.o <- gt(response=pheno.v,alternative=t(data.m),model=model,directional = FALSE, standardize = FALSE, permutations = 0, subsets=subsets[selG.idx],trace=F);
-        message(" Done ")
-        resGT.m <- as.matrix(result(gt.o));
-        tmp.s <- sort(resGT.m[,2],decreasing=TRUE,index.return=TRUE);
-        sresGT.m <- resGT.m[tmp.s$ix,];
-        return(sresGT.m);
-}
 
-BiocManager::install("globaltest")
 
-library(globaltest)
 
 
