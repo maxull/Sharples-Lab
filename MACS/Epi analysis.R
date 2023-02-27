@@ -24,7 +24,19 @@ BiocManager::install("ChAMP")
 
 library(R.utils); library(plyr);library(minfi); library(tidyverse);library(ggplot2); library(pathview); library(gage); library(gageData); library(ChAMP); library(org.Hs.eg.db); library(AnnotationDbi)
 
-library(ENmix); library(FedData)
+library(ENmix); library(FedData); library(cowplot)
+library(limma)
+library(RColorBrewer)
+
+library(pheatmap)
+library(viridis)
+
+library(devtools)
+install_github("achilleasNP/IlluminaHumanMethylationEPICmanifest") 
+install_github("achilleasNP/IlluminaHumanMethylationEPICanno.ilm10b5.hg38")
+
+library(IlluminaHumanMethylationEPICanno.ilm10b5.hg38)  # newest illumina annotation data
+
 
 ### set working directory to filepath that contains the data of interest
 ### this folder should contain the raw red and green signal .idat files and a CSV file of the targets
@@ -48,7 +60,7 @@ untar("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GC-AS
 
 ### load data from idat files and filter
 
-# load raw data to compare CPGs
+# load raw data 
 
 myData <- champ.import(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/raw idat/", 
                        arraytype = "EPIC")
@@ -56,84 +68,239 @@ myData <- champ.import(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/
 myLoad <- champ.load(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/raw idat/", 
                      arraytype = "EPIC", method = "minfi")
 
-length(rownames(myData$beta))
-length(rownames(myLoad$beta))
-length(rownames(getBeta(myNorm)))
+# add sample group to pd sheets
 
-# notes from running champ load
-####################################################################
-# Failed CpG Fraction.
-# 4BH          0.0009978820
-# 2BH          0.0007463926
-# 5PM          0.0006425668
-# 5BM          0.0007337028
-# 12BM         0.0006367987
-# 1PM          0.0007452390
-# 5BH          0.0009851921
-# 8PH          0.0020326798
-# 2BM          0.0006517957
-# 12BH         0.0006010364
-# 12PM         0.0006887116
-# 7PM          0.0004995178
-# 1PH          0.0005272047
-# 12PH         0.0006310306
-# 7PH          0.0005848857
-# 6PH          0.0008536794
-# 2PM          0.0006887116
-# 8BM          0.0008409895
-# 7BH          0.0005468162
-# 4BM          0.0005341264
-# 4PM          0.0005041323
-# 6BH          0.0004672164
-# 8PM          0.0013566580
-# 1BM          0.0012909016
-# 5PH          0.0008871344
-# 7BM          0.0006241088
-# 1BH          0.0005987292
-# 6BM          0.0005191293
-# 4PH          0.0005618133
-# 6PM          0.0007152449
-# 8BH          0.0012885944
-# 2PH          0.0012897480
+myLoad$pd$Sample_Group <- substr_right(myLoad$pd$Sample_Name,2)
+myData$pd$Sample_Group <- substr_right(myLoad$pd$Sample_Name,2)
 
-# Filtering probes with a detection p-value above 0.01 in one or more samples has removed 5517 probes from the analysis. If a large number of probes have been removed, ChAMP suggests you to identify potentially bad samples.
-# << Filter DetP Done. >>
-# 
-# 
-# There is no NA values in your matrix, there is no need to imputation.
-# 
-# Filtering probes with a beadcount <3 in at least 5% of samples, has removed 15774 from the analysis.
-# << Filter Beads Done. >>
-# 
-# Filtering non-cg probes, has removed 2896 from the analysis.
-# << Filter NoCG Done. >>
-# 
-# Using general EPIC SNP list for filtering.
-# Filtering probes with SNPs as identified in Zhou's Nucleic Acids Research Paper, 2016, has removed 95783 from the analysis.
-# << Filter SNP Done. >>
-# 
-# Filtering probes that align to multiple locations as identified in Nordlund et al, has removed 23 from the analysis.
-# << Filter MultiHit Done. >>
-# 
-# Filtering probes on the X or Y chromosome has removed 16404 from the analysis.
-# << Filter XY chromosome Done. >>
-# 
-# [Beta value is selected as output.]
-# 
-# Zeros in your dataset have been replaced with smallest positive value.
-# 
-# One in your dataset have been replaced with largest value below 1.
-# 
-# The analysis will be proceed with 730439 probes and 32 samples.
-# 
-# Current Data Set contains 0 NA in [Beta] Matrix.
+# identify principal components
+
+### PCA analysis
+
+# https://bioinfo4all.wordpress.com/2021/01/31/tutorial-6-how-to-do-principal-component-analysis-pca-in-r/
+
+install.packages(c("factoextra", "FactoMineR"))
+
+library(factoextra)
+library(FactoMineR)
 
 
+pca.data <- PCA(t(myData$beta), scale.unit = FALSE, graph = FALSE)
+
+
+fviz_eig(pca.data, addlabels = TRUE, ylim = c(0, 100))
+
+fviz_pca_ind(pca.data, addEllipses = FALSE,
+             col.ind = "cos2", 
+             gradient.cols = c("#FFCC00", "#CC9933", "#660033", "#330033"), 
+             repel = TRUE)
+
+
+### first three principal components explain 57.6 % of variance in Dataset, therefore normalize with 3 principal components
+### Normalize data
+
+# loag rgSet to do functional normalization
+
+myLoad <- champ.load(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/raw idat/", 
+                     arraytype = "EPIC", method = "minfi")
+
+# change annotation to new annotation file
+
+
+myLoad$rgSet@annotation = c(array = "IlluminaHumanMethylationEPIC", annotation = "ilm10b5.hg38")
+
+# normalize
+
+
+myNorm_fun <- preprocessFunnorm(myLoad$rgSet, 
+                                nPCs=3, 
+                                sex = NULL, 
+                                bgCorr = TRUE,
+                                dyeCorr = TRUE, 
+                                keepCN = FALSE, 
+                                ratioConvert = TRUE,
+                                verbose = TRUE)
+
+
+
+# notes from running processFunnorm
 ####################################################################
 
-CpG.GUI(arraytype = "EPIC")
+# > myNorm_fun <- preprocessFunnorm(myLoad$rgSet, 
+#                                   +                                 nPCs=3, 
+#                                   +                                 sex = NULL, 
+#                                   +                                 bgCorr = TRUE,
+#                                   +                                 dyeCorr = TRUE, 
+#                                   +                                 keepCN = FALSE, 
+#                                   +                                 ratioConvert = TRUE,
+#                                   +                                 verbose = TRUE)
+# [preprocessFunnorm] Background and dye bias correction with noob
+# Loading required package: IlluminaHumanMethylationEPICanno.ilm10b4.hg19
+# [preprocessFunnorm] Mapping to genome
+# [preprocessFunnorm] Quantile extraction
+# [preprocessFunnorm] Normalization
+# Warning message:
+#         In .getSex(CN = CN, xIndex = xIndex, yIndex = yIndex, cutoff = cutoff) :
+#         An inconsistency was encountered while determining sex. One possibility is that only one sex is present. We recommend further checks, for example with the plotSex function.
+#  
+# 
+
+
+
+
+
 
 ####################################################################
+
+
+
+####################################################################
+
+# filter normalized values
+
+####################################################################
+
+# add  the normalized beta values to myData
+
+myImport = myData
+
+myImport$beta <- getBeta(myNorm_fun)
+
+length(rownames(myImport$beta)) # all cpgs are still there, move on with filtering
+
+flt_beta <- champ.filter(beta = myImport$beta,
+                         pd = myImport$pd,
+                         detP = myImport$detP[rownames(myImport$beta),],
+                         beadcount = myImport$beadcount[rownames(myImport$beta),],
+                         Meth = myImport$Meth[rownames(myImport$beta),],
+                         UnMeth = myImport$UnMeth[rownames(myImport$beta),],
+                         arraytype = "EPIC")
+
+# notes from running processFunnorm
+####################################################################
+
+# > flt_beta <- champ.filter(beta = myImport$beta,
+#                            +                          pd = myImport$pd,
+#                            +                          detP = myImport$detP[rownames(myImport$beta),],
+#                            +                          beadcount = myImport$beadcount[rownames(myImport$beta),],
+#                            +                          Meth = myImport$Meth[rownames(myImport$beta),],
+#                            +                          UnMeth = myImport$UnMeth[rownames(myImport$beta),],
+#                            +                          arraytype = "EPIC")
+# [===========================]
+# [<<<< ChAMP.FILTER START >>>>>]
+#         
+#         In New version ChAMP, champ.filter() function has been set to do filtering on the result of champ.import(). You can use champ.import() + champ.filter() to do Data Loading, or set "method" parameter in champ.load() as "ChAMP" to get the same effect.
+# 
+# This function is provided for user need to do filtering on some beta (or M) matrix, which contained most filtering system in champ.load except beadcount. User need to input beta matrix, pd file themselves. If you want to do filterintg on detP matrix and Bead Count, you also need to input a detected P matrix and Bead Count information.
+# 
+# Note that if you want to filter more data matrix, say beta, M, intensity... please make sure they have exactly the same rownames and colnames.
+# 
+# 
+# [ Section 1:  Check Input Start ]
+# You have inputed beta,Meth,UnMeth for Analysis.
+# 
+# pd file provided, checking if it's in accord with Data Matrix...
+#     pd file check success.
+# 
+#   Parameter filterDetP is TRUE, checking if detP in accord with Data Matrix...
+#     detP check success.
+# 
+#   Parameter filterBeads is TRUE, checking if beadcount in accord with Data Matrix...
+#     beadcount check success.
+# 
+#   parameter autoimpute is TRUE. Checking if the conditions are fulfilled...
+#     !!! ProbeCutoff is 0, which means you have no needs to do imputation. autoimpute has been reset FALSE.
+# 
+#   Checking Finished :filterDetP,filterBeads,filterMultiHit,filterSNPs,filterNoCG,filterXY would be done on beta,Meth,UnMeth.
+#   You also provided :detP,beadcount .
+# [ Section 1: Check Input Done ]
+# 
+# 
+# [ Section 2: Filtering Start >>
+# 
+#   Filtering Detect P value Start
+#     The fraction of failed positions per sample
+#     You may need to delete samples with high proportion of failed probes:
+# 
+#      Failed CpG Fraction.
+# 4BH          0.0008846706
+# 2BH          0.0006617706
+# 5PM          0.0005624472
+# 5BM          0.0006479115
+# 12BM         0.0005636022
+# 1PM          0.0006687001
+# 5BH          0.0008927551
+# 8PH          0.0018998474
+# 2BM          0.0005820809
+# 12BH         0.0005231799
+# 12PM         0.0006028695
+# 7PM          0.0004504198
+# 1PH          0.0004561944
+# 12PH         0.0005497431
+# 7PH          0.0005185602
+# 6PH          0.0007714882
+# 2PM          0.0006144187
+# 8BM          0.0007587841
+# 7BH          0.0004873773
+# 4BM          0.0004712084
+# 4PM          0.0004446451
+# 6BH          0.0004157721
+# 8PM          0.0012496261
+# 1BM          0.0011745561
+# 5PH          0.0007888120
+# 7BM          0.0005497431
+# 1BH          0.0005301094
+# 6BM          0.0004596591
+# 4PH          0.0005000814
+# 6PM          0.0006536861
+# 8BH          0.0011757111
+# 2PH          0.0011861054
+# 
+#     Filtering probes with a detection p-value above 0.01.
+#     Removing 5278 probes.
+#     If a large number of probes have been removed, ChAMP suggests you to identify potentially bad samples
+# 
+#   Filtering BeadCount Start
+#     Filtering probes with a beadcount <3 in at least 5% of samples.
+#     Removing 15736 probes
+# 
+#   Filtering NoCG Start
+#     Only Keep CpGs, removing 2896 probes from the analysis.
+# 
+#   Filtering SNPs Start
+#     Using general EPIC SNP list for filtering.
+#     Filtering probes with SNPs as identified in Zhou's Nucleic Acids Research Paper 2016.
+# Removing 95783 probes from the analysis.
+# 
+# Filtering MultiHit Start
+# Filtering probes that align to multiple locations as identified in Nordlund et al
+# Removing 11 probes from the analysis.
+# 
+# Filtering XY Start
+# Filtering probes located on X,Y chromosome, removing 16369 probes from the analysis.
+# 
+# Updating PD file
+# 
+# Fixing Outliers Start
+# Replacing all value smaller/equal to 0 with smallest positive value.
+# Replacing all value greater/equal to 1 with largest value below 1..
+# [ Section 2: Filtering Done ]
+# 
+# All filterings are Done, now you have 729786 probes and 32 samples.
+# 
+# [<<<<< ChAMP.FILTER END >>>>>>]
+# [===========================]
+# [You may want to process champ.QC() next.]
+
+
+
+
+####################################################################
+
+# visualize normalization and distribution + QC
+
+####################################################################
+
 
 # mean and sd raw data
 
@@ -152,7 +319,7 @@ beta_mean <- long_beta %>%
 reso <- 600
 length <- 3.25*reso/72
 
-png(file="C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/Figures/median beta.png",
+png(file="C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/Figures/raw beta.png",
     units="in",res=reso,height=length,width=length*2)
 
 
@@ -163,8 +330,7 @@ long_beta %>%
         geom_violin()+
         geom_boxplot(color = "black", width = 0.2)+
         theme(axis.text.x = element_text(angle = -90))+
-        labs(title = "Raw beta values")+
-        geom_point(data = beta_mean, aes(x = FP, y = m), inherit.aes = FALSE, size = 3)
+        labs(title = "Raw beta values")
 
 dev.off()
 
@@ -177,63 +343,26 @@ long_beta %>%
         geom_errorbar(aes(ymin = m-s, ymax = m+s), width = 0.1)
 
 
+# density plots of normalized and pre-normalized values, and after filtering
 
+par(mfrow = c(3, 1))
 
+densityPlot(myData$beta, sampGroups=myData$pd$Sample_Group,
+            main="Pre-Normalized", legend=TRUE)
 
-### functional normalization
-
-myNorm <- champ.norm(beta = myLoad$beta,
-                     rgSet = myLoad$rgSet,
-                     method ="BMIQ",
-                     arraytype = "EPIC")
-
-# did not work, have to do it manually
-
-myNorm_fun <- preprocessFunnorm(myLoad$rgSet, nPCs=2, sex = NULL, bgCorr = TRUE,
-                  dyeCorr = TRUE, keepCN = FALSE, ratioConvert = TRUE,
-                  verbose = TRUE)
-
-myNorm_fun@colData@listData[["Sample_Group"]] <- substr_right(myLoad$pd$Sample_Name,2)
-myData$pd$Sample_Group <- substr_right(myLoad$pd$Sample_Name,2)
-myImport = myData
-
-
-myImport$beta <- getBeta(myNorm_fun)
-
-length(rownames(myImport$beta))
-
-densityPlot(myImport$beta, sampGroups=myLoad$pd$Sample_Group,
+densityPlot(myImport$beta, sampGroups=myImport$pd$Sample_Group,
             main="Normalized", legend=TRUE)
-        
-flt_beta <- champ.filter(beta = myImport$beta,
-                         pd = myImport$pd,
-                         detP = myImport$detP[rownames(myImport$beta),],
-                         beadcount = myImport$beadcount[rownames(myImport$beta),],
-                         Meth = myImport$Meth[rownames(myImport$beta),],
-                         UnMeth = myImport$UnMeth[rownames(myImport$beta),],
-                         arraytype = "EPIC")
 
-# notes from running champ norm
-####################################################################
-# [preprocessFunnorm] Background and dye bias correction with noob
-# [preprocessFunnorm] Mapping to genome
-# [preprocessFunnorm] Quantile extraction
-# [preprocessFunnorm] Normalization
-# Warning message:
-#         In .getSex(CN = CN, xIndex = xIndex, yIndex = yIndex, cutoff = cutoff) :
-#         An inconsistency was encountered while determining sex. One possibility is that only one sex is present. We recommend further checks, for example with the plotSex function.
+densityPlot(flt_beta$beta, sampGroups=flt_beta$pd$Sample_Group,
+            main="Normalized+filtered", legend=TRUE)
 
-####################################################################
+dev.off()
+
 
 champ.QC(beta = flt_beta$beta)
-### add group in myLoad$pd
 
 
-
-myLoad$pd[,4] <- substr_right(myLoad$pd$Sample_Name,2)
-
-
-### visualize nomralization and save density plots
+### visualize normalization and save density plots
 
 
 reso <- 600
@@ -254,12 +383,11 @@ dev.off()
 
 ### run quality control
 
-library(limma)
-library(RColorBrewer)
+
 
 pal <- brewer.pal(8,"Dark2")
-plotMDS(getM(myNorm), top=1000, gene.selection="common",
-        col=pal[factor(myNorm$Sample_Group)])
+plotMDS(B2M(flt_beta$beta), top=1000, gene.selection="common",
+        col=pal[factor(flt_beta$pd$Sample_Group)])
 
 
 
@@ -274,12 +402,15 @@ library(FactoMineR)
 
 flt_beta$beta
 
-pca.data <- PCA(myData$beta, scale.unit = FALSE, graph = FALSE)
+pca.data <- PCA(t(myData$beta), scale.unit = FALSE, graph = FALSE)
 
 
 fviz_eig(pca.data, addlabels = TRUE, ylim = c(0, 100))
 
-
+fviz_pca_ind(pca.data, addEllipses = FALSE,
+             col.ind = "cos2", 
+             gradient.cols = c("#FFCC00", "#CC9933", "#660033", "#330033"), 
+             repel = TRUE)
 
 
 champ.QC()      # default QC on myLoad
@@ -303,7 +434,11 @@ saveRDS(myLoad, file = "myLoad.RDATA")
 
 saveRDS(probe.features, file = "probe.features.RDATA")
 
-saveRDS(myNorm, file = "myNorm.RDATA")
+saveRDS(myNorm_fun, file = "myNorm_fun.RDATA")
+
+saveRDS(myData, file = "myData.RDATA")
+
+saveRDS(flt_beta, file = "flt_beta.RDATA")
 
 
 ### reload temporary files (not all are neaded for downstream analysis!)
@@ -318,6 +453,10 @@ probe.features <- readRDS("probe.features.RDATA")
 
 myNorm <- readRDS("myNorm.RDATA")
 
+myData <- readRDS("myData.RDATA")
+
+flt_beta <- readRDS("flt_beta.RDATA")
+
 ### set working directory back to original
 
 
@@ -328,61 +467,109 @@ setwd(mypath)
 ################################################################################################################################
 ################################################################################################################################
 
-### identify DMPs
+### identify DMPs from M vals
 
-myDMP <- champ.DMP(beta = getBeta(myNorm),
-          arraytype = "EPIC")                   ### significant DMPs with BH adjusted p val of 0.05
+####################################################################################
+
+
+
+
+myDMP_BH_BM <- champ.DMP(beta = B2M(flt_beta$beta),
+                   pheno = flt_beta$pd$Sample_Group,
+                   compare.group = c("BH", "BM"),
+                   arraytype = "EPIC")                   ### significant DMPs with BH adjusted p val of 0.05
+
+myDMP_PH_PM <- champ.DMP(beta = B2M(flt_beta$beta),
+                         pheno = flt_beta$pd$Sample_Group,
+                         compare.group = c("PH", "PM"),
+                         arraytype = "EPIC")                   ### significant DMPs with BH adjusted p val of 0.05
+
+myDMP_BM_PM <- champ.DMP(beta = B2M(flt_beta$beta),
+                         pheno = flt_beta$pd$Sample_Group,
+                         compare.group = c("BM", "PM"),
+                         adjust.method = "none",
+                         arraytype = "EPIC")                   ### significant DMPs with un-adjusted p val of 0.05
+
+myDMP_BH_PH <- champ.DMP(beta = B2M(flt_beta$beta),
+                         pheno = flt_beta$pd$Sample_Group,
+                         compare.group = c("BH", "PH"),
+                         adjust.method = "none",
+                         arraytype = "EPIC")                   ### significant DMPs with un-adjusted p val of 0.05
+
+
+# code to check DMPs with differenct p values
+myDMP$BH_to_BM %>% 
+        as.data.frame() %>% 
+        filter(adj.P.Val < 0.001) %>% 
+        rownames() %>% 
+        length()
+
+
+###
+
+# add newer anntoaton data
+library(dplyr)
+data(Other)
+data("Islands.UCSC")
+
+anno <- as.data.frame(Other[,c("UCSC_RefGene_Name", "Regulatory_Feature_Group")]) %>% 
+        rownames_to_column(var = "cpg")
+
+Islands <- Islands.UCSC[, 2] %>% 
+        rownames()
+
+
+Islands <-data.frame(cpg = rownames(Islands.UCSC),
+                     Relation_to_Island = Islands.UCSC[,2])
+
+
+anno <- merge(anno, Islands, by = "cpg")
+
+
+
+anno <- anno %>% 
+        mutate(UCSC_RefGene_Name = ifelse(UCSC_RefGene_Name == "", paste("NA"), paste(UCSC_RefGene_Name)))
+
+
+
+library(stringr)
+
+
+anno <- anno %>% 
+        mutate(split = str_split(UCSC_RefGene_Name, ";")) %>% # split
+        mutate(split = map(.$split, ~ unique(.x))) %>% # drop duplicates
+        mutate(UCSC_RefGene_Name = map_chr(.$split, ~paste(.x, collapse = ";"))) # recombine
+
+anno <- anno[,1:4]
+
+
+
 
 
 # BH adjusted p val of 0.05 gave no significant DMPs between BH to PH, and BM to PM
 
-# run these comparisons with unadjusted p val
-
-myDMP2<- champ.DMP(beta = getBeta(myNorm),
-                   arraytype = "EPIC",
-          adjust.method = "none",
-          adjPVal = 0.05)               ### worked, no p val adjustement
 
 
-# run DMPs on M vals instead of B vals
+### save DMPs
 
 
-mvals <- B2M(getBeta(myNorm))
+saveRDS(myDMP_BH_BM, "myDMP_BH_BM.RDATA")
 
-saveRDS(mvals, file = "mvals.RDATA")
+saveRDS(myDMP_PH_PM, "myDMP_PH_PM.RDATA")
 
+saveRDS(myDMP_BM_PM, "myDMP_BM_PM.RDATA")
 
-myDMP3 <- champ.DMP(beta = mvals, 
-                    arraytype = "EPIC")
+saveRDS(myDMP_BH_PH, "myDMP_BH_PH.RDATA")
 
+# reload DMPs
 
-myDMP4 <- champ.DMP(beta = mvals, 
-                    arraytype = "EPIC",
-                    adjust.method = "none",
-                    adjPVal = 0.05)
+myDMP_BH_BM <- readRDS("myDMP_BH_BM.RDATA")
 
-### visualize DMPs
+myDMP_PH_PM <- readRDS("myDMP_PH_PM.RDATA")
 
-DMP.GUI(myDMP[[2]])
+myDMP_BM_PM <- readRDS("myDMP_BM_PM.RDATA")
 
-
-saveRDS(myDMP, "myDMP.RDATA")
-
-saveRDS(myDMP2, "myDMP2.RDATA")
-
-
-myDMP <- readRDS("myDMP.RDATA")
-
-myDMP2 <- readRDS("myDMP2.RDATA")
-
-#### check number of dmps at different unadjusted pvals 0.05, 0.01, 0.001
-
-myDMP4$BH_to_PH %>% 
-        rownames_to_column(var = "cpg") %>% 
-        as.data.frame() %>% 
-        filter(P.Value < 0.05) %>% 
-        rownames() %>% 
-        length()
+myDMP_BH_PH <- readRDS("myDMP_BH_PH.RDATA")
 
 # done to here
 
@@ -397,16 +584,14 @@ myDMP4$BH_to_PH %>%
 
 ################################################################################################################################
 
-library(pheatmap)
-library(viridis)
-
-
 
 # create heatmap of dmps
 
+###################################################################################
+
 # add annotation of condition
 
-dfh <- data.frame(sample = as.character(colnames(b_vals)), condition = "Timepoint") %>% 
+dfh <- data.frame(sample = as.character(colnames(flt_beta$beta)), condition = "Timepoint") %>% 
         column_to_rownames("sample") %>% 
         mutate(condition = substr_right(rownames(.),2))
 
@@ -416,33 +601,20 @@ dfh <- data.frame(sample = as.character(colnames(b_vals)), condition = "Timepoin
 dfh_1 <- dfh %>% 
         filter(condition %in% c("BH", "BM"))
 
-dmp_list <- rownames(myDMP$BH_to_BM)
+dmp_list <- rownames(myDMP_BH_BM$BH_to_BM)
 
-b_vals <- getBeta(myNorm)
+b_vals <- flt_beta$beta
 
-b_vals_1 <- b_vals[, rownames(dfh_1)]
+b_vals_1 <- b_vals[dmp_list, rownames(dfh_1)]
         
 
-dmp_bvals <- b_vals_1[dmp_list,]   # filter f_bVals for only significant DMPs
-
-df_bvals <- head(dmp_bvals, n = 1000)
-
-
-
-pheatmap(t(df_bvals), annotation_row = dfh_1, cutree_rows = 2, 
-         show_colnames = FALSE, annotation_names_row = FALSE, 
-         color = viridis(n = 100), scale = "none")
-# all datapoints
-
-pheatmap(t(dmp_bvals), annotation_row = dfh_1, cutree_rows = 2, 
-         show_colnames = FALSE, annotation_names_row = FALSE, 
-         color = viridis(n = 100), scale = "none")
-
-# cant plot all DMPs
 # isolate DMPs within islands
+
+annEPIC <- read_excel("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/Annotation file Illumina/infinium-methylationepic-v-1-0-b5-manifest-file.xlsx")
 
 ann_df <- annEPIC@listData %>% 
         as.data.frame()
+
 
 Island <- ann_df %>% 
         select(Name, Relation_to_Island) %>% 
@@ -504,7 +676,7 @@ pheatmap(t(b_vals_isl_2), annotation_row = dfh_2, cutree_rows = 2,
 
 # homogenate
 
-dmp_isl_change <- myDMP2$BH_to_PH %>%
+dmp_isl_change <- myDMP_BH_PH$BH_to_PH %>%
         rownames_to_column(var = "cpg") %>% 
         as.data.frame() %>%  
         arrange(logFC)
@@ -540,42 +712,46 @@ pheatmap(t(b_vals_change2), annotation_row = dfh_4, cutree_rows = 2,
 
 ### export csv files of DMPs
 
-DMP_BM_to_PM <- myDMP2$PM_to_BM %>%
+#################################################################################
+
+
+
+myDMP_BH_PH$BH_to_PH %>%
         rownames_to_column(var = "cpg") %>% 
         as.data.frame() %>% 
-        mutate(logFC = logFC*-1) %>%
-        arrange(logFC)
+        arrange(logFC) %>% 
+        merge(., anno, by = "cpg") %>% 
+        write.csv("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/DMPs/BH_to_PH_unadj. P 0.05.csv", row.names = FALSE)
 
-write.csv(DMP_BM_to_PM, "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/DMPs/BM_to_PM_unadj. P 0.05.csv", row.names = FALSE)
 
-DMP_BH_to_PH <- myDMP2$BH_to_PH %>%
+myDMP_BH_BM$BH_to_BM %>% 
         rownames_to_column(var = "cpg") %>% 
         as.data.frame() %>% 
-        arrange(logFC)
+        arrange(logFC) %>%
+        merge(., anno, by = "cpg") %>% 
+        write.csv("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/DMPs/BH_to_BM_FDR P 0.05.csv", row.names = FALSE)
 
-write.csv(DMP_BH_to_PH, "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/DMPs/BH_to_PH_unadj. P 0.05.csv", row.names = FALSE)
 
-DMP_BH_to_BM <- myDMP$BH_to_BM %>%
+myDMP_PH_PM$PH_to_PM %>% 
         rownames_to_column(var = "cpg") %>% 
         as.data.frame() %>% 
-        arrange(logFC)
+        arrange(logFC) %>%
+        merge(., anno, by = "cpg") %>%
+        write.csv("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/DMPs/PH_to_PM_FDR P 0.05.csv", row.names = FALSE)
 
-write.csv(DMP_BH_to_BM, "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/DMPs/BH_to_BM_FDR P 0.05.csv", row.names = FALSE)
-
-DMP_PM_to_PH <- myDMP$PM_to_PH %>%
+myDMP_BM_PM$BM_to_PM %>% 
         rownames_to_column(var = "cpg") %>% 
         as.data.frame() %>% 
-        mutate(logFC = logFC*-1) %>%
-        arrange(logFC)
-
-write.csv(DMP_PM_to_PH, "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/DMPs/PH_to_PM_FDR P 0.05.csv", row.names = FALSE)
-
+        arrange(logFC) %>%
+        merge(., anno, by = "cpg") %>%
+        write.csv("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/DMPs/BM_to_PM_unadj. P 0.05.csv", row.names = FALSE)
 
 
-
-###
+#################################################################################
 
 # cell pop correction
+
+#################################################################################
 
 dfh_2<- dfh %>% 
         filter(condition %in% c("BH", "PH"))
@@ -610,18 +786,25 @@ setwd(mypath)
 
 
 
-################################################################################################################################
+#################################################################################
 
 ### identify DMRs
+
+#################################################################################
 
 myDMR <- champ.DMR(arraytype = "EPIC",
                    compare.group = c("BH", "BM"))          #no significant DMPs with BH adjusted p val of 0.05
 
-myDMR <- champ.DMR(arraytype = "EPIC",
+myDMR_BH_PH <- champ.DMR(beta = B2M(flt_beta$beta),
+                   pheno = flt_beta$pd$Sample_Group,
+                   compare.group = c("BH", "PH"),
+                   arraytype = "EPIC",
                    method = "Bumphunter",
                    adjPvalDmr = "none",
-                   compare.group = c("BH", "BM"),
                    cores = 4)
+
+dmr <- as.data.frame(myDMR_BH_PH$BumphunterDMR)
+
 
 ### DMR did not work
 
