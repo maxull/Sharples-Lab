@@ -43,6 +43,8 @@ library(IlluminaHumanMethylationEPICanno.ilm10b5.hg38)  # newest illumina annota
 
 ### save directory for later! 
 
+setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/")
+
 mypath <- getwd()
 
 #############################################################
@@ -542,8 +544,9 @@ anno <- anno %>%
 
 anno <- anno[,1:4]
 
+saveRDS(anno, "anno.RDATA")
 
-
+anno <- readRDS("anno.RDATA")
 
 
 # BH adjusted p val of 0.05 gave no significant DMPs between BH to PH, and BM to PM
@@ -839,27 +842,121 @@ for (i in 1:length(unique_gene)) {
 }
 
 
+# remove "NA" from unique_cpg list
+
+unique_cpg2 <- unique_cpg[-2]
+
+cpgs <- rownames(flt_beta$beta)
+x <- intersect(unique_cpg[[1]], cpgs)
+
+
+
+# remove cpg that do not exist in filtered b vals
+
+for (i in 1:length(unique_cpg)) {
+        unique_cpg2[[i]] <- intersect(unique_cpg[[i]], cpgs)
+        print(i)
+}
+
+subsets <- unique_cpg2
+saveRDS(subsets, "subsets.RDATA")
+
+unique_cpg2
+
+subsets <- list()
+
+
+for (i in 1:lenth(unique_cpg)) {
+        unique_cpg
+        
+        print(i)
+        
+}
+
+
+
+for (i in 1:length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)) {
+        index <- which(array2$ENTREZ == uniquecg[i,])
+        z <- array2[index,]
+        mygenes[[(as.character(uniquecg[i,]))]] <- z$rowname
+        print(i)
+        
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 saveRDS(unique_cpg, "unique_cpg.RDATA")
 
 
+unique_cpg <- readRDS("unique_cpg.RDATA")
 
 
+### isolate M values of homogenate and myonuclei in separate meatrix
+
+m_vals <- B2M(flt_beta$beta)
+
+# list of homogenate samples
+
+homogenate_samples <- flt_beta$pd %>% 
+        filter(Sample_Group %in% c("BH", "PH")) %>% 
+        as.data.frame() %>% 
+        dplyr::select(1,4) 
+
+myonuclei_samples <- flt_beta$pd %>% 
+        filter(Sample_Group %in% c("BM", "PM")) %>% 
+        as.data.frame() %>% 
+        dplyr::select(1,4)
+
+m_vals_homo <- m_vals[,homogenate_samples$Sample_Name]
+
+m_vals_myo <- m_vals[,myonuclei_samples$Sample_Name]
 
 
+# create df with baseline = 0 and post = 1
+
+condition_homo <- flt_beta$pd %>% 
+        filter(Sample_Group %in% c("BH", "PH")) %>%
+        mutate(condition = substr_right(Sample_Group, 2),
+               condition = substr(condition,1,1),
+               condition = ifelse(condition == "B", 0, 1)) %>% 
+        dplyr::select(1,8)
+
+condition_myo <- flt_beta$pd %>% 
+        filter(Sample_Group %in% c("BM", "PM")) %>%
+        mutate(condition = substr_right(Sample_Group, 2),
+               condition = substr(condition,1,1),
+               condition = ifelse(condition == "B", 0, 1)) %>% 
+        dplyr::select(1,8)
+
+rownames(condition_homo) <- condition_homo[,1]
+
+condition_homo <- condition_homo %>% 
+        dplyr::select(2)
+
+rownames(condition_myo) <- condition_myo[,1]
+
+condition_myo <- condition_myo %>% 
+        dplyr::select(2)
+
+# ready for global test
+
+# m_vals = m_vals_homo and m_vals_myo
+# subsets = unique_cpg
+# pheno = condition_homo and condition_myo
 
 
-
-
-
-
-
-
-
-
-
-
-
-
+library(globaltest)
+gt_homo <- gt(response = condition_homo$condition, alternative = t(m_vals_homo), subsets = unique_cpg, model = "logistic", direction = FALSE, permutations = 0)
 
 ################################################################################################################################
 
