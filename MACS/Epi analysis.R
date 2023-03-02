@@ -841,17 +841,22 @@ for (i in 1:length(unique_gene)) {
         print(i)
 }
 
+saveRDS(unique_cpg, "unique_cpg.RDATA")
+
+
+unique_cpg <- readRDS("unique_cpg.RDATA")
+
 
 # remove "NA" from unique_cpg list
 
 unique_cpg2 <- unique_cpg[-2]
 
-cpgs <- rownames(flt_beta$beta)
-x <- intersect(unique_cpg[[1]], cpgs)
 
 
 
 # remove cpg that do not exist in filtered b vals
+
+cpgs <- rownames(flt_beta$beta)
 
 for (i in 1:length(unique_cpg)) {
         unique_cpg2[[i]] <- intersect(unique_cpg[[i]], cpgs)
@@ -861,44 +866,8 @@ for (i in 1:length(unique_cpg)) {
 subsets <- unique_cpg2
 saveRDS(subsets, "subsets.RDATA")
 
-unique_cpg2
-
-subsets <- list()
 
 
-for (i in 1:lenth(unique_cpg)) {
-        unique_cpg
-        
-        print(i)
-        
-}
-
-
-
-for (i in 1:length(uniquecg$`unique(CGtoGENE2$ENTREZ)`)) {
-        index <- which(array2$ENTREZ == uniquecg[i,])
-        z <- array2[index,]
-        mygenes[[(as.character(uniquecg[i,]))]] <- z$rowname
-        print(i)
-        
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-saveRDS(unique_cpg, "unique_cpg.RDATA")
-
-
-unique_cpg <- readRDS("unique_cpg.RDATA")
 
 
 ### isolate M values of homogenate and myonuclei in separate meatrix
@@ -956,7 +925,23 @@ condition_myo <- condition_myo %>%
 
 
 library(globaltest)
-gt_homo <- gt(response = condition_homo$condition, alternative = t(m_vals_homo), subsets = unique_cpg, model = "logistic", direction = FALSE, permutations = 0)
+
+gt.options(trim = TRUE) # quietly removes/skips cpgs in subset file that are not present in the filtered m_vals
+
+
+gt_homo <- gt(response = condition_homo$condition, alternative = t(m_vals_homo), subsets = subsets, model = "linear", direction = FALSE, permutations = 0) # run with automatically set equal weighting, instead of gt setting the weight
+
+saveRDS(gt_homo, "gt_homo.RDATA")
+
+
+gt_homo_results <- as.data.frame(gt_homo@result)
+
+summary(gt_homo)
+summary(gt_homo_results)
+
+# add direction by finding the 
+
+
 
 ################################################################################################################################
 
