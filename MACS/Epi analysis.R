@@ -587,7 +587,6 @@ myDMP_BH_PH <- readRDS("myDMP_BH_PH.RDATA")
 
 ################################################################################################################################
 
-
 # create heatmap of dmps
 
 ###################################################################################
@@ -929,22 +928,210 @@ library(globaltest)
 gt.options(trim = TRUE) # quietly removes/skips cpgs in subset file that are not present in the filtered m_vals
 
 
-gt_homo <- gt(response = condition_homo$condition, alternative = t(m_vals_homo), subsets = subsets, model = "linear", direction = FALSE, permutations = 0) # run with automatically set equal weighting, instead of gt setting the weight
+gt_homo <- gt(response = condition_homo$condition, 
+              alternative = t(m_vals_homo), 
+              subsets = subsets, 
+              model = "linear", 
+              direction = FALSE, 
+              permutations = 0,
+              standardize = TRUE) # equal weighting of cpgs in gene 
 
 saveRDS(gt_homo, "gt_homo.RDATA")
 
 
-gt_homo_results <- as.data.frame(gt_homo@result)
+gt_myo <- gt(response = condition_myo$condition, 
+              alternative = t(m_vals_myo), 
+              subsets = subsets, 
+              model = "linear", 
+              direction = FALSE, 
+              permutations = 0,
+              standardize = TRUE) # equal weighting of cpgs in gene 
 
-summary(gt_homo)
-summary(gt_homo_results)
+saveRDS(gt_myo, "gt_myo.RDATA")
 
-# add direction by finding the 
+
+gt_homo <- readRDS("gt_homo.RDATA")
+
+gt_myo <- readRDS("gt_myo.RDATA")
+
+
+gt_homo_res <- gt_homo@result %>% 
+        as.data.frame() %>% 
+        na.omit() %>% 
+        dplyr::select(1:4, Cov = '#Cov') %>% 
+        filter(Cov > 1 ) %>% 
+        filter(`p-value` < 0.05) 
+
+gt_myo_res <- gt_myo@result %>% 
+        as.data.frame() %>% 
+        na.omit() %>% 
+        dplyr::select(1:4, Cov = '#Cov') %>% 
+        filter(Cov > 1 ) %>% 
+        filter(`p-value` < 0.05)
+
+
+
+# add direction by finding the ???
+
+
+
+
+
+# make ggplot of the global test
+
+# homogenate
+
+for (i in 1:length(rownames(gt_homo_res))) {
+        
+        x <- rownames(gt_homo_res[i,])
+        
+        z <- subsets[[x]]
+        
+        y <- b_vals_homo[z,] %>%        # change this to myo b_vals for myonuclei
+                as.data.frame() %>% 
+                rownames_to_column(var = "cpg")
+        
+        y <- y %>% 
+                pivot_longer(names_to = "FP", values_to = "b_vals", cols = !1)
+         
+        y <- merge(y, anno, by = "cpg")
+        
+        y <- merge(y,rownames_to_column(condition_homo, var = "FP"), by = "FP")
+        
+        y <- y %>% 
+                mutate(condition = factor(ifelse(condition == 0, "Baseline", "Post"), levels = c("Baseline", "Post")))
+        
+        p1 <- ggplot(data = y, aes(x = cpg, y = b_vals, group = condition, color = condition))+
+                geom_point(aes(shape = Relation_to_Island), size = 1)+
+                geom_smooth(method = "loess", se = FALSE, size = 1)+
+                theme_classic(base_size = 8)+
+                theme(axis.text.x = element_text(angle = -90),
+                      axis.title.x = element_blank())+ 
+                scale_y_continuous(limits = c(0,1))+
+                labs(title = paste(x, "homogenate", "(", "p-value  = ", round(gt_homo_res[i,1], 4),")" ))
+        
+        ggsave(p1, filename = paste("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/Figures/global test homo genes/", "p=",round(gt_homo_res[i,1], 4),"_",x,"_", "homogenate",".png", sep = ""),)
+        
+        
+        
+        print(i)
+}
+
+# myonuclei
+
+b_vals_myo <- flt_beta$beta[,myonuclei_samples$Sample_Name]
+
+
+for (i in 1:length(rownames(gt_myo_res))) {
+        
+        x <- rownames(gt_myo_res[i,])
+        
+        z <- subsets[[x]]
+        
+        y <- b_vals_myo[z,] %>%        
+                as.data.frame() %>% 
+                rownames_to_column(var = "cpg")
+        
+        y <- y %>% 
+                pivot_longer(names_to = "FP", values_to = "b_vals", cols = !1)
+        
+        y <- merge(y, anno, by = "cpg")
+        
+        y <- merge(y,rownames_to_column(condition_myo, var = "FP"), by = "FP")
+        
+        y <- y %>% 
+                mutate(condition = factor(ifelse(condition == 0, "Baseline", "Post"), levels = c("Baseline", "Post")))
+        
+        p1 <- ggplot(data = y, aes(x = cpg, y = b_vals, group = condition, color = condition))+
+                geom_point(aes(shape = Relation_to_Island), size = 1)+
+                geom_smooth(method = "loess", se = FALSE, size = 1)+
+                theme_classic(base_size = 8)+
+                theme(axis.text.x = element_text(angle = -90),
+                      axis.title.x = element_blank())+ 
+                scale_y_continuous(limits = c(0,1))+
+                labs(title = paste(x, "myonuclei", "(", "p-value  = ", round(gt_myo_res[i,1], 4),")" ))
+        
+        ggsave(p1, filename = paste("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/Figures/global test myo genes/", "p=",round(gt_myo_res[i,1], 4),"_",x,"_", "myonuclei",".png", sep = ""),)
+        
+        
+        
+        print(i)
+}
+
 
 
 
 ################################################################################################################################
 
+# identify direction of DMP affect of interstitial cells
+
+################################################################################
+
+b_vals <- as.data.frame(flt_beta$beta)
+
+head_b <- head(b_vals) %>% 
+        as.data.frame()
+
+b_vals <- b_vals %>% 
+        mutate("1BI" = b_vals$"1BM" - b_vals$"1BH",
+               "1PI" = b_vals$"1PM" - b_vals$"1PH",
+               "2BI" = b_vals$"2BM" - b_vals$"2BH",
+               "2PI" = b_vals$"2PM" - b_vals$"2PH",
+               "4BI" = b_vals$"4BM" - b_vals$"4BH",
+               "4PI" = b_vals$"4PM" - b_vals$"4PH",
+               "5BI" = b_vals$"5BM" - b_vals$"5BH",
+               "5PI" = b_vals$"5PM" - b_vals$"5PH",
+               "6BI" = b_vals$"6BM" - b_vals$"6BH",
+               "6PI" = b_vals$"6PM" - b_vals$"6PH",
+               "7BI" = b_vals$"7BM" - b_vals$"7BH",
+               "7PI" = b_vals$"7PM" - b_vals$"7PH",
+               "8BI" = b_vals$"8BM" - b_vals$"8BH",
+               "8PI" = b_vals$"8PM" - b_vals$"8PH",
+               "12BI" = b_vals$"12BM" - b_vals$"12BH",
+               "12PI" = b_vals$"12PM" - b_vals$"12PH")          # subtract homogenate profile from myonuclear profile to identify in which direction interstitial cells are dragging the myonuclear profile
+
+summary(b_vals)
+
+b_vals_int <- b_vals %>% 
+        mutate("1BI" = b_vals$"1BM" - b_vals$"1BI",
+               "1PI" = b_vals$"1PM" - b_vals$"1PI",
+               "2BI" = b_vals$"2BM" - b_vals$"2BI",
+               "2PI" = b_vals$"2PM" - b_vals$"2PI",
+               "4BI" = b_vals$"4BM" - b_vals$"4BI",
+               "4PI" = b_vals$"4PM" - b_vals$"4PI",
+               "5BI" = b_vals$"5BM" - b_vals$"5BI",
+               "5PI" = b_vals$"5PM" - b_vals$"5PI",
+               "6BI" = b_vals$"6BM" - b_vals$"6BI",
+               "6PI" = b_vals$"6PM" - b_vals$"6PI",
+               "7BI" = b_vals$"7BM" - b_vals$"7BI",
+               "7PI" = b_vals$"7PM" - b_vals$"7PI",
+               "8BI" = b_vals$"8BM" - b_vals$"8BI",
+               "8PI" = b_vals$"8PM" - b_vals$"8PI",
+               "12BI" = b_vals$"12BM" - b_vals$"12BI",
+               "12PI" = b_vals$"12PM" - b_vals$"12PI") %>% 
+        dplyr::select(33:48)
+
+summary(b_vals_int)
+
+b <- as.matrix(b_vals_int)
+densityPlot(b)
+
+
+# use champ.refbase to identify and correct for immune cell profiles from blood
+
+
+myRefbase_int <- champ.refbase(beta = b_vals_int,                      ### returns b-vals adjusted for 5 main cellpopulations identified
+                           arraytype = "EPIC")
+
+myRefbase_myo <- champ.refbase(beta = b_vals_myo,                      ### returns b-vals adjusted for 5 main cellpopulations identified
+                               arraytype = "EPIC")
+
+myRefbase_homo <- champ.refbase(beta = b_vals_homo,                      ### returns b-vals adjusted for 5 main cellpopulations identified
+                               arraytype = "EPIC")
+
+# not satisfied with how this works
+
+################################################################################
 ### identify GSEA
 
 
