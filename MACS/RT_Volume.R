@@ -46,6 +46,56 @@ ggsave(p1, filename = "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Fig
        dpi = 400,
        units = "px",width = 4000, height = 2000)
 
+
+### remake plot with v_total data normalized for lean mass
+
+# load dexa data to find total lean mass
+
+dexa_data <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/DEXA/DEXA_data.xlsx")
+
+x <- dexa_data %>% 
+        filter(Timepoint == "Baseline") %>% 
+        dplyr::select(FP, `Mager(g)_Total`) %>% 
+        na.omit()
+
+y <- RT_data %>% 
+        dplyr::select(Session,FP, v_total) 
+
+# merge dexa and strength data, and calculate normalized RT volume
+merge(x, y, by = "FP") %>% 
+        mutate(norm_total = (v_total/(`Mager(g)_Total`/1000))) %>% 
+        filter(norm_total != 0) %>% 
+        na.omit() -> RT_df
+
+RT_mean <- RT_df %>% 
+        na.omit() %>% 
+        group_by(Session) %>% 
+        summarise(mean = mean(norm_total),
+                  sd = sd(norm_total))
+
+# replot figure with norm data
+
+p2 <- ggplot(data = RT_df, aes(x = Session-2, y  = norm_total))+
+        geom_point(alpha = 0.2, size = 2, aes(color = FP))+
+        geom_line(data = RT_df, aes(y = norm_total, group = FP, color = FP), alpha = 0.2, size = 1.2)+
+        geom_point(data = RT_mean, aes(x = Session-2, y = mean), size = 3)+
+        geom_errorbar(data = RT_mean, aes(x = Session-2, ymin = (mean-sd), ymax = (mean+sd)), inherit.aes = FALSE, width = 0.2, size = 1)+
+        geom_line(data = RT_mean, aes(y = mean), size = 1.2)+
+        scale_y_continuous(expand = c(0,0),
+                           limits = c(0,450),
+                           n.breaks = 10)+
+        scale_x_continuous(n.breaks = 16,
+                           expand = c(0.03,0))+
+        theme_classic()+
+        labs(y = "norm Volume Load (KG*REPS*SETS/LEAN MASS)",
+             x = "Training session")+
+        geom_text(data = RT_mean, aes(label = as.integer(mean), x = Session-2, y = mean-sd), inherit.aes = FALSE, vjust = 3, size = 3)+
+        theme(legend.title = element_blank())
+
+ggsave(p2, filename = "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Figures/Norm Volume load.png", 
+       dpi = 400,
+       units = "px",width = 4000, height = 2000)
+
 ###############################################################################################
 
 ### individual plots
