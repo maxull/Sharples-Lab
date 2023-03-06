@@ -514,6 +514,16 @@ library(dplyr)
 data(Other)
 data("Islands.UCSC")
 
+annotation <- as.data.frame(Other)
+
+data(IlluminaHumanMethylationEPICanno.ilm10b5.hg38)
+
+as.data.frame(IlluminaHumanMethylationEPICanno.ilm10b5.hg38)
+rm(manifest)
+data("Locations")
+manifest <- as.data.frame(Locations)
+
+
 anno <- as.data.frame(Other[,c("UCSC_RefGene_Name", "Regulatory_Feature_Group")]) %>% 
         rownames_to_column(var = "cpg")
 
@@ -531,7 +541,6 @@ anno <- merge(anno, Islands, by = "cpg")
 
 anno <- anno %>% 
         mutate(UCSC_RefGene_Name = ifelse(UCSC_RefGene_Name == "", paste("NA"), paste(UCSC_RefGene_Name)))
-
 
 
 library(stringr)
@@ -1060,6 +1069,133 @@ for (i in 1:length(rownames(gt_myo_res))) {
 
 
 
+# add direction on global delta-Beta value change
+
+# mean beta post - mean beta baseline = negative (hypomethylation) positive (hyper)
+
+gt_homo_res
+
+b_vals_homo
+
+unique_cpg2
+
+x <- as.data.frame(rowMeans(t(b_vals_homo[unique_cpg2[[1]],]))) %>% 
+        rownames_to_column()
+
+y <- condition_homo %>% 
+        rownames_to_column() %>% 
+        as.data.frame() %>% 
+        mutate(condition = ifelse(condition == 0, "Baseline", "Post"))
+
+z <- merge(x,y, by = "rowname") %>% 
+        group_by(condition) %>% 
+        summarize(mean_b = mean(rowMeans(t(b_vals_homo[unique_cpg2[[1]], ])))) %>% 
+        pivot_wider(names_from = condition, values_from = mean_b, data = .) %>% 
+        mutate(change = Post - Baseline,
+               percent_change = (change/Baseline)*100) %>% 
+        mutate(gene = names(unique_cpg2[1]))
+
+change_df <- z
+
+# calculate change for all genes
+
+for (i in 1:length(unique_cpg2)) {
+        tryCatch({
+        
+        x <- as.data.frame(rowMeans(t(b_vals_homo[unique_cpg2[[i]],]))) %>% 
+                rownames_to_column()
+        
+        colnames(x) <- c("rowname", "means")
+        
+        z <- merge(x,y, by = "rowname") %>% 
+                group_by(condition) %>% 
+                summarize(mean_b = mean(means, na.rm = TRUE)) %>% 
+                pivot_wider(names_from = condition, values_from = mean_b, data = .) %>% 
+                mutate(change = Post - Baseline,
+                       percent_change = (change/Baseline)*100) %>% 
+                mutate(gene = names(unique_cpg2[i]))
+        
+        change_df <- change_df %>% 
+                rows_insert(z)
+        
+        }, error = function(e){cat("ERROR :",conditionMessage(e), "\n")})
+        
+        print(i)
+}
+
+
+# filter for change
+
+change_df[change_df$change > 0.01 | change_df$change < -0.01,]
+
+change_df_homo <- change_df
+
+# merge and save unfiltered global test, and mean change
+
+gt_homo_results2 <- gt_homo_results %>% 
+        rownames_to_column(var = "gene") %>%
+        merge(., change_df_homo, by = "gene", all.x = TRUE)
+
+saveRDS(gt_homo_results2, "gt_homo_results2.RDATA")
+
+
+# repeat for myonuclei
+
+x <- as.data.frame(rowMeans(t(b_vals_myo[unique_cpg2[[1]],]))) %>% 
+        rownames_to_column()
+
+y <- condition_myo %>% 
+        rownames_to_column() %>% 
+        as.data.frame() %>% 
+        mutate(condition = ifelse(condition == 0, "Baseline", "Post"))
+
+z <- merge(x,y, by = "rowname") %>% 
+        group_by(condition) %>% 
+        summarize(mean_b = mean(rowMeans(t(b_vals_myo[unique_cpg2[[1]], ])))) %>% 
+        pivot_wider(names_from = condition, values_from = mean_b, data = .) %>% 
+        mutate(change = Post - Baseline,
+               percent_change = (change/Baseline)*100) %>% 
+        mutate(gene = names(unique_cpg2[1]))
+
+change_df <- z
+
+# calculate change for all genes
+
+for (i in 1:length(unique_cpg2)) {
+        tryCatch({
+                
+                x <- as.data.frame(rowMeans(t(b_vals_myo[unique_cpg2[[i]],]))) %>% 
+                        rownames_to_column()
+                
+                colnames(x) <- c("rowname", "means")
+                
+                z <- merge(x,y, by = "rowname") %>% 
+                        group_by(condition) %>% 
+                        summarize(mean_b = mean(means, na.rm = TRUE)) %>% 
+                        pivot_wider(names_from = condition, values_from = mean_b, data = .) %>% 
+                        mutate(change = Post - Baseline,
+                               percent_change = (change/Baseline)*100) %>% 
+                        mutate(gene = names(unique_cpg2[i]))
+                
+                change_df <- change_df %>% 
+                        rows_insert(z)
+                
+        }, error = function(e){cat("ERROR :",conditionMessage(e), "\n")})
+        
+        print(i)
+}
+
+change_df[change_df$change > 0.01 | change_df$change < -0.01,]
+
+change_df_myo <- change_df
+
+gt_myo_results <- gt_myo@result %>%
+        as.data.frame() %>% 
+        rownames_to_column(var = "gene") %>%
+        merge(., change_df_homo, by = "gene", all.x = TRUE)
+
+
+
 
 ################################################################################################################################
 
@@ -1116,7 +1252,7 @@ summary(b_vals_int)
 b <- as.matrix(b_vals_int)
 densityPlot(b)
 
-
+unique(anno$Regulatory_Feature_Group)
 # use champ.refbase to identify and correct for immune cell profiles from blood
 
 
