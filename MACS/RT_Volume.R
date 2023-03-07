@@ -19,6 +19,26 @@ RT_mean <- RT_data %>%
         summarise(mean = mean(v_total),
                   sd = sd(v_total))
 
+
+
+# perform paired t test for RT volume gains
+session3 <- RT_data %>% 
+        filter(Session == "3") %>% 
+        na.omit() %>% 
+        filter(FP != "MACS_007") %>% 
+        summarize(mean = mean(v_total))
+
+session16 <- RT_data %>% 
+        filter(Session == "16") %>% 
+        filter(v_total != 0) %>% 
+        summarise(mean = mean(v_total))
+
+t.test(x = session3$v_total, y = session16$v_total, paired = TRUE)
+
+###
+
+
+
 RT_data %>% 
         filter(v_total != 0) %>% 
         na.omit() -> RT_df
