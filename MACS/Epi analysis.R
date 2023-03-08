@@ -609,6 +609,101 @@ myDMP_BH_PH <- readRDS("myDMP_BH_PH.RDATA")
 # - GSEA
 # - global test etc.
 
+########################################################################
+
+# create horizontal barchart of DMPs in different positions
+
+########################################################################
+
+
+# start with baseline samples
+
+baseline_dmps <- myDMP_BH_BM$BH_to_BM %>% 
+        rownames_to_column(var = "cpg") %>% 
+        as.data.frame() %>% 
+        dplyr::select(cpg, P.Value, deltaBeta)
+
+# merge with newer annotation
+
+baseline_dmps <- merge(baseline_dmps, anno, by = "cpg") %>% 
+        as.data.frame() %>% 
+        mutate("dir" = as.factor(ifelse(deltaBeta <0, "Negative_skew", "Positive_skew"))) %>% 
+        summary()
+        
+dfh_1 <- dfh %>% 
+        filter(condition %in% c("BH", "BM"))        
+
+change_b_vals_baseline <- b_vals[,rownames(dfh_1)] %>% 
+        mutate(average_homo = (`1BH`+ `1BH`+ `4BH`+ `5BH`+ `6BH`+ `7BH`+ `8BH`+`12BH`)/8,
+               average_myo = (`1BM`+ `1BM`+ `4BM`+ `5BM`+ `6BM`+ `7BM`+ `8BM`+`12BM`)/8,
+               change = average_myo-average_homo) %>% 
+        dplyr::select(change) %>% 
+        rownames_to_column(var = "cpg")
+
+merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>% 
+        ggplot(aes(x = change, y = Relation_to_Island, fill = dir))+
+        geom_bar(stat = "identity")
+
+n_count <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>% 
+        filter(dir == "Negative_skew") %>% 
+        mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
+        summarise(count(Relation_to_Island)) %>% 
+        as.data.frame() 
+
+p_count <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>% 
+        filter(dir == "Positive_skew") %>% 
+        mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
+        summarise(count(Relation_to_Island)) %>% 
+        as.data.frame() 
+
+df <- data.frame(
+        category = n_count[6:1,]$x,
+        neg_skew = (n_count[6:1,]$freq)*-1,
+        pos_skew = p_count[6:1,]$freq)
+
+ggplot(df, aes(x = category)) +
+        geom_bar(aes(y = neg_skew, fill = "neg_skew"), stat = "identity") +
+        geom_bar(aes(y = pos_skew, fill = "pos_skew"), stat = "identity") +
+        scale_fill_manual(values = c("#453781FF", "#DCE319FF")) + # set colors
+        geom_label(aes(label = as.integer(neg_skew)*-1, x = category, y = as.integer(neg_skew)), size = 4, alpha = 0.8, nudge_y = -3000)+
+        geom_label(aes(label = as.integer(pos_skew), x = category, y = as.integer(pos_skew)), size = 4, alpha = 0.8, nudge_y = 3000)+
+        coord_flip()+
+        theme_classic()+
+        theme(legend.title = element_blank(),
+              axis.title.y = element_blank(),
+              axis.title.x = element_text(hjust = 0.58))+
+        labs(y = "Number of DMPs",
+             title = "Baseline DMPs between Homogenate and Myonuclei")
+
+
+# find number of significant cpgs that were altered more than <0.01 B < 0.1 B < 0.2 B <
+
+
+change_b_vals_baseline %>% 
+        mutate(change = abs(change)) %>% # change all numbers to positive
+        merge(baseline_dmps,.,by.x = "cpg") %>% 
+        # find values in ranges
+        mutate(skew = ifelse(change <0.01, "<0.01", 
+                             ifelse(change >0.01 & change < 0.1, "0.01<0.1", 
+                                    ifelse(change > 0.1 & change < 0.2, "0.1<0.2", 
+                                           ifelse(change > 0.2 & change < 0.3, "0.2<0.3",">0.3"))))) %>% 
+        summarise(count(skew)) -> df1
+        
+df2 <- data.frame(category = factor(df1[,1]$x, levels = c("<0.01", "0.01<0.1", "0.1<0.2", "0.2<0.3", ">0.3")),
+                  count = df1[,1]$freq)
+
+ggplot(data = df2, aes(x = category))+
+        geom_bar(aes(y = count), stat = "identity")+
+        geom_label(aes(label = count, y = count), alpha = 0.8)+
+        theme_classic()+
+        labs(title = "number of DMPs with different skewed B-values at baseline",
+             x = "B-value skew")+
+        theme(axis.title.y = element_blank())
+
+
+
+
+
 
 
 ################################################################################################################################
