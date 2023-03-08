@@ -40,8 +40,27 @@ df %>%
         geom_line(aes(group = FP))+
         geom_errorbar(aes(ymin = mean-sd,
                           ymax = mean+sd), width = 0.2)+
-        facet_grid(~muscle)
+        facet_grid(~muscle) %>% 
+        filter(muscle == "VL")-> df_vl
+
                 
+# run t.test on change from T2 to T3
+
+# create a new dataframe, df_vl, that contains only the VL muscle
+df %>% 
+        group_by(FP, timepoint, muscle) %>% 
+        summarise(mean = mean(cm2)) %>% 
+        pivot_wider(names_from = timepoint, values_from = mean) %>% 
+        filter(muscle == "VL") -> df_vl
+
+# run a paired t-test on the T3 and T2 columns of the new dataframe
+t.test(df_vl$T3, df_vl$T2, paired = T)
+
+
+
+
+
+
 
 # plot % change
 

@@ -103,8 +103,14 @@ fviz_pca_ind(pca.data, addEllipses = FALSE,
 
 # loag rgSet to do functional normalization
 
-myLoad <- champ.load(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/raw idat/", 
-                     arraytype = "EPIC", method = "minfi")
+# Load the champ package
+library(champ)
+
+# Load the idat files from the directory
+myLoad <- champ.load(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/raw idat/", arraytype = "EPIC", method = "minfi")
+
+
+
 
 # change annotation to new annotation file
 
@@ -114,6 +120,16 @@ myLoad$rgSet@annotation = c(array = "IlluminaHumanMethylationEPIC", annotation =
 # normalize
 
 
+# preprocessFunnorm is a function that normalizes the data
+# myLoad$rgSet is the data that is being normalized
+# nPCs is the number of principal components to be used for normalization
+# sex is the sex of the samples
+# bgCorr is the background correction
+# dyeCorr is the dye bias correction
+# keepCN is the copy number correction
+# ratioConvert is the ratio conversion
+# verbose is the verbose output
+
 myNorm_fun <- preprocessFunnorm(myLoad$rgSet, 
                                 nPCs=3, 
                                 sex = NULL, 
@@ -122,6 +138,7 @@ myNorm_fun <- preprocessFunnorm(myLoad$rgSet,
                                 keepCN = FALSE, 
                                 ratioConvert = TRUE,
                                 verbose = TRUE)
+
 
 
 

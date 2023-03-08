@@ -20,7 +20,7 @@ dexa_data %>%
 
 df <- dexa_data %>% 
         #filter(FP == "MACS_001") %>% 
-        select(1,3,7:16) %>% 
+        dplyr::select(1,2,6:15) %>% 
         pivot_wider(names_from = Timepoint, values_from = 3:12) %>% 
         mutate(lean_total_change = (.[[3]]-.[[2]]),
                lean_arms_change = (.[[5]]-.[[4]]),
@@ -31,7 +31,17 @@ df <- dexa_data %>%
                "lean_total_change_%" =  (((.[[3]]-.[[2]])/.[[2]])*100),
                "lean_arms_change_%" =  (((.[[5]]-.[[4]])/.[[4]])*100),
                "lean_legs_change_%" =  (((.[[7]]-.[[6]])/.[[6]])*100),
-               "lean_left_leg_change_%" =  (((.[[9]]-.[[8]])/.[[8]])*100))
+               "lean_left_leg_change_%" =  (((.[[9]]-.[[8]])/.[[8]])*100)) %>% 
+        na.omit()
+
+# t test for change from baseline
+
+t.test(df$`Mager(g)_Total_Baseline`,df$`Mager(g)_Total_Post`, paired = TRUE)
+
+t.test(df$`Mager(g)_Left_Leg_Post`, df$`Mager(g)_Left_Leg_Baseline`, paired = TRUE)
+
+
+
               
 df2 <- df %>% 
         select(1, 27:31) %>% 

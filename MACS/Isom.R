@@ -359,18 +359,20 @@ ggarrange(p30,p60,p90,p30e,p60e,p90e, ncol = 3, nrow = 2, common.legend = TRUE, 
 # % change from baseline
 
 df_ext <- isom_df %>%
-        select(1,4,5,6,8,9) %>% 
+        dplyr::select(1,4,5,6,8,9) %>% 
         filter(timepoint >= 2) %>%
         mutate(timepoint = ifelse(timepoint == 2 , "baseline" , "post")) %>% 
         filter(reps == 3) %>% 
         mutate(names = paste(timepoint, angle, sep = "_")) %>% 
-        select(FP, names, t_max) %>% 
+        dplyr::select(FP, names, t_max) %>% 
         pivot_wider(names_from = names, values_from = t_max) %>% 
         mutate(change_30 = ((post_30 - baseline_30)/baseline_30)*100,
                change_60 = ((post_60 - baseline_60)/baseline_60)*100,
                change_90 = ((post_90 - baseline_90)/baseline_90)*100,)
 
-
+t.test(df_ext$baseline_30, df_ext$post_30, paired = TRUE)
+t.test(df_ext$baseline_60, df_ext$post_60, paired = TRUE)
+t.test(df_ext$baseline_90, df_ext$post_90, paired = TRUE)
 
 
 # plot % change from baseline
