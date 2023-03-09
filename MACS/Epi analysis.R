@@ -797,6 +797,16 @@ plot_grid(p1,p3,p2,p4, rel_widths = c(1.5,1), labels = c("A", "B", "C", "D"))
 
 
 
+# count baseline DMPs for islands within promoters
+
+myDMP_BH_BM$BH_to_BM %>%
+        as.data.frame() %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island") %>% 
+        nrow()
+
+unique(anno$Regulatory_Feature_Group)
 
 ################################################################################################################################
 
@@ -958,11 +968,8 @@ post_neg <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>%
 post_pos <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>% 
         filter(dir == "Positive_skew")
 
-y = base_neg$cpg
 
-
-
-
+# add the four different cpg lists to a shared list
 
 
 DMPs <- list(
@@ -976,11 +983,31 @@ devtools::install_github("yanlinlin82/ggvenn")
 
 library(ggvenn)
 
+# plot venn-diagram with only baseline and post sides
 
-ggvenn(DMPs, set_name_size = 10, stroke_size = 1, 
+venn <- ggvenn(DMPs, set_name_size = 10, stroke_size = 1, 
        fill_color = c("#453781FF", "#DCE319FF","#453781FF", "#DCE319FF"),text_size = 10,stroke_alpha = 0.8)
 
+# find the two cpgs that were positively skewed at baseline and negatively at post
 
+merge(base_pos, post_neg, by = "cpg") 
+
+# rind the significant position in homo DMPs across time
+
+myDMP_BH_PH$BH_to_PH %>% 
+        rownames_to_column(var = "cpg") %>% 
+        rownames_to_column(var = "number") %>% 
+        filter(cpg == "cg00408117" | cpg == "cg13897145")
+
+Illumina_anno %>% 
+        filter(IlmnID == "cg00408117" | IlmnID == "cg13897145")
+
+# find the same pobes in myonuclear DMPs list
+
+myDMP_BM_PM$BM_to_PM %>% 
+        rownames_to_column(var = "cpg") %>% 
+        rownames_to_column(var = "number") %>% 
+        filter(cpg == "cg00408117" | cpg == "cg13897145")
 
 #################################################################################
 
