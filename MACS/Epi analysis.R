@@ -114,8 +114,17 @@ myLoad <- champ.load(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Ma
 
 # change annotation to new annotation file
 
+# annotation headers explained: https://knowledge.illumina.com/microarray/general/microarray-general-reference_material-list/000001568
 
 myLoad$rgSet@annotation = c(array = "IlluminaHumanMethylationEPIC", annotation = "ilm10b5.hg38")
+
+Illumina_anno <- read.csv("Annotation file Illumina/infinium-methylationepic-v-1-0-b5-manifest-file.csv", skip = 7, header = TRUE)
+
+
+
+count(Illumina_anno$UCSC_RefGene_Name)
+
+
 
 # normalize
 
@@ -700,7 +709,7 @@ p3 <- ggplot(data = df2, aes(x = category))+
         theme(axis.title.y = element_blank())+
         scale_y_continuous(trans = "log2", expand  = c(0, 1), n.breaks = 9)
 
-#################################################################################
+
 # repeat for post samples
 
 post_dmps <- myDMP_PH_PM$PH_to_PM %>% 
@@ -784,7 +793,7 @@ p4 <- ggplot(data = df4, aes(x = category))+
         scale_y_continuous(trans = "log2", expand  = c(0, 1), n.breaks = 9)
 
 
-plot_grid(p1,p3,p2,p4, rel_widths = c(1.5,1))
+plot_grid(p1,p3,p2,p4, rel_widths = c(1.5,1), labels = c("A", "B", "C", "D"))
 
 
 
@@ -797,7 +806,7 @@ plot_grid(p1,p3,p2,p4, rel_widths = c(1.5,1))
 
 # add annotation of condition
 
-dfh <- data.frame(sample = as.character(colnames(flt_beta$beta)), condition = "Timepoint") %>% 
+dfh <- data.frame(sample = as.character(colnames(baseline_dmps_in_islands)), condition = "Timepoint") %>% 
         column_to_rownames("sample") %>% 
         mutate(condition = substr_right(rownames(.),2))
 
@@ -817,7 +826,6 @@ island_cpg <- anno %>%
         filter(Relation_to_Island == "Island",
                cpg %in% rownames(b_vals))
 
-island_cpg <- island_cpg[rownames(b_vals),1] # not a good solution
 
 # filter b vals for significant island cpgs
 
@@ -828,96 +836,69 @@ b_vals_1 <- b_vals[island_cpg$cpg,rownames(dfh_1)] %>%
         dplyr::select(2:17)
 
 
-pheatmap(t(b_vals_1), annotation_row = dfh_1, cutree_rows = 2, 
+base_heat <- pheatmap(t(b_vals_1), annotation_row = dfh_1, cutree_rows = 2, 
          show_colnames = FALSE, annotation_names_row = FALSE, 
          color = viridis(n = 100), scale = "none")
 
 
+# repeat for post samples
 
+dmp_post <- rownames(myDMP_PH_PM$PH_to_PM)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-
-# isolate DMPs within islands
-
-annEPIC <- read_excel("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/Annotation file Illumina/infinium-methylationepic-v-1-0-b5-manifest-file.xlsx")
-
-ann_df <- annEPIC@listData %>% 
-        as.data.frame()
-
-
-Island <- ann_df %>% 
-        select(Name, Relation_to_Island) %>% 
-        filter(Relation_to_Island == "Island") %>% 
-        column_to_rownames(var = "Name")
-
-# check that island cpg exists in b_vals list
-
-
-b_vals_isl <- b_vals[rownames(b_vals) %in% c(rownames(Island)),] # keep cpg rows that map to cpg islands
-
-# filter DMPs BH to BM
-
-b_vals_3 <- b_vals_isl[, rownames(dfh_1)]
-
-# 160000 + rows is still to much, lets keep highest fold change DMPs
-
-dmp_isl <- myDMP$BH_to_BM %>%
-        rownames_to_column(var = "cpg") %>% 
+b_vals_2 <- b_vals[island_cpg$cpg,rownames(dfh_2)] %>% 
         as.data.frame() %>% 
-        filter(cgi == "island") %>% 
-        arrange(logFC)
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% dmp_post) %>% 
+        dplyr::select(2:17)
 
-b_vals_isl <- b_vals[rownames(b_vals) %in% c(dmp_isl$cpg),rownames(dfh_1)]
+dfh$condition <- factor(dfh$condition, levels = c("BH","BM","PH","PM"))
 
-pheatmap(t(b_vals_isl), annotation_row = dfh_1, cutree_rows = 2, 
+post_heat <- pheatmap(t(b_vals_2), annotation_row = dfh_2, cutree_rows = 2, 
+                      show_colnames = FALSE, annotation_names_row = FALSE, 
+                      color = viridis(n = 100), scale = "none", cluster_rows = TRUE)
+
+
+
+
+
+baseline_dmps_in_islands <- merge(b_vals_1, b_vals_2, by.x = "cpg") %>% 
+        na.omit() %>% 
+        dplyr::select("1BH","2BH","4BH","5BH","6BH","7BH","8BH","12BH",
+                      "1BM","2BM","4BM","5BM","6BM","7BM","8BM","12BM",
+                      "1PH","2PH","4PH","5PH","6PH","7PH","8PH","12PH",
+                      "1PM","2PM","4PM","5PM","6PM","7PM","8PM","12PM")
+
+
+# plot baseline
+
+baseline_dmps <- pheatmap(t(baseline_dmps_in_islands[,rownames(dfh_1)]), annotation_row = dfh_1, cluster_rows = FALSE, gaps_row = 8, 
          show_colnames = FALSE, annotation_names_row = FALSE, 
          color = viridis(n = 100), scale = "none")
 
+# plot post
+
+post_dmps <- pheatmap(t(baseline_dmps_in_islands[,rownames(dfh_2)]), annotation_row = dfh_2, cluster_rows = FALSE, gaps_row = 8, 
+                          show_colnames = FALSE, annotation_names_row = FALSE, 
+                          color = viridis(n = 100), scale = "none")
+
+# plot together
+
+library(gridExtra)
+library(grid)
+
+plot_list <- list()
+
+
+plot_list[['p1']]=baseline_dmps[[4]]
+plot_list[['p2']]=post_dmps[[4]]
+
+plot_heat <- plot_grid(baseline_dmps[[4]], post_dmps[[4]], ncol=1, labels = c("A", "B"))   
+
+ggsave2(plot_heat, filename = "heatmap_homo_vs_myo.pdf",units = "cm", width = 19, height = 21, bg = "white")
 
 
 
 
-# heatmap all timepoints and conditions
-
-dfh_2 <- dfh %>% 
-        filter(condition %in% c("PH", "PM"))
-
-# change direction of post dmps, so it matches with baseline
-
-dmp_isl_2 <- myDMP$PM_to_PH %>%
-        rownames_to_column(var = "cpg") %>% 
-        as.data.frame() %>% 
-        filter(cgi == "island") %>% 
-        mutate(logFC = logFC*-1) %>% 
-        arrange(logFC)
-
-# plot post DMPs
-
-
-b_vals_isl_2 <- b_vals[rownames(b_vals) %in% c(dmp_isl_2$cpg),rownames(dfh_2)]
-
-pheatmap(t(b_vals_isl_2), annotation_row = dfh_2, cutree_rows = 2, 
-         show_colnames = FALSE, annotation_names_row = FALSE, 
-         color = viridis(n = 100), scale = "none", )
 
 
 # plot baseline to post change
@@ -954,6 +935,51 @@ b_vals_change2 <- b_vals[rownames(b_vals) %in% c(dmp_isl_change2$cpg),rownames(d
 pheatmap(t(b_vals_change2), annotation_row = dfh_4, cutree_rows = 2, 
          show_colnames = FALSE, annotation_names_row = FALSE, 
          color = viridis(n = 100), scale = "none")
+
+
+#################################################################################
+
+# DMP venn diagrams
+
+#################################################################################
+
+# create 4 cpg lists of DMPs at baseline homo, baseline myo, post homo and post myo
+
+
+base_neg <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>% 
+        filter(dir == "Negative_skew")
+
+base_pos <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>% 
+        filter(dir == "Positive_skew")
+
+post_neg <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>% 
+        filter(dir == "Negative_skew")
+
+post_pos <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>% 
+        filter(dir == "Positive_skew")
+
+y = base_neg$cpg
+
+
+
+
+
+
+DMPs <- list(
+        " " = base_neg$cpg,
+        Baseline = base_pos$cpg,
+        Post = post_neg$cpg,
+        "  " = post_pos$cpg
+)
+
+devtools::install_github("yanlinlin82/ggvenn")
+
+library(ggvenn)
+
+
+ggvenn(DMPs, set_name_size = 10, stroke_size = 1, 
+       fill_color = c("#453781FF", "#DCE319FF","#453781FF", "#DCE319FF"),text_size = 10,stroke_alpha = 0.8)
+
 
 
 #################################################################################
@@ -1505,9 +1531,10 @@ myRefbase_homo <- champ.refbase(beta = b_vals_homo,                      ### ret
 # not satisfied with how this works
 
 ################################################################################
+
 ### identify GSEA
 
-
+##############################################################################
 
 ### default test
 myGSEA <- champ.GSEA(arraytype = "EPIC",
