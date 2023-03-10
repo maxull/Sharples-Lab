@@ -40,7 +40,7 @@ library(globaltest);library(AnnotationDbi); library(tidyverse)
 #  set working direcotry to where you have the RData file stored
 
 
- m
+
 
 
 # file descriptions

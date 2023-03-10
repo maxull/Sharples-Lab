@@ -907,6 +907,7 @@ plot_heat <- plot_grid(baseline_dmps[[4]], post_dmps[[4]], ncol=1, labels = c("A
 ggsave2(plot_heat, filename = "heatmap_homo_vs_myo.pdf",units = "cm", width = 19, height = 21, bg = "white")
 
 
+# plot promoter assosiated islands in a heatmap
 
 
 
@@ -1008,6 +1009,111 @@ myDMP_BM_PM$BM_to_PM %>%
         rownames_to_column(var = "cpg") %>% 
         rownames_to_column(var = "number") %>% 
         filter(cpg == "cg00408117" | cpg == "cg13897145")
+
+
+###############################################################################
+
+# self organizing map (som)
+
+################################################################################
+library(kohonen)
+
+# create dataframe with group averages
+
+som_data <-  B2M(b_vals)%>% 
+        as.data.frame() %>% 
+        mutate(avg_BH = round((`1BH`+`2BH`+`4BH`+`5BH`+`6BH`+`7BH`+`8BH`+`12BH`)/8,2),
+               avg_BM = round((`1BM`+`2BM`+`4BM`+`5BM`+`6BM`+`7BM`+`8BM`+`12BM`)/8,2),
+               avg_PH = round((`1PH`+`2PH`+`4PH`+`5PH`+`6PH`+`7PH`+`8PH`+`12PH`)/8,2),
+               avg_PM = round((`1PM`+`2PM`+`4PM`+`5PM`+`6PM`+`7PM`+`8PM`+`12PM`)/8,2)) %>% 
+        dplyr::select(avg_BH, avg_BM, avg_PH, avg_PM) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::filter(cpg %in% c(rownames(myDMP_BH_BM$BH_to_BM),rownames(myDMP_PH_PM$PH_to_PM)))
+
+
+rownames(som_data) <- som_data[,1]
+som_data <- som_data[,-1]
+
+# transform into matrix   
+        
+som_data1 <- as.matrix(t(som_data))
+
+
+# create grid of dimentions which will give us the total amount of groups to cluster into. 2 x 2 = 4 groups
+
+som_grid <- somgrid(xdim = 2, ydim = 2, topo = "rectangular")
+
+# set seed for reproducebility
+set.seed(1)
+
+# run model
+som_model <- som(som_data1, grid = som_grid)
+
+som_data[,"cluster"] <- som_model$unit.classif
+
+
+count(som_model$unit.classif)
+
+som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               cluster = factor(cluster)) %>% 
+        dplyr::group_by(cluster,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                  s = sd(mean_M)) %>% 
+        ggplot(aes(x = condition, y = m))+
+        geom_line(aes(group = cluster))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s), width = 0.2)+
+        facet_grid(~cluster)
+
+# do kmeans clustering instead of som
+
+### run kmeans clustering on som_data
+
+set.seed(1)
+
+
+xyss <- vector()
+
+for (i in 1:10) {
+        xyss[i] <- sum(kmeans(som_data,i)$withinss)
+}
+plot(1:10, xyss, type = "b", main = "clusters of M-value profiles", xlab = "number of clusters", ylab = "XYSS")
+
+# elbow at ~4 clusters
+
+# make cluster with identified elbow
+set.seed(1)
+kmeans <- kmeans(som_data, 4, iter.max = 300, nstart = 10)
+
+# add cluster number to som data and replot
+
+k_means <-as.data.frame(kmeans$cluster)
+
+som_data[,"kmeans"] <- k_means[,1]
+
+count(k_means[,1])
+som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               cluster = factor(cluster),
+               kmeans = factor(kmeans)) %>% 
+        dplyr::group_by(kmeans,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                         s = sd(mean_M)) %>% 
+        ggplot(aes(x = condition, y = m))+
+        geom_line(aes(group = kmeans))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s), width = 0.2)+
+        scale_x_discrete(labels = c("BH", "BM","PH","PM"))+
+        facet_grid(~kmeans)+
+        labs(y = "M-value")+
+        theme_bw()+
+        geom_text(aes(label = round(m,2), y = m-s), vjust = 1.2)
+        
+
+
 
 #################################################################################
 
