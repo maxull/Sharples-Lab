@@ -989,6 +989,10 @@ library(ggvenn)
 venn <- ggvenn(DMPs, set_name_size = 10, stroke_size = 1, 
        fill_color = c("#453781FF", "#DCE319FF","#453781FF", "#DCE319FF"),text_size = 10,stroke_alpha = 0.8)
 
+
+
+
+
 # find the two cpgs that were positively skewed at baseline and negatively at post
 
 merge(base_pos, post_neg, by = "cpg") 
