@@ -1147,16 +1147,18 @@ kmeans_plot <- som_data %>%
                timepoint = substr_right(as.character(condition), 2)) %>% 
         mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
                timepoint = substr(timepoint, 1,1)) %>% 
-        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post"),
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post")) %>% 
+        mutate(timepoint = factor(timepoint, levels = c("Baseline", "Post")),
                sample = factor(sample, levels = c("Myonuclei","Homogenate"))) %>% 
         ggplot(aes(x = timepoint, y = m, color = sample))+
         geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
         geom_errorbar(aes(ymin = m-s,
                           ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
-        scale_x_discrete(labels = c("BH", "BM","PH","PM"))+
         facet_grid(~kmeans)+
         labs(y = "M-value")+
-        theme_bw()+
+        theme_bw(base_size = 30)+
+        theme(axis.text.x = element_text(size = 15),
+              axis.title.x = element_blank())+
         geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5)
         
 plot_grid(venn, kmeans_plot, ncol = 1, labels = c("C","D"), rel_heights = c(3,1), scale = c(1,1))
