@@ -628,9 +628,9 @@ myDMP_BH_PH <- readRDS("myDMP_BH_PH.RDATA")
 # start with baseline samples
 
 baseline_dmps <- myDMP_BH_BM$BH_to_BM %>% 
+        as.data.frame() %>%
         rownames_to_column(var = "cpg") %>% 
-        as.data.frame() %>% 
-        dplyr::select(cpg, P.Value, deltaBeta)
+         dplyr::select(cpg, P.Value, deltaBeta)
 
 # merge with newer annotation
 
@@ -680,7 +680,7 @@ p1 <- ggplot(df, aes(x = category)) +
               axis.title.y = element_blank(),
               axis.title.x = element_text(hjust = 0.58))+
         labs(y = "Number of DMPs",
-             title = "Baseline DMPs between Homogenate and Myonuclei")
+             title = "Baseline DMPs in Homogenate vs. Myonuclei")
 
 
 # find number of significant cpgs that were altered more than <0.01 B < 0.1 B < 0.2 B <
@@ -748,9 +748,9 @@ p_count2 <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>%
         as.data.frame() 
 
 df2 <- data.frame(
-        category = n_count[6:1,]$x,
-        neg_skew = (n_count[6:1,]$freq)*-1,
-        pos_skew = p_count[6:1,]$freq)
+        category = n_count2[6:1,]$x,
+        neg_skew = (n_count2[6:1,]$freq)*-1,
+        pos_skew = p_count2[6:1,]$freq)
 
 p2 <- ggplot(df2, aes(x = category)) +
         geom_bar(aes(y = neg_skew, fill = "neg_skew"), stat = "identity") +
@@ -764,7 +764,7 @@ p2 <- ggplot(df2, aes(x = category)) +
               axis.title.y = element_blank(),
               axis.title.x = element_text(hjust = 0.58))+
         labs(y = "Number of DMPs",
-             title = "Post DMPs between Homogenate and Myonuclei")
+             title = "Post DMPs in Homogenate vs. Myonuclei")
 
 
 # find number of significant cpgs that were altered more than <0.01 B < 0.1 B < 0.2 B <
@@ -842,13 +842,7 @@ island_cpg <- anno %>%
 b_vals_1 <- b_vals[island_cpg$cpg,rownames(dfh_1)] %>% 
         as.data.frame() %>% 
         rownames_to_column(var = "cpg") %>% 
-        filter(cpg %in% dmp_list) %>% 
-        dplyr::select(2:17)
-
-
-base_heat <- pheatmap(t(b_vals_1), annotation_row = dfh_1, cutree_rows = 2, 
-         show_colnames = FALSE, annotation_names_row = FALSE, 
-         color = viridis(n = 100), scale = "none")
+        filter(cpg %in% dmp_list) 
 
 
 # repeat for post samples
@@ -858,15 +852,9 @@ dmp_post <- rownames(myDMP_PH_PM$PH_to_PM)
 b_vals_2 <- b_vals[island_cpg$cpg,rownames(dfh_2)] %>% 
         as.data.frame() %>% 
         rownames_to_column(var = "cpg") %>% 
-        filter(cpg %in% dmp_post) %>% 
-        dplyr::select(2:17)
+        filter(cpg %in% dmp_post)
 
 dfh$condition <- factor(dfh$condition, levels = c("BH","BM","PH","PM"))
-
-post_heat <- pheatmap(t(b_vals_2), annotation_row = dfh_2, cutree_rows = 2, 
-                      show_colnames = FALSE, annotation_names_row = FALSE, 
-                      color = viridis(n = 100), scale = "none", cluster_rows = TRUE)
-
 
 
 
@@ -893,21 +881,46 @@ post_dmps <- pheatmap(t(baseline_dmps_in_islands[,rownames(dfh_2)]), annotation_
 
 # plot together
 
-library(gridExtra)
-library(grid)
 
-plot_list <- list()
-
-
-plot_list[['p1']]=baseline_dmps[[4]]
-plot_list[['p2']]=post_dmps[[4]]
 
 plot_heat <- plot_grid(baseline_dmps[[4]], post_dmps[[4]], ncol=1, labels = c("A", "B"))   
 
 ggsave2(plot_heat, filename = "heatmap_homo_vs_myo.pdf",units = "cm", width = 19, height = 21, bg = "white")
 
 
+
+
 # plot promoter assosiated islands in a heatmap
+
+
+heat_1 <- b_vals_1 %>% 
+        dplyr::select(`cpg`,`1BH`,`2BH`,`4BH`,`5BH`,`6BH`,`7BH`,`8BH`,`12BH`,
+                      `1BM`,`2BM`,`4BM`,`5BM`,`6BM`,`7BM`,`8BM`,`12BM`) %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(Relation_to_Island == "Island" & Regulatory_Feature_Group == "Promoter_Associated") %>% 
+        dplyr::select(`1BH`,`2BH`,`4BH`,`5BH`,`6BH`,`7BH`,`8BH`,`12BH`,
+                      `1BM`,`2BM`,`4BM`,`5BM`,`6BM`,`7BM`,`8BM`,`12BM`) %>% 
+        t() %>% 
+        pheatmap(., annotation_row = dfh_1, gaps_row = 8, 
+                 show_colnames = FALSE, annotation_names_row = FALSE, 
+                 color = viridis(n = 100), scale = "none", cluster_rows = FALSE)
+
+
+heat_2 <- b_vals_2 %>% 
+        dplyr::select(`cpg`, `1PH`,`2PH`,`4PH`,`5PH`,`6PH`,`7PH`,`8PH`,`12PH`,
+                      `1PM`,`2PM`,`4PM`,`5PM`,`6PM`,`7PM`,`8PM`,`12PM`) %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(Relation_to_Island == "Island" & Regulatory_Feature_Group == "Promoter_Associated") %>% 
+        dplyr::select(`1PH`,`2PH`,`4PH`,`5PH`,`6PH`,`7PH`,`8PH`,`12PH`,
+                      `1PM`,`2PM`,`4PM`,`5PM`,`6PM`,`7PM`,`8PM`,`12PM`) %>% 
+        t() %>% 
+        pheatmap(., annotation_row = dfh_2, gaps_row = 8, 
+                 show_colnames = FALSE, annotation_names_row = FALSE, 
+                 color = viridis(n = 100), scale = "none", cluster_rows = FALSE)
+
+promoter_heat <- plot_grid(heat_1[[4]], heat_2[[4]], ncol=1, labels = c("A","B"))
+
+
 
 
 
@@ -955,6 +968,31 @@ pheatmap(t(b_vals_change2), annotation_row = dfh_4, cutree_rows = 2,
 #################################################################################
 
 # create 4 cpg lists of DMPs at baseline homo, baseline myo, post homo and post myo
+
+
+baseline_dmps <- myDMP_BH_BM$BH_to_BM %>% 
+        as.data.frame() %>%
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::select(cpg, P.Value, deltaBeta)
+
+# merge with newer annotation
+
+baseline_dmps <- merge(baseline_dmps, anno, by = "cpg") %>% 
+        as.data.frame() %>% 
+        mutate("dir" = as.factor(ifelse(deltaBeta <0, "Negative_skew", "Positive_skew")))
+
+post_dmps <- myDMP_PH_PM$PH_to_PM %>% 
+        as.data.frame() %>%
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::select(cpg, P.Value, deltaBeta)
+
+# merge with newer annotation
+
+post_dmps <- merge(post_dmps, anno, by = "cpg") %>% 
+        as.data.frame() %>% 
+        mutate("dir" = as.factor(ifelse(deltaBeta <0, "Negative_skew", "Positive_skew")))
+
+
 
 
 base_neg <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>% 
@@ -1080,10 +1118,10 @@ set.seed(1)
 
 xyss <- vector()
 
-for (i in 1:10) {
+for (i in 1) {
         xyss[i] <- sum(kmeans(som_data,i)$withinss)
 }
-plot(1:10, xyss, type = "b", main = "clusters of M-value profiles", xlab = "number of clusters", ylab = "XYSS")
+plot(2:10, xyss, type = "b", main = "clusters of M-value profiles", xlab = "number of clusters", ylab = "XYSS")
 
 # elbow at ~4 clusters
 
@@ -1098,26 +1136,36 @@ k_means <-as.data.frame(kmeans$cluster)
 som_data[,"kmeans"] <- k_means[,1]
 
 count(k_means[,1])
-som_data %>% 
+kmeans_plot <- som_data %>% 
         pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
         mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
-               cluster = factor(cluster),
-               kmeans = factor(kmeans)) %>% 
+               kmeans = factor(kmeans))%>% 
         dplyr::group_by(kmeans,condition) %>% 
         dplyr::summarize(m = mean(mean_M),
                          s = sd(mean_M)) %>% 
-        ggplot(aes(x = condition, y = m))+
-        geom_line(aes(group = kmeans))+
+        mutate(sample = substr_right(as.character(condition), 1),
+               timepoint = substr_right(as.character(condition), 2)) %>% 
+        mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
+               timepoint = substr(timepoint, 1,1)) %>% 
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post"),
+               sample = factor(sample, levels = c("Myonuclei","Homogenate"))) %>% 
+        ggplot(aes(x = timepoint, y = m, color = sample))+
+        geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
         geom_errorbar(aes(ymin = m-s,
-                          ymax = m+s), width = 0.2)+
+                          ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
         scale_x_discrete(labels = c("BH", "BM","PH","PM"))+
         facet_grid(~kmeans)+
         labs(y = "M-value")+
         theme_bw()+
-        geom_text(aes(label = round(m,2), y = m-s), vjust = 1.2)
+        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5)
         
+plot_grid(venn, kmeans_plot, ncol = 1, labels = c("C","D"), rel_heights = c(3,1), scale = c(1,1))
 
 
+venn <- venn + theme(plot.margin = unit(c(0,-5,0,-5), "cm"))
+
+plot_grid(venn, labels = "C")
+plot_grid(kmeans_plot, labels = "D")
 
 #################################################################################
 
