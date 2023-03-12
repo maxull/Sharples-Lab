@@ -655,10 +655,10 @@ n_count <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>%
         filter(dir == "Negative_skew") %>% 
         mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
         summarise(count(Relation_to_Island)) %>% 
-        as.data.frame() 
+        as.data.frame()
 
 p_count <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>% 
-        filter(dir == "Positive_skew") %>% 
+        filter(dir == "Positive_skew") %>%
         mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
         summarise(count(Relation_to_Island)) %>% 
         as.data.frame() 
@@ -736,10 +736,10 @@ change_b_vals_post <- b_vals[,rownames(dfh_2)] %>%
 
 
 n_count2 <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>% 
-        filter(dir == "Negative_skew") %>% 
+        filter(dir == "Negative_skew") %>%    nrow()
         mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
         summarise(count(Relation_to_Island)) %>% 
-        as.data.frame() 
+        as.data.frame()
 
 p_count2 <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>% 
         filter(dir == "Positive_skew") %>% 
@@ -803,6 +803,16 @@ myDMP_BH_BM$BH_to_BM %>%
         as.data.frame() %>% 
         rownames_to_column(var = "cpg") %>% 
         merge(., anno, by = "cpg") %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island") %>% 
+        nrow()
+
+# count post dmps for islnds within promoters
+
+myDMP_PH_PM$PH_to_PM %>%
+        as.data.frame() %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(Relation_to_Island == "Island") %>% 
         filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island") %>% 
         nrow()
 
@@ -973,7 +983,8 @@ pheatmap(t(b_vals_change2), annotation_row = dfh_4, cutree_rows = 2,
 baseline_dmps <- myDMP_BH_BM$BH_to_BM %>% 
         as.data.frame() %>%
         rownames_to_column(var = "cpg") %>% 
-        dplyr::select(cpg, P.Value, deltaBeta)
+        dplyr::select(cpg, P.Value, deltaBeta) 
+
 
 # merge with newer annotation
 
@@ -1035,22 +1046,31 @@ venn <- ggvenn(DMPs, set_name_size = 10, stroke_size = 1,
 
 merge(base_pos, post_neg, by = "cpg") 
 
-# rind the significant position in homo DMPs across time
+# find the significant position in homo DMPs across time
 
 myDMP_BH_PH$BH_to_PH %>% 
         rownames_to_column(var = "cpg") %>% 
         rownames_to_column(var = "number") %>% 
-        filter(cpg == "cg00408117" | cpg == "cg13897145")
+        filter(cpg == "cg00408117" | cpg == "cg13897145" | cpg == "cg06394887")
+
+
 
 Illumina_anno %>% 
-        filter(IlmnID == "cg00408117" | IlmnID == "cg13897145")
+        filter(IlmnID == "cg00408117" | IlmnID == "cg13897145"| IlmnID == "cg06394887")
+
+
+# find the one probe that is neg baseline and pos post
+
+merge(base_neg,post_pos, by = "cpg")
 
 # find the same pobes in myonuclear DMPs list
 
 myDMP_BM_PM$BM_to_PM %>% 
         rownames_to_column(var = "cpg") %>% 
+        rownames() %>% 
+        length()
         rownames_to_column(var = "number") %>% 
-        filter(cpg == "cg00408117" | cpg == "cg13897145")
+        filter(cpg == "cg00408117" | cpg == "cg13897145"| cpg == "cg06394887")
 
 
 ###############################################################################
@@ -1136,7 +1156,8 @@ k_means <-as.data.frame(kmeans$cluster)
 som_data[,"kmeans"] <- k_means[,1]
 
 count(k_means[,1])
-kmeans_plot <- som_data %>% 
+#kmeans_plot <- 
+som_data %>% 
         pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
         mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
                kmeans = factor(kmeans))%>% 
@@ -1154,20 +1175,27 @@ kmeans_plot <- som_data %>%
         geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
         geom_errorbar(aes(ymin = m-s,
                           ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
-        facet_grid(~kmeans)+
+        facet_grid(~kmeans, labeller = as_labeller(c(`1`="1: N = 56239", `2`="2: N = 49432",`3`="3: N = 52972",`4`="4: N = 29792")))+
         labs(y = "M-value")+
-        theme_bw(base_size = 30)+
+        theme_bw(base_size = 20)+
         theme(axis.text.x = element_text(size = 15),
-              axis.title.x = element_blank())+
-        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5)
+              axis.title.x = element_blank(),
+              panel.grid.minor = element_blank(),
+              panel.grid.major.x = element_blank())+
+        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 4.5)+
+        labs(tag = "D")+
+        theme(plot.tag.position = c(0.01,0.97),
+              plot.tag = element_text(face = "bold"))
+
+                
         
-plot_grid(venn, kmeans_plot, ncol = 1, labels = c("C","D"), rel_heights = c(3,1), scale = c(1,1))
 
 
-venn <- venn + theme(plot.margin = unit(c(0,-5,0,-5), "cm"))
+#venn <- 
+        venn + labs(tag = "C")+ theme(plot.tag.position = c(0.055,0.97),
+                                      plot.tag = element_text(size = 25, face = "bold"))
 
-plot_grid(venn, labels = "C")
-plot_grid(kmeans_plot, labels = "D")
+
 
 #################################################################################
 
