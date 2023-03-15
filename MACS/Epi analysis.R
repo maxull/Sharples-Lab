@@ -70,6 +70,8 @@ myData <- champ.import(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/
 myLoad <- champ.load(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/raw idat/", 
                      arraytype = "EPIC", method = "minfi")
 
+
+
 # add sample group to pd sheets
 
 myLoad$pd$Sample_Group <- substr_right(myLoad$pd$Sample_Name,2)
@@ -526,7 +528,7 @@ myDMP_BH_PH <- champ.DMP(beta = B2M(flt_beta$beta),
 
 
 # code to check DMPs with differenct p values
-myDMP$BH_to_BM %>% 
+myDMP_BH_BM$BH_to_BM %>% 
         as.data.frame() %>% 
         filter(adj.P.Val < 0.001) %>% 
         rownames() %>% 
@@ -609,14 +611,27 @@ myDMP_BM_PM <- readRDS("myDMP_BM_PM.RDATA")
 
 myDMP_BH_PH <- readRDS("myDMP_BH_PH.RDATA")
 
-# done to here
 
-####
 
-# to do
-# - DMR
-# - GSEA
-# - global test etc.
+# run BMIQ normalization and identify DMPs across time
+
+bmiq_norm <- champ.norm(beta = myLoad$beta, arraytype = "EPIC")
+
+rownames(bmiq_norm) %>% 
+        length()
+
+myDMP_BM_PM_bmiq <- champ.DMP(beta = B2M(bmiq_norm),
+                         pheno = flt_beta$pd$Sample_Group,
+                         compare.group = c("BM", "PM"),
+                        adjust.method = "none",
+                         arraytype = "EPIC")                   ### significant DMPs with un-adjusted p val of 0.05
+
+myDMP_BH_PH_bmiq <- champ.DMP(beta = B2M(bmiq_norm),
+                         pheno = flt_beta$pd$Sample_Group,
+                         compare.group = c("BH", "PH"),
+                         adjust.method = "none",
+                         arraytype = "EPIC")                   ### significant DMPs with un-adjusted p val of 0.05
+
 
 ########################################################################
 
@@ -1072,6 +1087,24 @@ myDMP_BM_PM$BM_to_PM %>%
         rownames_to_column(var = "number") %>% 
         filter(cpg == "cg00408117" | cpg == "cg13897145"| cpg == "cg06394887")
 
+        
+
+##############################################################################
+        
+# volcano plot of DMPs after RT
+        
+#############################################################################
+        
+# plot DMPs based on M-value delta change and p value
+        
+myDMP_BH_PH_bmiq$BH_to_PH %>% 
+                as.data.frame() %>% 
+                dplyr::select(P.Value, deltaBeta) %>% 
+                mutate(color_comb = log2(abs(deltaBeta))) %>% 
+                ggplot(aes(x = log2(deltaBeta), y = log10(P.Value)))+
+                geom_point(aes(color = (color_comb)))+
+                scale_color_viridis()+
+                scale_y_reverse()
 
 ###############################################################################
 
@@ -1189,13 +1222,138 @@ som_data %>%
 
                 
         
+# remake som plot with individual y axis scaling
 
 
-#venn <- 
-        venn + labs(tag = "C")+ theme(plot.tag.position = c(0.055,0.97),
-                                      plot.tag = element_text(size = 25, face = "bold"))
+k1 <- som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               kmeans = factor(kmeans))%>% 
+        dplyr::group_by(kmeans,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                         s = sd(mean_M)) %>% 
+        mutate(sample = substr_right(as.character(condition), 1),
+               timepoint = substr_right(as.character(condition), 2)) %>% 
+        mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
+               timepoint = substr(timepoint, 1,1)) %>% 
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post")) %>% 
+        mutate(timepoint = factor(timepoint, levels = c("Baseline", "Post")),
+               sample = factor(sample, levels = c("Myonuclei","Homogenate"))) %>% 
+        filter(kmeans == "1") %>% 
+        ggplot(aes(x = timepoint, y = m, color = sample))+
+        geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
+        labs(y = "M-value",
+             title = "Cluster 1: N = 56239")+
+        theme_bw(base_size = 20)+
+        theme(axis.text.x = element_text(size = 15),
+              legend.position = "none",
+              axis.title.x = element_blank())+
+        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
 
 
+k2 <- som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               kmeans = factor(kmeans))%>% 
+        dplyr::group_by(kmeans,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                         s = sd(mean_M/sqrt(length(mean_M)))) %>% 
+        mutate(sample = substr_right(as.character(condition), 1),
+               timepoint = substr_right(as.character(condition), 2)) %>% 
+        mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
+               timepoint = substr(timepoint, 1,1)) %>% 
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post")) %>% 
+        mutate(timepoint = factor(timepoint, levels = c("Baseline", "Post")),
+               sample = factor(sample, levels = c("Myonuclei","Homogenate"))) %>% 
+        filter(kmeans == "2") %>% 
+        ggplot(aes(x = timepoint, y = m, color = sample))+
+        geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
+        labs(y = "M-value",
+             title = "Cluster 2: N = 49432")+
+        theme_bw(base_size = 20)+
+        theme(axis.text.x = element_text(size = 15),
+              legend.position = "none",
+              axis.title.x = element_blank(),
+              axis.title.y = element_blank(),
+              panel.grid.minor = element_blank())+
+        scale_y_continuous(limits = c(-2.25,-0.90))
+        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
+
+
+k3 <- som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               kmeans = factor(kmeans))%>% 
+        dplyr::group_by(kmeans,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                         s = sd(mean_M/sqrt(length(mean_M)))) %>% 
+        mutate(sample = substr_right(as.character(condition), 1),
+               timepoint = substr_right(as.character(condition), 2)) %>% 
+        mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
+               timepoint = substr(timepoint, 1,1)) %>% 
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post")) %>% 
+        mutate(timepoint = factor(timepoint, levels = c("Baseline", "Post")),
+               sample = factor(sample, levels = c("Myonuclei","Homogenate"))) %>% 
+        filter(kmeans == "3") %>% 
+        ggplot(aes(x = timepoint, y = m, color = sample))+
+        geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
+        labs(y = "M-value",
+             title = "Cluster 3: N = 52972")+
+        theme_bw(base_size = 20)+
+        theme(axis.text.x = element_text(size = 15),
+              legend.position = "none",
+              axis.title.x = element_blank(),
+              axis.title.y = element_blank(),
+              panel.grid.minor = element_blank())+
+        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
+
+
+k4 <- som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               kmeans = factor(kmeans))%>% 
+        dplyr::group_by(kmeans,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                         s = sd(mean_M/sqrt(length(mean_M)))) %>% 
+        mutate(sample = substr_right(as.character(condition), 1),
+               timepoint = substr_right(as.character(condition), 2)) %>% 
+        mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
+               timepoint = substr(timepoint, 1,1)) %>% 
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post")) %>% 
+        mutate(timepoint = factor(timepoint, levels = c("Baseline", "Post")),
+               sample = factor(sample, levels = c("Myonuclei","Homogenate"))) %>% 
+        filter(kmeans == "4") %>% 
+        ggplot(aes(x = timepoint, y = m, color = sample))+
+        geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
+        labs(y = "M-value",
+             title = "Cluster 4: N = 29792")+
+        theme_bw(base_size = 20)+
+        theme(axis.text.x = element_text(size = 15),
+              legend.position = "none",
+              axis.title.x = element_blank(),
+              axis.title.y = element_blank(),
+              panel.grid.minor = element_blank())+
+        scale_y_continuous(limits = c(-4.15,-3))+
+        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
+
+grobs <- ggplotGrob(k4)$grobs
+legend <- grobs[[which(sapply(grobs, function(x) x$name) == "guide-box")]]
+
+
+library(ggpubr)
+
+ggarrange(k1,k2,k3,k4,common.legend = TRUE, legend = "right", nrow = 1,widths = c(1,0.9,0.9,0.9))
+
+
+plot_grid(k1,k2,k3,k4, nrow = 1)
 
 #################################################################################
 
@@ -1296,6 +1454,24 @@ dmr <- as.data.frame(myDMR_BH_PH$BumphunterDMR)
 
 
 ### DMR did not work
+
+# DMR on BMIQ norm data
+
+myDMR_BH_PH_bmiq <- champ.DMR(beta = B2M(bmiq_norm),
+                         pheno = flt_beta$pd$Sample_Group,
+                         compare.group = c("BH", "PH"),
+                         arraytype = "EPIC",
+                         method = "Bumphunter",
+                         adjPvalDmr = "none",
+                         cores = 4)
+
+myDMR_BM_PM_bmiq <- champ.DMR(beta = B2M(bmiq_norm),
+                              pheno = flt_beta$pd$Sample_Group,
+                              compare.group = c("BM", "PM"),
+                              arraytype = "EPIC",
+                              method = "Bumphunter",
+                              adjPvalDmr = "none",
+                              cores = 4)
 
 
 # global test
