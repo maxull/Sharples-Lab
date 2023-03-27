@@ -56,7 +56,7 @@ gunzip("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GC-A
 untar("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GC-AS-10179.tar", exdir = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/raw idat/")
 
 
-
+rm(CellTypeMeans450K)
 #############################################################
 #############################################################
 
@@ -76,6 +76,22 @@ myLoad <- champ.load(directory = "C:/Users/maxul/Documents/Skole/Master 21-22/Ma
 
 myLoad$pd$Sample_Group <- substr_right(myLoad$pd$Sample_Name,2)
 myData$pd$Sample_Group <- substr_right(myLoad$pd$Sample_Name,2)
+
+summary(myData$Meth)
+colMeans(myData$UnMeth)
+
+colMeans(myData$detP) %>% 
+        as.data.frame() %>% 
+        dplyr::select(detP = 1) %>% 
+        rownames_to_column(var = "FP") %>% 
+        mutate(Condition = substr_right(FP, 2),
+               MACS = str_sub(FP, end = -3)) %>% 
+        ggplot(aes(x = FP, y = detP, fill = MACS))+
+        geom_bar(stat = "identity")+
+        geom_hline(yintercept = 0.01,linewidth = 2.3, color = "red")+
+        theme_bw()+
+        scale_y_sqrt()
+        
 
 # identify principal components
 
@@ -201,10 +217,21 @@ length(rownames(myImport$beta)) # all cpgs are still there, move on with filteri
 flt_beta <- champ.filter(beta = myImport$beta,
                          pd = myImport$pd,
                          detP = myImport$detP[rownames(myImport$beta),],
-                         beadcount = myImport$beadcount[rownames(myImport$beta),],
+                         #beadcount = myImport$beadcount[rownames(myImport$beta),],
                          Meth = myImport$Meth[rownames(myImport$beta),],
                          UnMeth = myImport$UnMeth[rownames(myImport$beta),],
-                         arraytype = "EPIC")
+                         arraytype = "EPIC",
+                         filterBeads = FALSE,
+                         filterXY = FALSE,
+                         filterSNPs = FALSE)
+
+
+
+flt_beta2 <- dropLociWithSnps(flt_beta)
+
+
+qcReport(myLoad$rgSet, sampNames=myLoad$pd$Sample_Name, sampGroups=myLoad$pd$Sample_Group, 
+         pdf="qcReport.pdf")
 
 # notes from running processFunnorm
 ####################################################################
@@ -377,8 +404,8 @@ long_beta %>%
 
 par(mfrow = c(3, 1))
 
-densityPlot(myData$beta, sampGroups=myData$pd$Sample_Group,
-            main="Pre-Normalized", legend=TRUE)
+densityPlot(myData$M, sampGroups=myData$pd$Sample_Group,
+            main="Pre-Normalized M", legend=TRUE)
 
 densityPlot(myImport$beta, sampGroups=myImport$pd$Sample_Group,
             main="Normalized", legend=TRUE)
@@ -388,6 +415,9 @@ densityPlot(flt_beta$beta, sampGroups=flt_beta$pd$Sample_Group,
 
 dev.off()
 
+
+densityPlot(B2M(bmiq_norm), sampGroups=myData$pd$Sample_Group,
+            main="Normalized M", legend=TRUE)
 
 champ.QC(beta = flt_beta$beta)
 
@@ -416,31 +446,52 @@ dev.off()
 
 
 pal <- brewer.pal(8,"Dark2")
-plotMDS(B2M(flt_beta$beta), top=1000, gene.selection="common",
-        col=pal[factor(flt_beta$pd$Sample_Group)])
+plotMDS(B2M(myData$beta), top=1000, gene.selection="common",
+        col=pal[factor(flt_beta$pd$Sample_Group)], dim = c(1,2))
 
+
+# Kmeans to show the amount of clusters that explain amount of variance
+
+kmeans_data <- t(myData$beta)
+
+set.seed(1)
+
+xyss <- vector()
+
+for (i in 1:10) {
+        xyss[i] <- sum(kmeans(kmeans_data,i)$withinss)
+}
+plot(1:10, xyss, type = "b", main = "clusters of B-value profiles", xlab = "number of clusters", ylab = "XYSS")
 
 
 ### PCA analysis
 
-# https://bioinfo4all.wordpress.com/2021/01/31/tutorial-6-how-to-do-principal-component-analysis-pca-in-r/
 
-install.packages(c("factoextra", "FactoMineR"))
+# bar chart of PCAs
 
-library(factoextra)
-library(FactoMineR)
+pca <- prcomp(kmeans_data, scale = FALSE)
 
-flt_beta$beta
+pca_var <- round(pca$sdev^2 / sum(pca$sdev^2), 2)
 
-pca.data <- PCA(t(myData$beta), scale.unit = FALSE, graph = FALSE)
+# Create a data frame for plotting
+pca_df <- data.frame(PC = factor(paste0("PC", 1:length(pca_var)), levels = levels), 
+                     Variance = pca_var)
+
+                     levels <- pca_df$PC
+# Create the plot
+ggplot(pca_df, aes(x = PC, y = Variance)) +
+        geom_col(fill = "steelblue") +
+        geom_text(aes(label = paste0(Variance*100, "%")), 
+                  position = position_stack(vjust = 0.5)) +
+        scale_y_continuous(labels = scales::percent_format()) +
+        labs(title = "Principal Component Analysis",
+             x = "Principal Component",
+             y = "Variance Explained")
 
 
-fviz_eig(pca.data, addlabels = TRUE, ylim = c(0, 100))
 
-fviz_pca_ind(pca.data, addEllipses = FALSE,
-             col.ind = "cos2", 
-             gradient.cols = c("#FFCC00", "#CC9933", "#660033", "#330033"), 
-             repel = TRUE)
+
+
 
 
 champ.QC()      # default QC on myLoad
@@ -1096,16 +1147,57 @@ myDMP_BM_PM$BM_to_PM %>%
 #############################################################################
         
 # plot DMPs based on M-value delta change and p value
-        
-myDMP_BH_PH_bmiq$BH_to_PH %>% 
-                as.data.frame() %>% 
-                dplyr::select(P.Value, deltaBeta) %>% 
-                mutate(color_comb = log2(abs(deltaBeta))) %>% 
-                ggplot(aes(x = log2(deltaBeta), y = log10(P.Value)))+
-                geom_point(aes(color = (color_comb)))+
-                scale_color_viridis()+
-                scale_y_reverse()
 
+library(ggrepel)
+options()
+# DMPs in homogenate after RT        
+
+myDMP_BH_PH_bmiq$BH_to_PH %>% 
+        as.data.frame() %>% 
+        dplyr::select(P.Value, deltaM = deltaBeta, Gene = gene, Feature = cgi) %>% 
+        filter(deltaM > 1 | deltaM < -1) %>% 
+        mutate(dir = ifelse(deltaM <0, "neg", "pos"),
+               deltaM = abs(deltaM),
+               Delta_M = (deltaM)) %>% 
+        mutate(deltaM = ifelse(dir == "neg", (deltaM*-1), deltaM),
+               Gene = ifelse(deltaM < -1 | deltaM > 2 | log10(P.Value) < -3, as.character(Gene), "")) -> volcano_df 
+
+set.seed(1)
+volcano_df %>% 
+        ggplot(aes(x = deltaM, y = log10(P.Value)))+
+        geom_point(aes(color = Delta_M, shape = Feature), size = 3)+
+        scale_shape_manual(values = c(17,15,16,18))+
+        scale_color_viridis()+
+        scale_y_reverse()+
+        geom_text_repel(aes(label = Gene), force = 2, max.overlaps = Inf, box.padding = 0.6)+
+        theme_classic()+
+        labs(title = "Homogenate DMPs after 7 weeks of RT")
+
+
+
+# DMPs in myonuclei after RT
+
+myDMP_BM_PM_bmiq$BM_to_PM %>% 
+        as.data.frame() %>% 
+        dplyr::select(P.Value, deltaM = deltaBeta, Gene = gene, Feature = cgi) %>% 
+        filter(deltaM > 1 | deltaM < -1) %>% 
+        mutate(dir = ifelse(deltaM <0, "neg", "pos"),
+               deltaM = abs(deltaM),
+               Delta_M = (deltaM)) %>% 
+        mutate(deltaM = ifelse(dir == "neg", (deltaM*-1), deltaM),
+               Gene = ifelse(deltaM < -1 | deltaM > 2 | log10(P.Value) < -3.5, as.character(Gene), "")) -> volcano_df 
+
+set.seed(1)
+volcano_df %>% 
+        ggplot(aes(x = deltaM, y = log10(P.Value)))+
+        geom_point(aes(color = Delta_M, shape = Feature), size = 3)+
+        scale_shape_manual(values = c(17,15,16,18))+
+        scale_color_viridis()+
+        scale_y_reverse()+
+        geom_text_repel(aes(label = Gene), force = 2, max.overlaps = Inf, box.padding = 0.6)+
+        theme_classic()+
+        labs(title = "Myonuclear DMPs after 7 weeks of RT")
+                
 ###############################################################################
 
 # self organizing map (som)
@@ -1166,6 +1258,8 @@ som_data %>%
 
 ### run kmeans clustering on som_data
 
+
+
 set.seed(1)
 
 
@@ -1174,7 +1268,7 @@ xyss <- vector()
 for (i in 1) {
         xyss[i] <- sum(kmeans(som_data,i)$withinss)
 }
-plot(2:10, xyss, type = "b", main = "clusters of M-value profiles", xlab = "number of clusters", ylab = "XYSS")
+plot(1:10, xyss, type = "b", main = "clusters of M-value profiles", xlab = "number of clusters", ylab = "XYSS")
 
 # elbow at ~4 clusters
 
@@ -1396,45 +1490,6 @@ myDMP_BM_PM$BM_to_PM %>%
 
 #################################################################################
 
-# cell pop correction
-
-#################################################################################
-
-dfh_2<- dfh %>% 
-        filter(condition %in% c("BH", "PH"))
-
-b_vals_2 <- b_vals[, rownames(dfh_2)]
-
-myRefbase <- champ.refbase(beta = b_vals_2,                      ### returns b-vals adjusted for 5 main cellpopulations identified
-                           arraytype = "EPIC")
-
-myRefbase$CorrectedBeta
-
-densityPlot(myNorm@assays@data@listData[["Beta"]], sampGroups=myLoad$pd$Sample_Group,
-            main="Normalized", legend=TRUE)
-
-densityPlot(myRefbase$CorrectedBeta, sampGroups=dfh_2$condition,
-            main="Normalized", legend=TRUE)
-
-
-
-
-
-getwd()
-
-setwd(mypath)
-
-
-
-
-
-
-
-
-
-
-#################################################################################
-
 ### identify DMRs
 
 #################################################################################
@@ -1502,6 +1557,40 @@ for (i in 1:length(unique_gene)) {
         
         print(i)
 }
+
+
+
+1:10
+
+for (i in 1:10) {
+        
+        
+        print(i)
+        
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 saveRDS(unique_cpg, "unique_cpg.RDATA")
 
@@ -2045,8 +2134,5 @@ data("kegg.sets.hs")
 
 
 ################################################################################################################################
-
-
-
 
 
