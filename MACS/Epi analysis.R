@@ -217,17 +217,16 @@ length(rownames(myImport$beta)) # all cpgs are still there, move on with filteri
 flt_beta <- champ.filter(beta = myImport$beta,
                          pd = myImport$pd,
                          detP = myImport$detP[rownames(myImport$beta),],
-                         #beadcount = myImport$beadcount[rownames(myImport$beta),],
+                         beadcount = myImport$beadcount[rownames(myImport$beta),],
                          Meth = myImport$Meth[rownames(myImport$beta),],
                          UnMeth = myImport$UnMeth[rownames(myImport$beta),],
                          arraytype = "EPIC",
-                         filterBeads = FALSE,
-                         filterXY = FALSE,
-                         filterSNPs = FALSE)
+                         filterBeads = TRUE,
+                         filterXY = TRUE,
+                         filterSNPs = TRUE)
 
 
 
-flt_beta2 <- dropLociWithSnps(flt_beta)
 
 
 qcReport(myLoad$rgSet, sampNames=myLoad$pd$Sample_Name, sampGroups=myLoad$pd$Sample_Group, 
@@ -446,8 +445,35 @@ dev.off()
 
 
 pal <- brewer.pal(8,"Dark2")
-plotMDS(B2M(myData$beta), top=1000, gene.selection="common",
+plotMDS(B2M(flt_beta$beta), top=1000, gene.selection="common",
         col=pal[factor(flt_beta$pd$Sample_Group)], dim = c(1,2))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Kmeans to show the amount of clusters that explain amount of variance
@@ -489,10 +515,14 @@ ggplot(pca_df, aes(x = PC, y = Variance)) +
              y = "Variance Explained")
 
 
+data("EPIC.manifest.hg19")
 
+EPIC.manifest.hg19
+data(SNPs.Illumina)
 
-
-
+as.data.frame(SNPs.Illumina) %>% 
+        mutate(SNP_ID = ifelse(SNP_ID == "", "NA", SNP_ID))   %>% 
+        filter(SNP_ID == "NA")
 
 champ.QC()      # default QC on myLoad
 
@@ -637,6 +667,7 @@ saveRDS(anno, "anno.RDATA")
 anno <- readRDS("anno.RDATA")
 
 
+        
 # BH adjusted p val of 0.05 gave no significant DMPs between BH to PH, and BM to PM
 
 
@@ -1529,6 +1560,10 @@ myDMR_BM_PM_bmiq <- champ.DMR(beta = B2M(bmiq_norm),
                               cores = 4)
 
 
+DMR.GUI(myDMP_BH_PH_bmiq,runDMP = FALSE, beta = bmiq_norm, pheno = myLoad$pd$Sample_Group, compare.group = c("BH","PH") ,arraytype = "EPIC")
+
+
+
 # global test
 
 ################################################################################
@@ -1996,17 +2031,6 @@ b <- as.matrix(b_vals_int)
 densityPlot(b)
 
 unique(anno$Regulatory_Feature_Group)
-# use champ.refbase to identify and correct for immune cell profiles from blood
-
-
-myRefbase_int <- champ.refbase(beta = b_vals_int,                      ### returns b-vals adjusted for 5 main cellpopulations identified
-                           arraytype = "EPIC")
-
-myRefbase_myo <- champ.refbase(beta = b_vals_myo,                      ### returns b-vals adjusted for 5 main cellpopulations identified
-                               arraytype = "EPIC")
-
-myRefbase_homo <- champ.refbase(beta = b_vals_homo,                      ### returns b-vals adjusted for 5 main cellpopulations identified
-                               arraytype = "EPIC")
 
 # not satisfied with how this works
 
