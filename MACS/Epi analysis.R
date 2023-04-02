@@ -55,8 +55,6 @@ gunzip("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GC-A
 
 untar("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GC-AS-10179.tar", exdir = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/raw idat/")
 
-
-rm(CellTypeMeans450K)
 #############################################################
 #############################################################
 
@@ -206,6 +204,10 @@ myNorm_fun <- preprocessFunnorm(myLoad$rgSet,
 
 ####################################################################
 
+
+
+
+
 # add  the normalized beta values to myData
 
 myImport = myData
@@ -214,6 +216,8 @@ myImport$beta <- getBeta(myNorm_fun)
 
 length(rownames(myImport$beta)) # all cpgs are still there, move on with filtering
 
+# filter with champ function
+
 flt_beta <- champ.filter(beta = myImport$beta,
                          pd = myImport$pd,
                          detP = myImport$detP[rownames(myImport$beta),],
@@ -221,13 +225,47 @@ flt_beta <- champ.filter(beta = myImport$beta,
                          Meth = myImport$Meth[rownames(myImport$beta),],
                          UnMeth = myImport$UnMeth[rownames(myImport$beta),],
                          arraytype = "EPIC",
-                         filterBeads = TRUE,
-                         filterXY = TRUE,
-                         filterSNPs = TRUE)
+                         filterBeads = FALSE,
+                         filterXY = FALSE,
+                         filterSNPs = FALSE,
+                         filterMultiHit = FALSE)
+
+# filtered out 5278 probes with detP above 0.01 in more than 5% of samples
+# filtered out 2913 non-CpG probes 
+# Replacing all value smaller/equal to 0 with smallest positive value.
+# Replacing all value greater/equal to 1 with largest value below 1..
+
+# filter out cross reactive probes and SNPs from pidsley et al
+# Get list of potentailly problematic probes identified in  Pidsley et al. 2016 - https://doi.org/10.1186/s13059-016-1066-1
+
+f1 <- read.csv("./filter_data/13059_2016_1066_MOESM1_ESM (2).csv") # cross reactive probes from Pidsley et al 2016
+f2 <- read.csv("./filter_data/13059_2016_1066_MOESM4_ESM.csv")     # SNP affected probes from Pidsley et al. 2016
+
+f1 <- as.data.frame(f1)
+f2 <- as.data.frame(f2)
+
+beta <- flt_beta$beta[!(rownames(flt_beta$beta)%in% f1$X),] # %>% rownames() %>% length()  
+
+# filtered out 42636 cross reactive probes from Pidsley et al. 2016
+
+beta <- beta[!(rownames(beta) %in% f2$PROBE),]   # %>% rownames() %>% length()
+
+# filtered out 946 remaining known SNPs from Pidsley et al. 2016
+
+rownames(beta) %>%  length()
+
+# 804857 remaining probes after filtering
+
+# plot density plot of filtered and normalized beta values
+
+densityPlot(beta, sampGroups=myData$pd$Sample_Group,
+            main="norm + filt beta", legend=TRUE)
 
 
+densityPlot(B2M(beta), sampGroups=myData$pd$Sample_Group,
+            main="norm + filt M", legend=TRUE)
 
-
+# both beta and M value distributions look ok
 
 qcReport(myLoad$rgSet, sampNames=myLoad$pd$Sample_Name, sampGroups=myLoad$pd$Sample_Group, 
          pdf="qcReport.pdf")
@@ -585,23 +623,23 @@ setwd(mypath)
 
 
 
-myDMP_BH_BM <- champ.DMP(beta = B2M(flt_beta$beta),
+myDMP_BH_BM <- champ.DMP(beta = B2M(beta),
                    pheno = flt_beta$pd$Sample_Group,
                    compare.group = c("BH", "BM"),
                    arraytype = "EPIC")                   ### significant DMPs with BH adjusted p val of 0.05
 
-myDMP_PH_PM <- champ.DMP(beta = B2M(flt_beta$beta),
+myDMP_PH_PM <- champ.DMP(beta = B2M(beta),
                          pheno = flt_beta$pd$Sample_Group,
                          compare.group = c("PH", "PM"),
                          arraytype = "EPIC")                   ### significant DMPs with BH adjusted p val of 0.05
 
-myDMP_BM_PM <- champ.DMP(beta = B2M(flt_beta$beta),
+myDMP_BM_PM <- champ.DMP(beta = B2M(beta),
                          pheno = flt_beta$pd$Sample_Group,
                          compare.group = c("BM", "PM"),
                          adjust.method = "none",
                          arraytype = "EPIC")                   ### significant DMPs with un-adjusted p val of 0.05
 
-myDMP_BH_PH <- champ.DMP(beta = B2M(flt_beta$beta),
+myDMP_BH_PH <- champ.DMP(beta = B2M(beta),
                          pheno = flt_beta$pd$Sample_Group,
                          compare.group = c("BH", "PH"),
                          adjust.method = "none",
