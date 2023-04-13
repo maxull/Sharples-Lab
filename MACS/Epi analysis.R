@@ -649,9 +649,18 @@ myDMP_BH_PH <- champ.DMP(beta = B2M(beta),
 # code to check DMPs with differenct p values
 myDMP_BH_BM$BH_to_BM %>% 
         as.data.frame() %>% 
-        filter(adj.P.Val < 0.001) %>% 
+        #filter(adj.P.Val < 0.001) %>% 
         rownames() %>% 
         length()
+
+myDMP_PH_PM$PH_to_PM %>% 
+        as.data.frame() %>% 
+        #filter(adj.P.Val < 0.001) %>% 
+        rownames() %>% 
+        length()
+
+
+
 
 
 ###
@@ -733,25 +742,6 @@ myDMP_BH_PH <- readRDS("myDMP_BH_PH.RDATA")
 
 
 
-# run BMIQ normalization and identify DMPs across time
-
-bmiq_norm <- champ.norm(beta = myLoad$beta, arraytype = "EPIC")
-
-rownames(bmiq_norm) %>% 
-        length()
-
-myDMP_BM_PM_bmiq <- champ.DMP(beta = B2M(bmiq_norm),
-                         pheno = flt_beta$pd$Sample_Group,
-                         compare.group = c("BM", "PM"),
-                        adjust.method = "none",
-                         arraytype = "EPIC")                   ### significant DMPs with un-adjusted p val of 0.05
-
-myDMP_BH_PH_bmiq <- champ.DMP(beta = B2M(bmiq_norm),
-                         pheno = flt_beta$pd$Sample_Group,
-                         compare.group = c("BH", "PH"),
-                         adjust.method = "none",
-                         arraytype = "EPIC")                   ### significant DMPs with un-adjusted p val of 0.05
-
 
 ########################################################################
 
@@ -776,7 +766,7 @@ baseline_dmps <- merge(baseline_dmps, anno, by = "cpg") %>%
 dfh_1 <- dfh %>% 
         filter(condition %in% c("BH", "BM"))        
 
-change_b_vals_baseline <- b_vals[,rownames(dfh_1)] %>% 
+change_b_vals_baseline <- beta[,rownames(dfh_1)] %>% 
         as.data.frame() %>% 
         mutate(average_homo = (`1BH`+ `2BH`+ `4BH`+ `5BH`+ `6BH`+ `7BH`+ `8BH`+`12BH`)/8,
                average_myo = (`1BM`+ `2BM`+ `4BM`+ `5BM`+ `6BM`+ `7BM`+ `8BM`+`12BM`)/8,
@@ -789,19 +779,20 @@ change_b_vals_baseline <- b_vals[,rownames(dfh_1)] %>%
 n_count <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>% 
         filter(dir == "Negative_skew") %>% 
         mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
-        summarise(count(Relation_to_Island)) %>% 
+        summarise(dplyr::count(.,Relation_to_Island)) %>% 
         as.data.frame()
 
 p_count <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>% 
         filter(dir == "Positive_skew") %>%
         mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
-        summarise(count(Relation_to_Island)) %>% 
+        summarise(count(.,Relation_to_Island)) %>% 
         as.data.frame() 
 
 df <- data.frame(
-        category = n_count[6:1,]$x,
-        neg_skew = (n_count[6:1,]$freq)*-1,
-        pos_skew = p_count[6:1,]$freq)
+        category = n_count[6:1,1],
+        neg_skew = (n_count[6:1,2])*-1,
+        pos_skew = p_count[6:1,2]) %>% 
+        mutate(total = (neg_skew)*-1+pos_skew)
 
 p1 <- ggplot(df, aes(x = category)) +
         geom_bar(aes(y = neg_skew, fill = "neg_skew"), stat = "identity") +
@@ -829,10 +820,10 @@ change_b_vals_baseline %>%
                              ifelse(change >0.01 & change < 0.1, "0.01<0.1", 
                                     ifelse(change > 0.1 & change < 0.2, "0.1<0.2", 
                                            ifelse(change > 0.2 & change < 0.3, "0.2<0.3",">0.3"))))) %>% 
-        summarise(count(skew)) -> df1
+        summarise(count(.,skew)) -> df1
         
-df2 <- data.frame(category = factor(df1[,1]$x, levels = c("<0.01", "0.01<0.1", "0.1<0.2", "0.2<0.3", ">0.3")),
-                  count = df1[,1]$freq)
+df2 <- data.frame(category = factor(df1[,1], levels = c("<0.01", "0.01<0.1", "0.1<0.2", "0.2<0.3", ">0.3")),
+                  count = df1[,2])
 
 library(scales)
 p3 <- ggplot(data = df2, aes(x = category))+
@@ -861,7 +852,7 @@ post_dmps <- merge(post_dmps, anno, by = "cpg") %>%
 dfh_2 <- dfh %>% 
         filter(condition %in% c("PH", "PM"))        
 
-change_b_vals_post <- b_vals[,rownames(dfh_2)] %>% 
+change_b_vals_post <- beta[,rownames(dfh_2)] %>% 
         as.data.frame() %>% 
         mutate(average_homo = (`1PH`+ `2PH`+ `4PH`+ `5PH`+ `6PH`+ `7PH`+ `8PH`+`12PH`)/8,
                average_myo = (`1PM`+ `2PM`+ `4PM`+ `5PM`+ `6PM`+ `7PM`+ `8PM`+`12PM`)/8,
@@ -871,21 +862,21 @@ change_b_vals_post <- b_vals[,rownames(dfh_2)] %>%
 
 
 n_count2 <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>% 
-        filter(dir == "Negative_skew") %>%    nrow()
+        filter(dir == "Negative_skew") %>%
         mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
-        summarise(count(Relation_to_Island)) %>% 
+        summarise(count(.,Relation_to_Island)) %>% 
         as.data.frame()
 
 p_count2 <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>% 
         filter(dir == "Positive_skew") %>% 
         mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
-        summarise(count(Relation_to_Island)) %>% 
+        summarise(count(.,Relation_to_Island)) %>% 
         as.data.frame() 
 
 df2 <- data.frame(
-        category = n_count2[6:1,]$x,
-        neg_skew = (n_count2[6:1,]$freq)*-1,
-        pos_skew = p_count2[6:1,]$freq)
+        category = n_count2[6:1,1],
+        neg_skew = (n_count2[6:1,2])*-1,
+        pos_skew = p_count2[6:1,2])
 
 p2 <- ggplot(df2, aes(x = category)) +
         geom_bar(aes(y = neg_skew, fill = "neg_skew"), stat = "identity") +
@@ -913,10 +904,10 @@ change_b_vals_post %>%
                              ifelse(change >0.01 & change < 0.1, "0.01<0.1", 
                                     ifelse(change > 0.1 & change < 0.2, "0.1<0.2", 
                                            ifelse(change > 0.2 & change < 0.3, "0.2<0.3",">0.3"))))) %>% 
-        summarise(count(skew)) -> df3
+        summarise(count(.,skew)) -> df3
 
-df4 <- data.frame(category = factor(df3[,1]$x, levels = c("<0.01", "0.01<0.1", "0.1<0.2", "0.2<0.3", ">0.3")),
-                  count = df3[,1]$freq)
+df4 <- data.frame(category = factor(df3[,1], levels = c("<0.01", "0.01<0.1", "0.1<0.2", "0.2<0.3", ">0.3")),
+                  count = df3[,2])
 
 p4 <- ggplot(data = df4, aes(x = category))+
         geom_bar(aes(y = count), stat = "identity")+
@@ -973,7 +964,7 @@ dfh_1 <- dfh %>%
 
 dmp_list <- rownames(myDMP_BH_BM$BH_to_BM)
 
-b_vals <- flt_beta$beta
+
 
 # create list of cpgs that map to islands
 
@@ -984,20 +975,20 @@ island_cpg <- anno %>%
 
 # filter b vals for significant island cpgs
 
-b_vals_1 <- b_vals[island_cpg$cpg,rownames(dfh_1)] %>% 
+b_vals_1 <- beta[,rownames(dfh_1)] %>% 
         as.data.frame() %>% 
         rownames_to_column(var = "cpg") %>% 
-        filter(cpg %in% dmp_list) 
+        filter(cpg %in% island_cpg$cpg & cpg %in% dmp_list)
 
 
 # repeat for post samples
 
 dmp_post <- rownames(myDMP_PH_PM$PH_to_PM)
 
-b_vals_2 <- b_vals[island_cpg$cpg,rownames(dfh_2)] %>% 
+b_vals_2 <- beta[,rownames(dfh_2)] %>% 
         as.data.frame() %>% 
         rownames_to_column(var = "cpg") %>% 
-        filter(cpg %in% dmp_post)
+        filter(cpg %in% dmp_post & cpg %in% island_cpg$cpg)
 
 dfh$condition <- factor(dfh$condition, levels = c("BH","BM","PH","PM"))
 
@@ -1023,6 +1014,16 @@ baseline_dmps <- pheatmap(t(baseline_dmps_in_islands[,rownames(dfh_1)]), annotat
 post_dmps <- pheatmap(t(baseline_dmps_in_islands[,rownames(dfh_2)]), annotation_row = dfh_2, cluster_rows = FALSE, gaps_row = 8, 
                           show_colnames = FALSE, annotation_names_row = FALSE, 
                           color = viridis(n = 100), scale = "none")
+
+library(dendextend)
+
+col_dend <- post_dmps[[2]]
+
+col_dend$order <- rev(col_dend$order)
+
+post_dmps <- pheatmap(t(baseline_dmps_in_islands[,rownames(dfh_2)]), annotation_row = dfh_2, cluster_rows = FALSE, gaps_row = 8, 
+         show_colnames = FALSE, annotation_names_row = FALSE, 
+         color = viridis(n = 100), scale = "none", cluster_cols = as.hclust(col_dend))
 
 # plot together
 
@@ -1185,27 +1186,23 @@ merge(base_pos, post_neg, by = "cpg")
 
 myDMP_BH_PH$BH_to_PH %>% 
         rownames_to_column(var = "cpg") %>% 
-        rownames_to_column(var = "number") %>% 
-        filter(cpg == "cg00408117" | cpg == "cg13897145" | cpg == "cg06394887")
+        rownames_to_column(var = "number") %>%
+        filter(cpg == "cg00408117" | cpg == "cg13897145")
 
 
 
 Illumina_anno %>% 
-        filter(IlmnID == "cg00408117" | IlmnID == "cg13897145"| IlmnID == "cg06394887")
+        filter(IlmnID == "cg00408117" | IlmnID == "cg13897145")
 
 
-# find the one probe that is neg baseline and pos post
 
-merge(base_neg,post_pos, by = "cpg")
 
 # find the same pobes in myonuclear DMPs list
 
 myDMP_BM_PM$BM_to_PM %>% 
         rownames_to_column(var = "cpg") %>% 
-        rownames() %>% 
-        length()
         rownames_to_column(var = "number") %>% 
-        filter(cpg == "cg00408117" | cpg == "cg13897145"| cpg == "cg06394887")
+        filter(cpg == "cg00408117" | cpg == "cg13897145")
 
         
 
@@ -1276,7 +1273,7 @@ library(kohonen)
 
 # create dataframe with group averages
 
-som_data <-  B2M(b_vals)%>% 
+som_data <-  B2M(beta)%>% 
         as.data.frame() %>% 
         mutate(avg_BH = round((`1BH`+`2BH`+`4BH`+`5BH`+`6BH`+`7BH`+`8BH`+`12BH`)/8,2),
                avg_BM = round((`1BM`+`2BM`+`4BM`+`5BM`+`6BM`+`7BM`+`8BM`+`12BM`)/8,2),
@@ -1334,7 +1331,7 @@ set.seed(1)
 
 xyss <- vector()
 
-for (i in 1) {
+for (i in 2:10) {
         xyss[i] <- sum(kmeans(som_data,i)$withinss)
 }
 plot(1:10, xyss, type = "b", main = "clusters of M-value profiles", xlab = "number of clusters", ylab = "XYSS")
@@ -1351,7 +1348,7 @@ k_means <-as.data.frame(kmeans$cluster)
 
 som_data[,"kmeans"] <- k_means[,1]
 
-count(k_means[,1])
+count(som_data, kmeans)
 #kmeans_plot <- 
 som_data %>% 
         pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
@@ -1408,7 +1405,7 @@ k1 <- som_data %>%
         geom_errorbar(aes(ymin = m-s,
                           ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
         labs(y = "M-value",
-             title = "Cluster 1: N = 56239")+
+             title = "Cluster 1: N = 52597")+
         theme_bw(base_size = 20)+
         theme(axis.text.x = element_text(size = 15),
               legend.position = "none",
@@ -1422,7 +1419,7 @@ k2 <- som_data %>%
                kmeans = factor(kmeans))%>% 
         dplyr::group_by(kmeans,condition) %>% 
         dplyr::summarize(m = mean(mean_M),
-                         s = sd(mean_M/sqrt(length(mean_M)))) %>% 
+                         s = sd(mean_M)) %>% 
         mutate(sample = substr_right(as.character(condition), 1),
                timepoint = substr_right(as.character(condition), 2)) %>% 
         mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
@@ -1436,14 +1433,13 @@ k2 <- som_data %>%
         geom_errorbar(aes(ymin = m-s,
                           ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
         labs(y = "M-value",
-             title = "Cluster 2: N = 49432")+
+             title = "Cluster 2: N = 56339")+
         theme_bw(base_size = 20)+
         theme(axis.text.x = element_text(size = 15),
               legend.position = "none",
               axis.title.x = element_blank(),
               axis.title.y = element_blank(),
               panel.grid.minor = element_blank())+
-        scale_y_continuous(limits = c(-2.25,-0.90))
         geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
 
 
@@ -1453,7 +1449,7 @@ k3 <- som_data %>%
                kmeans = factor(kmeans))%>% 
         dplyr::group_by(kmeans,condition) %>% 
         dplyr::summarize(m = mean(mean_M),
-                         s = sd(mean_M/sqrt(length(mean_M)))) %>% 
+                         s = sd(mean_M)) %>% 
         mutate(sample = substr_right(as.character(condition), 1),
                timepoint = substr_right(as.character(condition), 2)) %>% 
         mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
@@ -1467,7 +1463,7 @@ k3 <- som_data %>%
         geom_errorbar(aes(ymin = m-s,
                           ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
         labs(y = "M-value",
-             title = "Cluster 3: N = 52972")+
+             title = "Cluster 3: N = 31464")+
         theme_bw(base_size = 20)+
         theme(axis.text.x = element_text(size = 15),
               legend.position = "none",
@@ -1476,14 +1472,14 @@ k3 <- som_data %>%
               panel.grid.minor = element_blank())+
         geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
 
-
+ 
 k4 <- som_data %>% 
         pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
         mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
                kmeans = factor(kmeans))%>% 
         dplyr::group_by(kmeans,condition) %>% 
         dplyr::summarize(m = mean(mean_M),
-                         s = sd(mean_M/sqrt(length(mean_M)))) %>% 
+                         s = sd(mean_M)) %>% 
         mutate(sample = substr_right(as.character(condition), 1),
                timepoint = substr_right(as.character(condition), 2)) %>% 
         mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
@@ -1497,18 +1493,15 @@ k4 <- som_data %>%
         geom_errorbar(aes(ymin = m-s,
                           ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
         labs(y = "M-value",
-             title = "Cluster 4: N = 29792")+
+             title = "Cluster 4: N = 59741")+
         theme_bw(base_size = 20)+
         theme(axis.text.x = element_text(size = 15),
               legend.position = "none",
               axis.title.x = element_blank(),
               axis.title.y = element_blank(),
               panel.grid.minor = element_blank())+
-        scale_y_continuous(limits = c(-4.15,-3))+
         geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
 
-grobs <- ggplotGrob(k4)$grobs
-legend <- grobs[[which(sapply(grobs, function(x) x$name) == "guide-box")]]
 
 
 library(ggpubr)
@@ -1516,7 +1509,7 @@ library(ggpubr)
 ggarrange(k1,k2,k3,k4,common.legend = TRUE, legend = "right", nrow = 1,widths = c(1,0.9,0.9,0.9))
 
 
-plot_grid(k1,k2,k3,k4, nrow = 1)
+
 
 #################################################################################
 
