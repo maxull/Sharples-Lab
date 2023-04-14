@@ -25,36 +25,12 @@ saveRDS(myDMP_BM_PM, file = "myDMP_BM_PM.RDATA")   # myonuclear unadjusterd p va
 
 # count DMPs and plot
 
-myDMP_BH_PH_bmiq$BH_to_PH %>% 
-        as.data.frame() %>% 
-        dplyr::select(deltaBeta) %>% 
-        dplyr::summarise(hypo = sum(deltaBeta < 0),
-                         hyper = sum(deltaBeta > 0)) %>% 
-        mutate(comp = "BH_to_PH",
-               norm = "BMIQ") -> x
-
-
-
-
-myDMP_BM_PM_bmiq$BM_to_PM %>% 
-        as.data.frame() %>% 
-        dplyr::select(deltaBeta) %>% 
-        dplyr::summarise(hypo = sum(deltaBeta < 0),
-                         hyper = sum(deltaBeta > 0)) %>% 
-        mutate(comp = "BM_to_PM",
-               norm = "BMIQ") %>% 
-        base::rbind(x,.)->x
-
-
-
 myDMP_BH_PH$BH_to_PH %>% 
         as.data.frame() %>% 
         dplyr::select(deltaBeta) %>% 
         dplyr::summarise(hypo = sum(deltaBeta < 0),
                          hyper = sum(deltaBeta > 0)) %>% 
-        mutate(comp = "BH_to_PH",
-               norm = "Fun-norm")%>% 
-        base::rbind(x,.)->x
+        mutate(comp = "BH_to_PH") -> x
 
 
 
@@ -64,12 +40,15 @@ myDMP_BM_PM$BM_to_PM %>%
         dplyr::select(deltaBeta) %>% 
         dplyr::summarise(hypo = sum(deltaBeta < 0),
                          hyper = sum(deltaBeta > 0)) %>% 
-        mutate(comp = "BM_to_PM",
-               norm = "Fun-norm")%>% 
+        mutate(comp = "BM_to_PM") %>% 
         base::rbind(x,.)->x
 
+
+
+
+
 x %>% 
-        ggplot(aes(x = comp, fill = norm))+
+        ggplot(aes(x = comp))+
         geom_bar(aes(y = -hypo), stat = "identity", position = "dodge", width = 0.6)+
         geom_bar(aes(y = hyper), stat = "identity", position = "dodge", width = 0.6)
 
@@ -88,8 +67,6 @@ hDMP <- myDMP_BH_PH$BH_to_PH %>%
         rownames_to_column(var = "cpg") %>% 
         dplyr::select(cpg, P.Value, BH_AVG, PH_AVG, deltaM = deltaBeta, gene) %>% 
         merge(.,anno, by = "cpg") %>% 
-        rownames() %>% 
-        length()
         group_by(Relation_to_Island) %>% 
         dplyr::summarise(hypo = sum(deltaM < 0),
                          hyper = sum(deltaM > 0),
@@ -101,7 +78,7 @@ mDMP <- myDMP_BM_PM$BM_to_PM %>%
         as.data.frame() %>% 
         rownames_to_column(var = "cpg") %>% 
         dplyr::select(cpg, P.Value, BM_AVG, PM_AVG, deltaM = deltaBeta, gene) %>% 
-        merge(.,anno, by = "cpg") 
+        merge(.,anno, by = "cpg") %>% 
         group_by(Relation_to_Island) %>% 
         dplyr::summarise(hypo = sum(deltaM < 0),
                          hyper = sum(deltaM > 0),
@@ -139,7 +116,7 @@ library(cowplot)
 plot_grid(p1,p2,nrow = 1)
 
 
-# isolate homogenate and myonuclei DMPs within promoter assosiated islands andd plot together
+# isolate homogenate and myonuclei DMPs within promoter assosiated islands and plot together
 
 
 hDMP <- myDMP_BH_PH$BH_to_PH %>% 
@@ -177,10 +154,188 @@ rbind(hDMP, mDMP) %>%
         
 
 
+###
+
+# isolate cpgs in islands and promoters and check directional overlap
+
+# isolate data
 
 
 
-
-
-
+hDMP <- myDMP_BH_PH$BH_to_PH %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::select(cpg, P.Value, BH_AVG, PH_AVG, deltaM = deltaBeta, gene) %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island")
         
+mDMP <- myDMP_BM_PM$BM_to_PM %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::select(cpg, P.Value, BM_AVG, PM_AVG, deltaM = deltaBeta, gene) %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island")
+
+DMPs_pro_isl <- merge(hDMP, mDMP, by = "cpg")
+
+# hypo homo and hypo myo
+
+DMPs_pro_isl %>% 
+        filter(deltaM.x < 0 & deltaM.y < 0) %>% 
+        dplyr::select(cpg, gene.x)
+
+# hyper homo and myo
+
+DMPs_pro_isl %>% 
+        filter(deltaM.x > 0 & deltaM.y > 0) %>% 
+        dplyr::select(cpg, gene.x)
+
+# hyper homo and hypo myo
+
+DMPs_pro_isl %>% 
+        filter(deltaM.x > 0 & deltaM.y < 0) %>% 
+        dplyr::select(cpg, gene.x)
+
+# hypo homo and hyper myo
+
+DMPs_pro_isl %>% 
+        filter(deltaM.x < 0 & deltaM.y > 0) %>% 
+        dplyr::select(cpg, gene.x)
+
+
+# all CPGs, but with higher delta M
+
+# isolate data
+
+hDMP <- myDMP_BH_PH$BH_to_PH %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::select(cpg, P.Value, BH_AVG, PH_AVG, deltaM = deltaBeta, gene) %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(deltaM >= 0.3 | deltaM <= -0.3)
+
+mDMP <- myDMP_BM_PM$BM_to_PM %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::select(cpg, P.Value, BM_AVG, PM_AVG, deltaM = deltaBeta, gene) %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(deltaM >= 0.3 | deltaM <= -0.3)
+
+DMPs_0.3 <- merge(hDMP, mDMP, by = "cpg")
+
+# hypo homo and hypo myo
+
+DMPs_0.3 %>% 
+        filter(deltaM.x < 0 & deltaM.y < 0) %>% 
+        dplyr::select(cpg, gene.x)
+
+# hyper homo and myo
+
+DMPs_0.3 %>% 
+        filter(deltaM.x > 0 & deltaM.y > 0) %>% 
+        dplyr::select(cpg, gene.x)
+
+# hyper homo and hypo myo
+
+DMPs_0.3 %>% 
+        filter(deltaM.x > 0 & deltaM.y < 0) %>% 
+        dplyr::select(cpg, gene.x)
+
+# hypo homo and hyper myo
+
+DMPs_0.3 %>% 
+        filter(deltaM.x < 0 & deltaM.y > 0) %>% 
+        dplyr::select(cpg, gene.x)
+
+
+
+# find DMPs that are only in homo and only in myo
+
+hDMP <- myDMP_BH_PH$BH_to_PH %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::select(cpg, P.Value, BH_AVG, PH_AVG, deltaM = deltaBeta, gene) %>% 
+        merge(.,anno, by = "cpg")
+
+
+mDMP <- myDMP_BM_PM$BM_to_PM %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::select(cpg, P.Value, BM_AVG, PM_AVG, deltaM = deltaBeta, gene) %>% 
+        merge(.,anno, by = "cpg")
+
+hDMP[hDMP$cpg %in%  mDMP$cpg == FALSE,] -> x
+
+mDMP[mDMP$cpg %in%  hDMP$cpg == FALSE,] -> y
+
+merge(x,y, by = "cpg")
+
+
+# plot venn diagram
+
+
+DMPs <- list(hDMP = hDMP$cpg,
+             mDMP = mDMP$cpg)
+
+
+library(ggvenn)
+
+# plot venn-diagram 
+
+venn <- ggvenn(DMPs, set_name_size = 10, stroke_size = 1, text_size = 10)
+
+# re-do venn with island and promoter DMPs
+
+hDMP <- myDMP_BH_PH$BH_to_PH %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::select(cpg, P.Value, BH_AVG, PH_AVG, deltaM = deltaBeta, gene) %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island")
+
+mDMP <- myDMP_BM_PM$BM_to_PM %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::select(cpg, P.Value, BM_AVG, PM_AVG, deltaM = deltaBeta, gene) %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island")
+
+DMPs <- list(hDMP = hDMP$cpg,
+             mDMP = mDMP$cpg)
+
+venn <- ggvenn(DMPs, set_name_size = 10, stroke_size = 1, text_size = 10)
+
+
+###
+
+# add fantom 4 and 5 enhancers to annotation
+Illumina_anno %>% 
+        dplyr::select(cpg = 1, 21:22) %>% 
+        merge(anno, ., by = "cpg") -> anno
+
+
+# Homogenate DMPs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
