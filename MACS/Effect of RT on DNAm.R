@@ -48,9 +48,16 @@ myDMP_BM_PM$BM_to_PM %>%
 
 
 x %>% 
+        mutate(percent_hyper = hyper/(hypo+hyper)*100,
+               percent_hypo = hypo/(hypo+hyper)*100) %>% 
         ggplot(aes(x = comp))+
-        geom_bar(aes(y = -hypo), stat = "identity", position = "dodge", width = 0.6)+
-        geom_bar(aes(y = hyper), stat = "identity", position = "dodge", width = 0.6)
+        geom_bar(aes(y = -hypo), stat = "identity", position = "dodge", width = 0.6, fill = hypo_col)+
+        geom_bar(aes(y = hyper), stat = "identity", position = "dodge", width = 0.6, fill = hyper_col)+
+        geom_label(aes(x = comp, y = hyper, label = paste(hyper, "/", round(percent_hyper, 1), "%")), alpha = 0.8)+
+        geom_label(aes(x = comp, y = -hypo, label = paste(hypo, "/", round(percent_hypo, 1), "%")), alpha = 0.8)+
+        theme_classic() +
+        theme(axis.title.x = element_blank())+
+        labs(y = "DMPs after 7 weeks RT (un adj.p < 0.05" )
 
 
 # DMPs in fun-normalized vary considerably from BMIQ normalized
@@ -113,7 +120,7 @@ p2 <- ggplot(data = mDMP, aes(x = Relation_to_Island))+
 
 library(cowplot)
 
-plot_grid(p1,p2,nrow = 1)
+plot_grid(p1,p2,nrow = 1, labels = c("A","B"))
 
 
 # isolate homogenate and myonuclei DMPs within promoter assosiated islands and plot together
