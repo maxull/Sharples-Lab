@@ -8,7 +8,6 @@
 
 # files
 
-saveRDS(bmiq_norm, file = "bmiq_norm.RDATA")    # bmiq normalized and filtered B values
 
 saveRDS(myNorm_fun, file = "fun_norm.RDATA")    # functional normalized and filtered B values
 
@@ -325,9 +324,20 @@ Illumina_anno %>%
 
 
 
+# count hyper and hypo methylated probes in islands and promoters, to compare with adams percentages
+
+hDMP %>% 
+        mutate(dir = ifelse(deltaM < 0, "hypo", "hyper")) %>% 
+        dplyr::summarise(count(.,dir))
+
+mDMP %>% nrow()
+        mutate(dir = ifelse(deltaM < 0, "hypo", "hyper")) %>% 
+        dplyr::summarise(count(.,dir))
 
 
-
+# load adams DMP lists to overlap the cpgs
+        
+Adam_dmps <- read.csv("C:/Users/maxul/Downloads/DMPs.xlsx", skip = 2)
 
 
 

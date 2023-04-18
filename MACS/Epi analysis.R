@@ -745,6 +745,256 @@ myDMP_BH_PH <- readRDS("myDMP_BH_PH.RDATA")
 
 ########################################################################
 
+### re-do DMPs manually
+
+########################################################################3
+
+# calculate group averages
+
+M_change <- beta %>%
+        B2M() %>% 
+        as.data.frame() %>% 
+        dplyr::select("1BH","2BH","4BH","5BH","6BH","7BH","8BH","12BH",
+                      "1BM","2BM","4BM","5BM","6BM","7BM","8BM","12BM",
+                      "1PH","2PH","4PH","5PH","6PH","7PH","8PH","12PH",
+                      "1PM","2PM","4PM","5PM","6PM","7PM","8PM","12PM") %>% 
+        mutate(BH = (`1BH`+`2BH`+`4BH`+`5BH`+`6BH`+`7BH`+`8BH`+`12BH`)/8,
+               BM = (`1BM`+`2BM`+`4BM`+`5BM`+`6BM`+`7BM`+`8BM`+`12BM`)/8,
+               PH = (`1PH`+`2PH`+`4PH`+`5PH`+`6PH`+`7PH`+`8PH`+`12PH`)/8,
+               PM = (`1PM`+`2PM`+`4PM`+`5PM`+`6PM`+`7PM`+`8PM`+`12PM`)/8) %>% 
+        # calculate change
+        mutate(BM_vs_BH = BM-BH,
+               PM_vs_PH = PM-PH,
+               PH_vs_BH = PH-BH,
+               PM_vs_BM = PM-BM)
+
+# calculate paired sample t-test
+
+# start with difference at baseline between myonuclei vs. homogenate 1.29 min for 10000 cpgs
+
+DMPs_BM_vs_BH = data.frame()
+DMPs_PM_vs_PH = data.frame()
+DMPs_PH_vs_BH = data.frame()
+DMPs_PM_vs_BM = data.frame()
+
+# baseline homogenate vs. myonuclei
+
+for (i in 1:length(rownames(M_change)))  {
+        y1 = as.numeric(M_change[i,1:8])
+        z1 = as.numeric(M_change[i,9:16])
+        
+        test <- t.test(x = z1, y = y1, paired = TRUE)
+        data.frame(
+                cpg = rownames(M_change)[i],
+                t = test$statistic,
+                p.value = test$p.value,
+                conf.int_0.025 = test$conf.int[1],
+                conf.int_0.975 = test$conf.int[2],
+                delta_M = test$estimate) %>% 
+                rbind(DMPs_BM_vs_BH,.) -> DMPs_BM_vs_BH
+        
+        print(i)
+}
+
+# post homogenate vs. myonuclei 
+
+for (i in 1:length(rownames(M_change)))  {
+        y1 = as.numeric(M_change[i,17:24])
+        z1 = as.numeric(M_change[i,25:32])
+        
+        test <- t.test(x = z1, y = y1, paired = TRUE)
+        data.frame(
+                cpg = rownames(M_change)[i],
+                t = test$statistic,
+                p.value = test$p.value,
+                conf.int_0.025 = test$conf.int[1],
+                conf.int_0.975 = test$conf.int[2],
+                delta_M = test$estimate) %>% 
+                rbind(DMPs_BM_vs_BH,.) -> DMPs_PM_vs_PH
+        
+        print(i)
+}
+
+# baseline to post homogenate
+
+for (i in 1:length(rownames(M_change)))  {
+        y1 = as.numeric(M_change[i,1:8])
+        z1 = as.numeric(M_change[i,17:24])
+        
+        test <- t.test(x = z1, y = y1, paired = TRUE)
+        data.frame(
+                cpg = rownames(M_change)[i],
+                t = test$statistic,
+                p.value = test$p.value,
+                conf.int_0.025 = test$conf.int[1],
+                conf.int_0.975 = test$conf.int[2],
+                delta_M = test$estimate) %>% 
+                rbind(DMPs_BM_vs_BH,.) -> DMPs_PH_vs_BH
+        
+        print(i)
+}
+
+
+# baseline to post myonuclei
+
+for (i in 1:length(rownames(M_change)))  {
+        y1 = as.numeric(M_change[i,1:8])
+        z1 = as.numeric(M_change[i,17:24])
+        
+        test <- t.test(x = z1, y = y1, paired = TRUE)
+        data.frame(
+                cpg = rownames(M_change)[i],
+                t = test$statistic,
+                p.value = test$p.value,
+                conf.int_0.025 = test$conf.int[1],
+                conf.int_0.975 = test$conf.int[2],
+                delta_M = test$estimate) %>% 
+                rbind(DMPs_BM_vs_BH,.) -> DMPs_PM_vs_BM
+        
+        print(i)
+}
+
+
+
+###
+# chatGPT solution = half the time slowest 3.9 min for 10000 cpgs
+
+# Extract relevant columns from M_change
+y1 <- as.matrix(M_change[,1:8])
+z1 <- as.matrix(M_change[,9:16])
+
+# Pre-allocate memory for DMPs_PM_vs_PH
+DMPs_BM_vs_BH <- data.frame(
+        cpg = rownames(M_change),
+        t = numeric(length(rownames(M_change))),
+        p.value = numeric(length(rownames(M_change))),
+        conf.int_0.025 = numeric(length(rownames(M_change))),
+        conf.int_0.975 = numeric(length(rownames(M_change))),
+        delta_M = numeric(length(rownames(M_change)))
+)
+
+# Loop through rows and perform t.test
+length(rownames(M_change))) 
+start_time = Sys.time()
+for (i in 1:10000) {
+        test <- t.test(x = z1[i,], y = y1[i,], paired = TRUE)
+        DMPs_BM_vs_BH[i, c("t", "p.value", "conf.int_0.025", "conf.int_0.975", "delta_M")] <- 
+                c(test$statistic, test$p.value, test$conf.int[1], test$conf.int[2], test$estimate)
+        
+        print(i)
+}
+###
+end_time = Sys.time()
+end_time-start_time
+
+
+# chatGPT parallel solution was fastest 28 sek for 10000 cpgs
+
+library(foreach)
+library(doParallel)
+
+# Set the number of cores to use
+num_cores <- detectCores() - 1 # Leave one core free for other processes
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+
+
+DMPs_BM_vs_BH = data.frame()
+
+length(rownames(M_change)))
+writeLines(c(""), "log.txt") # clears the log file that can be used to track progress
+
+sink("log.txt")
+
+start_time = Sys.time()
+results_BM_vs_BH <- foreach(iteration=1:10000, .combine=rbind) %dopar% {
+        print(i)
+        sink()
+        y1 = as.numeric(M_change[i,1:8])
+        z1 = as.numeric(M_change[i,9:16])
+        
+        test <- t.test(x = z1, y = y1, paired = TRUE)
+        c(test$statistic, test$p.value, test$conf.int[1], test$conf.int[2], test$estimate)
+
+}
+
+end_time = Sys.time()
+end_time-start_time
+
+
+
+
+
+
+
+
+
+
+# Extract relevant columns from M_change
+y1 <- as.matrix(M_change[,1:8])
+z1 <- as.matrix(M_change[,9:16])
+
+# Pre-allocate memory for DMPs_PM_vs_PH
+DMPs_BM_vs_BH <- data.frame(
+        cpg = rownames(M_change),
+        t = numeric(length(rownames(M_change))),
+        p.value = numeric(length(rownames(M_change))),
+        conf.int_0.025 = numeric(length(rownames(M_change))),
+        conf.int_0.975 = numeric(length(rownames(M_change))),
+        delta_M = numeric(length(rownames(M_change)))
+)
+
+# Loop through rows and perform t.test in parallel
+
+results <- foreach(i = 1:100000, .combine=rbind) %dopar% {
+        test <- t.test(x = z1[i,], y = y1[i,], paired = TRUE)
+        c(test$statistic, test$p.value, test$conf.int[1], test$conf.int[2], test$estimate)
+        
+}
+
+
+# Assign results to DMPs_PM_vs_PH
+DMPs_BM_vs_BH[, c("t", "p.value", "conf.int_0.025", "conf.int_0.975", "delta_M")] <- results
+
+# Stop the parallel processing
+stopCluster(cl)
+
+
+rm(results)
+
+
+
+
+# difference at post between myonuclei vs. homogenate
+
+
+DMPs_PM_vs_PH = data.frame()
+
+
+for (i in 1:length(rownames(M_change)))  {
+        y1 = as.numeric(M_change[i,17:24])
+        z1 = as.numeric(M_change[i,25:32])
+        
+        test <- t.test(x = z1, y = y1, paired = TRUE)
+        data.frame(
+                cpg = rownames(M_change)[i],
+                t = test$statistic,
+                p.value = test$p.value,
+                conf.int_0.025 = test$conf.int[1],
+                conf.int_0.975 = test$conf.int[2],
+                delta_M = test$estimate) %>% 
+                rbind(DMPs_BM_vs_BH,.) -> DMPs_PM_vs_PH
+        
+        print(i)
+}
+
+
+
+
+
+
+######################################################################
+
 # create horizontal barchart of DMPs in different positions
 
 ########################################################################
@@ -1331,7 +1581,7 @@ set.seed(1)
 
 xyss <- vector()
 
-for (i in 2:10) {
+for (i in 1:10) {
         xyss[i] <- sum(kmeans(som_data,i)$withinss)
 }
 plot(1:10, xyss, type = "b", main = "clusters of M-value profiles", xlab = "number of clusters", ylab = "XYSS")
