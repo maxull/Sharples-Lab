@@ -379,7 +379,7 @@ DMPs <- list(
         post_pos = post_pos$cpg
 )
 
-ggvenn(DMPs, set_name_size = 10, stroke_size = 1, 
+venn <- ggvenn(DMPs, set_name_size = 10, stroke_size = 1, 
        fill_color = c("#453781FF", "#DCE319FF","#453781FF", "#DCE319FF"),
        text_size = 10,
        stroke_alpha = 0.8,
@@ -471,5 +471,190 @@ post_heatmap2 <- pheatmap(t(heatmap_beta[,18:33]), annotation_row = dfh_2, clust
 plot_heat <- plot_grid(baseline_heatmap[[4]], post_heatmap2[[4]], ncol=1, labels = c("A", "B"))
 
 
+######################################################################################
 
+### k means plots
+
+#######################################################################################
+
+som_data <-  B2M(beta)%>% 
+        as.data.frame() %>% 
+        mutate(avg_BH = round((`1BH`+`2BH`+`4BH`+`5BH`+`6BH`+`7BH`+`8BH`+`12BH`)/8,2),
+               avg_BM = round((`1BM`+`2BM`+`4BM`+`5BM`+`6BM`+`7BM`+`8BM`+`12BM`)/8,2),
+               avg_PH = round((`1PH`+`2PH`+`4PH`+`5PH`+`6PH`+`7PH`+`8PH`+`12PH`)/8,2),
+               avg_PM = round((`1PM`+`2PM`+`4PM`+`5PM`+`6PM`+`7PM`+`8PM`+`12PM`)/8,2)) %>% 
+        dplyr::select(avg_BH, avg_BM, avg_PH, avg_PM) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::filter(cpg %in% c(DMPs_BM_vs_BH$cpg,DMPs_PM_vs_PH$cpg))
+
+
+rownames(som_data) <- som_data[,1]
+som_data <- som_data[,-1]
+
+### run kmeans clustering on som_data
+
+
+
+set.seed(1)
+
+
+xyss <- vector()
+
+for (i in 1:10) {
+        xyss[i] <- sum(kmeans(som_data,i)$withinss)
+}
+plot(1:10, xyss, type = "b", main = "clusters of M-value profiles", xlab = "number of clusters", ylab = "XYSS")
+
+# elbow at ~4 clusters
+
+# make cluster with identified elbow
+set.seed(1)
+kmeans <- kmeans(som_data, 4, iter.max = 300, nstart = 10)
+
+# add cluster number to som data and replot
+
+k_means <-as.data.frame(kmeans$cluster)
+
+som_data[,"kmeans"] <- k_means[,1]
+
+
+# remake som plot with individual y axis scaling
+
+# count cluster DMPs
+
+som_data %>% 
+        filter(kmeans == "4") %>% nrow()
+
+tally(as.factor(som_data$kmeans))
+
+
+k1 <- som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               kmeans = factor(kmeans))%>% 
+        dplyr::group_by(kmeans,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                         s = sd(mean_M)) %>% 
+        mutate(sample = substr_right(as.character(condition), 1),
+               timepoint = substr_right(as.character(condition), 2)) %>% 
+        mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
+               timepoint = substr(timepoint, 1,1)) %>% 
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post")) %>% 
+        mutate(timepoint = factor(timepoint, levels = c("Baseline", "Post")),
+               sample = factor(sample, levels = c("Myonuclei","Homogenate"))) %>% 
+        filter(kmeans == "2") %>% 
+        ggplot(aes(x = timepoint, y = m, color = sample))+
+        geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
+        labs(y = "M-value",
+             title = "Cluster 1: N = 90250")+
+        theme_bw(base_size = 20)+
+        theme(axis.text.x = element_text(size = 15),
+              legend.position = "none",
+              axis.title.x = element_blank())+
+        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
+
+
+k2 <- som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               kmeans = factor(kmeans))%>% 
+        dplyr::group_by(kmeans,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                         s = sd(mean_M)) %>% 
+        mutate(sample = substr_right(as.character(condition), 1),
+               timepoint = substr_right(as.character(condition), 2)) %>% 
+        mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
+               timepoint = substr(timepoint, 1,1)) %>% 
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post")) %>% 
+        mutate(timepoint = factor(timepoint, levels = c("Baseline", "Post")),
+               sample = factor(sample, levels = c("Myonuclei","Homogenate"))) %>% 
+        filter(kmeans == "4") %>% 
+        ggplot(aes(x = timepoint, y = m, color = sample))+
+        geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
+        labs(y = "M-value",
+             title = "Cluster 2: N = 83018")+
+        theme_bw(base_size = 20)+
+        theme(axis.text.x = element_text(size = 15),
+              legend.position = "none",
+              axis.title.x = element_blank(),
+              axis.title.y = element_blank(),
+              panel.grid.minor = element_blank())+
+        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
+
+
+k3 <- som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               kmeans = factor(kmeans))%>% 
+        dplyr::group_by(kmeans,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                         s = sd(mean_M)) %>% 
+        mutate(sample = substr_right(as.character(condition), 1),
+               timepoint = substr_right(as.character(condition), 2)) %>% 
+        mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
+               timepoint = substr(timepoint, 1,1)) %>% 
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post")) %>% 
+        mutate(timepoint = factor(timepoint, levels = c("Baseline", "Post")),
+               sample = factor(sample, levels = c("Myonuclei","Homogenate"))) %>% 
+        filter(kmeans == "3") %>% 
+        ggplot(aes(x = timepoint, y = m, color = sample))+
+        geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
+        labs(y = "M-value",
+             title = "Cluster 3: N = 67620")+
+        theme_bw(base_size = 20)+
+        theme(axis.text.x = element_text(size = 15),
+              legend.position = "none",
+              axis.title.x = element_blank(),
+              axis.title.y = element_blank(),
+              panel.grid.minor = element_blank())+
+        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
+
+
+k4 <- som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               kmeans = factor(kmeans))%>% 
+        dplyr::group_by(kmeans,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                         s = sd(mean_M)) %>% 
+        mutate(sample = substr_right(as.character(condition), 1),
+               timepoint = substr_right(as.character(condition), 2)) %>% 
+        mutate(sample = ifelse(sample == "M", "Myonuclei", "Homogenate"),
+               timepoint = substr(timepoint, 1,1)) %>% 
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post")) %>% 
+        mutate(timepoint = factor(timepoint, levels = c("Baseline", "Post")),
+               sample = factor(sample, levels = c("Myonuclei","Homogenate"))) %>% 
+        filter(kmeans == "1") %>% 
+        ggplot(aes(x = timepoint, y = m, color = sample))+
+        geom_line(aes(group = sample), size = 1.5, position = position_dodge(width = 0.2))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s, x = timepoint, group = sample),inherit.aes = FALSE, width = 0.2, size = 1, position = position_dodge(width = 0.2), alpha = 0.5)+
+        labs(y = "M-value",
+             title = "Cluster 4: N = 35842")+
+        theme_bw(base_size = 20)+
+        theme(axis.text.x = element_text(size = 15),
+              legend.position = "none",
+              axis.title.x = element_blank(),
+              axis.title.y = element_blank(),
+              panel.grid.minor = element_blank())+
+        geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
+
+
+
+library(ggpubr)
+
+# plot kmeans
+kmeans_plot <- ggarrange(k1,k2,k3,k4,common.legend = TRUE, legend = "right", nrow = 1,widths = c(1,0.9,0.9,0.9), labels = c("D", "","",""), font.label = list(size = 27))
+
+# plot venn and kmeans together
+plot <- plot_grid(venn, kmeans_plot, ncol = 1, rel_heights = c(2,1), labels = c("C",""), label_size = 27)
+
+# plot with heatmap (doesnt wirk)
+plot_grid(plot_heat, plot)
 
