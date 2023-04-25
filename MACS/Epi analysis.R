@@ -747,7 +747,7 @@ myDMP_BH_PH <- readRDS("myDMP_BH_PH.RDATA")
 
 ### re-do DMPs manually
 
-########################################################################3
+########################################################################
 
 # calculate group averages
 
@@ -770,98 +770,11 @@ M_change <- beta %>%
 
 # calculate paired sample t-test
 
-# start with difference at baseline between myonuclei vs. homogenate 1.29 min for 10000 cpgs
-
-DMPs_BM_vs_BH = data.frame()
-DMPs_PM_vs_PH = data.frame()
-DMPs_PH_vs_BH = data.frame()
-DMPs_PM_vs_BM = data.frame()
-
-# baseline homogenate vs. myonuclei
-
-for (i in 1:length(rownames(M_change)))  {
-        y1 = as.numeric(M_change[i,1:8])
-        z1 = as.numeric(M_change[i,9:16])
-        
-        test <- t.test(x = z1, y = y1, paired = TRUE)
-        data.frame(
-                cpg = rownames(M_change)[i],
-                t = test$statistic,
-                p.value = test$p.value,
-                conf.int_0.025 = test$conf.int[1],
-                conf.int_0.975 = test$conf.int[2],
-                delta_M = test$estimate) %>% 
-                rbind(DMPs_BM_vs_BH,.) -> DMPs_BM_vs_BH
-        
-        print(i)
-}
-
-# post homogenate vs. myonuclei 
-
-for (i in 1:length(rownames(M_change)))  {
-        y1 = as.numeric(M_change[i,17:24])
-        z1 = as.numeric(M_change[i,25:32])
-        
-        test <- t.test(x = z1, y = y1, paired = TRUE)
-        data.frame(
-                cpg = rownames(M_change)[i],
-                t = test$statistic,
-                p.value = test$p.value,
-                conf.int_0.025 = test$conf.int[1],
-                conf.int_0.975 = test$conf.int[2],
-                delta_M = test$estimate) %>% 
-                rbind(DMPs_BM_vs_BH,.) -> DMPs_PM_vs_PH
-        
-        print(i)
-}
-
-# baseline to post homogenate
-
-for (i in 1:length(rownames(M_change)))  {
-        y1 = as.numeric(M_change[i,1:8])
-        z1 = as.numeric(M_change[i,17:24])
-        
-        test <- t.test(x = z1, y = y1, paired = TRUE)
-        data.frame(
-                cpg = rownames(M_change)[i],
-                t = test$statistic,
-                p.value = test$p.value,
-                conf.int_0.025 = test$conf.int[1],
-                conf.int_0.975 = test$conf.int[2],
-                delta_M = test$estimate) %>% 
-                rbind(DMPs_BM_vs_BH,.) -> DMPs_PH_vs_BH
-        
-        print(i)
-}
-
-
-# baseline to post myonuclei
-
-for (i in 1:length(rownames(M_change)))  {
-        y1 = as.numeric(M_change[i,1:8])
-        z1 = as.numeric(M_change[i,17:24])
-        
-        test <- t.test(x = z1, y = y1, paired = TRUE)
-        data.frame(
-                cpg = rownames(M_change)[i],
-                t = test$statistic,
-                p.value = test$p.value,
-                conf.int_0.025 = test$conf.int[1],
-                conf.int_0.975 = test$conf.int[2],
-                delta_M = test$estimate) %>% 
-                rbind(DMPs_BM_vs_BH,.) -> DMPs_PM_vs_BM
-        
-        print(i)
-}
-
-
-
-###
-# chatGPT solution = half the time slowest 3.9 min for 10000 cpgs
-
 # Extract relevant columns from M_change
-y1 <- as.matrix(M_change[,1:8])
-z1 <- as.matrix(M_change[,9:16])
+BH <- as.matrix(M_change[,1:8])
+BM <- as.matrix(M_change[,9:16])
+PH <- as.matrix(M_change[,17:24])
+PM <- as.matrix(M_change[,25:32])
 
 # Pre-allocate memory for DMPs_PM_vs_PH
 DMPs_BM_vs_BH <- data.frame(
@@ -873,126 +786,125 @@ DMPs_BM_vs_BH <- data.frame(
         delta_M = numeric(length(rownames(M_change)))
 )
 
+DMPs_PM_vs_PH <- data.frame(
+        cpg = rownames(M_change),
+        t = numeric(length(rownames(M_change))),
+        p.value = numeric(length(rownames(M_change))),
+        conf.int_0.025 = numeric(length(rownames(M_change))),
+        conf.int_0.975 = numeric(length(rownames(M_change))),
+        delta_M = numeric(length(rownames(M_change)))
+)
+
+DMPs_PM_vs_BM <- data.frame(
+        cpg = rownames(M_change),
+        t = numeric(length(rownames(M_change))),
+        p.value = numeric(length(rownames(M_change))),
+        conf.int_0.025 = numeric(length(rownames(M_change))),
+        conf.int_0.975 = numeric(length(rownames(M_change))),
+        delta_M = numeric(length(rownames(M_change)))
+)
+
+DMPs_PH_vs_BH <- data.frame(
+        cpg = rownames(M_change),
+        t = numeric(length(rownames(M_change))),
+        p.value = numeric(length(rownames(M_change))),
+        conf.int_0.025 = numeric(length(rownames(M_change))),
+        conf.int_0.975 = numeric(length(rownames(M_change))),
+        delta_M = numeric(length(rownames(M_change)))
+)
+
+
 # Loop through rows and perform t.test
-length(rownames(M_change))) 
-start_time = Sys.time()
-for (i in 1:10000) {
-        test <- t.test(x = z1[i,], y = y1[i,], paired = TRUE)
+
+for (i in 1:804857) {
+        test <- t.test(x = BM[i,], y = BH[i,], paired = TRUE)
         DMPs_BM_vs_BH[i, c("t", "p.value", "conf.int_0.025", "conf.int_0.975", "delta_M")] <- 
                 c(test$statistic, test$p.value, test$conf.int[1], test$conf.int[2], test$estimate)
         
         print(i)
 }
-###
-end_time = Sys.time()
-end_time-start_time
 
-
-# chatGPT parallel solution was fastest 28 sek for 10000 cpgs
-
-library(foreach)
-library(doParallel)
-
-# Set the number of cores to use
-num_cores <- detectCores() - 1 # Leave one core free for other processes
-cl <- makeCluster(num_cores)
-registerDoParallel(cl)
-
-
-DMPs_BM_vs_BH = data.frame()
-
-length(rownames(M_change)))
-writeLines(c(""), "log.txt") # clears the log file that can be used to track progress
-
-sink("log.txt")
-
-start_time = Sys.time()
-results_BM_vs_BH <- foreach(iteration=1:10000, .combine=rbind) %dopar% {
-        print(i)
-        sink()
-        y1 = as.numeric(M_change[i,1:8])
-        z1 = as.numeric(M_change[i,9:16])
+for (i in 1:804857) {
+        test <- t.test(x = PM[i,], y = PH[i,], paired = TRUE)
+        DMPs_PM_vs_PH[i, c("t", "p.value", "conf.int_0.025", "conf.int_0.975", "delta_M")] <- 
+                c(test$statistic, test$p.value, test$conf.int[1], test$conf.int[2], test$estimate)
         
-        test <- t.test(x = z1, y = y1, paired = TRUE)
-        c(test$statistic, test$p.value, test$conf.int[1], test$conf.int[2], test$estimate)
-
+        print(i)
 }
 
-end_time = Sys.time()
-end_time-start_time
+for (i in 1:804857) {
+        test <- t.test(x = PM[i,], y = BM[i,], paired = TRUE)
+        DMPs_PM_vs_BM[i, c("t", "p.value", "conf.int_0.025", "conf.int_0.975", "delta_M")] <- 
+                c(test$statistic, test$p.value, test$conf.int[1], test$conf.int[2], test$estimate)
+        
+        print(i)
+}
+
+for (i in 1:804857) {
+        test <- t.test(x = PH[i,], y = BH[i,], paired = TRUE)
+        DMPs_PH_vs_BH[i, c("t", "p.value", "conf.int_0.025", "conf.int_0.975", "delta_M")] <- 
+                c(test$statistic, test$p.value, test$conf.int[1], test$conf.int[2], test$estimate)
+        
+        print(i)
+}
+
+
+# performed these loops/calculations on confocal pc
+
+
+DMPs_BM_vs_BH <- readRDS("DMPs_BM_vs_BH.RDATA")
+DMPs_PH_vs_BH <- readRDS("DMPs_PH_vs_BH.RDATA")
+DMPs_PM_vs_BM <- readRDS("DMPs_PM_vs_BM.RDATA")
+DMPs_PM_vs_PH <- readRDS("DMPs_PM_vs_PH.RDATA")
+
+# add adjusted p value for within time comparison
+library(stats)
+
+DMPs_BM_vs_BH$adj.p.val <- p.adjust(p = DMPs_BM_vs_BH$p.value, method = "fdr", n = length(rownames(DMPs_BM_vs_BH)))
+DMPs_PM_vs_PH$adj.p.val <- p.adjust(p = DMPs_PM_vs_PH$p.value, method = "fdr", n = length(rownames(DMPs_PM_vs_PH)))        
+
+p.adjust(p = DMPs_PM_vs_PH$p.value, method = "bonferroni", n = length(rownames(DMPs_PM_vs_PH))) %>% 
+        as.data.frame() %>% 
+        filter(.<0.05) %>% nrow()
+
+# filter all dmp lists for p.value <=0.05
+
+
+DMPs_BM_vs_BH <- DMPs_BM_vs_BH %>% 
+        filter(adj.p.val < 0.05)
+
+DMPs_PM_vs_PH <- DMPs_PM_vs_PH %>% 
+        filter(adj.p.val < 0.05) 
+
+DMPs_PM_vs_BM <- DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05)
+
+DMPs_PH_vs_BH <- DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05)%>% nrow()
+
+# venn diagram of overlap
+
+DMPs_cond <- list(
+        BM_vs_BH = DMPs_BM_vs_BH$cpg,
+        PM_vs_PH = DMPs_PM_vs_PH$cpg
+        )
 
 
 
+library(ggvenn)
 
+# plot venn-diagram with condition DMPs
 
+venn <- ggvenn(DMPs_cond, set_name_size = 10, stroke_size = 1, text_size = 10,stroke_alpha = 0.8)
 
+# plot venn-diagram with time effect DMPs
 
-
-
-
-# Extract relevant columns from M_change
-y1 <- as.matrix(M_change[,1:8])
-z1 <- as.matrix(M_change[,9:16])
-
-# Pre-allocate memory for DMPs_PM_vs_PH
-DMPs_BM_vs_BH <- data.frame(
-        cpg = rownames(M_change),
-        t = numeric(length(rownames(M_change))),
-        p.value = numeric(length(rownames(M_change))),
-        conf.int_0.025 = numeric(length(rownames(M_change))),
-        conf.int_0.975 = numeric(length(rownames(M_change))),
-        delta_M = numeric(length(rownames(M_change)))
+DMPs_time <- list(
+        PM_vs_BM = DMPs_PM_vs_BM$cpg,
+        PH_vs_BH = DMPs_PH_vs_BH$cpg
 )
 
-# Loop through rows and perform t.test in parallel
-
-results <- foreach(i = 1:100000, .combine=rbind) %dopar% {
-        test <- t.test(x = z1[i,], y = y1[i,], paired = TRUE)
-        c(test$statistic, test$p.value, test$conf.int[1], test$conf.int[2], test$estimate)
-        
-}
-
-
-# Assign results to DMPs_PM_vs_PH
-DMPs_BM_vs_BH[, c("t", "p.value", "conf.int_0.025", "conf.int_0.975", "delta_M")] <- results
-
-# Stop the parallel processing
-stopCluster(cl)
-
-
-rm(results)
-
-
-
-
-# difference at post between myonuclei vs. homogenate
-
-
-DMPs_PM_vs_PH = data.frame()
-
-
-for (i in 1:length(rownames(M_change)))  {
-        y1 = as.numeric(M_change[i,17:24])
-        z1 = as.numeric(M_change[i,25:32])
-        
-        test <- t.test(x = z1, y = y1, paired = TRUE)
-        data.frame(
-                cpg = rownames(M_change)[i],
-                t = test$statistic,
-                p.value = test$p.value,
-                conf.int_0.025 = test$conf.int[1],
-                conf.int_0.975 = test$conf.int[2],
-                delta_M = test$estimate) %>% 
-                rbind(DMPs_BM_vs_BH,.) -> DMPs_PM_vs_PH
-        
-        print(i)
-}
-
-
-
-
-
-
+ggvenn(DMPs_time, set_name_size = 10, stroke_size = 1, text_size = 10,stroke_alpha = 0.8)
 ######################################################################
 
 # create horizontal barchart of DMPs in different positions
