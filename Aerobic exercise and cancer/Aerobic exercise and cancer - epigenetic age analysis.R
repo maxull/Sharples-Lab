@@ -6,6 +6,7 @@
 
 
 BiocManager::install("SummarizedExperiment")
+BiocManager::install("MEAT")
 
 library(SummarizedExperiment); library(MEAT); library(wateRmelon); library(ggplot2); library(tidyverse)
 
@@ -112,7 +113,7 @@ epiage<- epiage %>%
 
 ### boxplot of epiage estimations
 
-epiage %>% 
+epi_plot <- epiage %>% 
         ggplot(aes(x = Condition, y = DNAmage, fill = Timepoint, color = Timepoint))+
         geom_boxplot(fatten = 1,lwd = 1.5)+
         theme_classic()+
@@ -127,6 +128,25 @@ epiage %>%
         ylab("DNAm Age")+
         ylim(47,70)
 
+### get boxplot data
+
+?ggplot_build(epi_plot)$data %>% 
+        as.data.frame() %>% 
+        mutate(group = c("Healthy Age-matched PRE",
+                         "Healthy Age-matched POST",
+                         "Cancer Untrained PRE",
+                         "Cancer Untrained POST",
+                         "Cancer Trained PRE",
+                         "Cancer Trained POST")) %>% 
+        dplyr::select(group,
+                      3:10) %>% 
+        mutate(outliers = ifelse(outliers == 0, "NA", outliers)) %>% 
+        as.data.frame() -> fig_9_data
+
+write.csv(fig_9_data,"C:/Users/maxul/Documents/Skole/Master 21-22/Master/Cancer data/fig_9_data.csv")
+
+fig_9_data$outliers <- as.character(fig_9_data$outliers)
+
 # create legends for manual copying
 epiage %>% 
         ggplot(aes(x = DNAmage, fill = Timepoint, color = Timepoint))+
@@ -137,7 +157,7 @@ epiage %>%
         theme(legend.key.size = unit(5, 'cm'),
               legend.key.height = unit(0.7, 'cm'),
               legend.key.width = unit(0.7, 'cm'))
-
+fig_9_data$
 
 
 # colors
@@ -159,8 +179,9 @@ epiage %>%
 epiage_data <- epiage %>% 
         select(1,2,3,6,7,8,9,10)
 
-write.csv(epiage_data, "C:/Users/maxul/OneDrive/Dokumenter/Skole/Master 21-22/Master/Cancer data/cancer_epiage_corrected_mistake.csv",
+write.csv(epiage_data, "C:/Users/maxul/Documents/Skole/Master 21-22/Master/Cancer data/Cancer data/cancer_epiage_corrected_mistake.csv",
           row.names = FALSE)
+write.csv(epiage_data, "C:/Users/maxul/Documents/Skole/Master 21-22/Master/Cancer data/epiage_data.csv")
 
 ###
 ### AA diff

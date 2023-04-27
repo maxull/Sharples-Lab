@@ -4,6 +4,8 @@
 ###                                                                                      ###
 ############################################################################################
 
+library(cowplot)
+
 ########################################################################
 
 ### re-do DMPs manually
@@ -126,7 +128,7 @@ DMPs_PM_vs_PH$adj.p.val <- p.adjust(p = DMPs_PM_vs_PH$p.value, method = "fdr", n
 
 p.adjust(p = DMPs_PM_vs_PH$p.value, method = "bonferroni", n = length(rownames(DMPs_PM_vs_PH))) %>% 
         as.data.frame() %>% 
-        filter(.<0.05) %>% nrow()
+        filter(.<0.05) 
 
 # filter all dmp lists for p.value <=0.05
 
@@ -141,7 +143,7 @@ DMPs_PM_vs_BM <- DMPs_PM_vs_BM %>%
         filter(p.value < 0.05)
 
 DMPs_PH_vs_BH <- DMPs_PH_vs_BH %>% 
-        filter(p.value < 0.05)%>% nrow()
+        filter(p.value < 0.05)
 
 
 #############################################################################################
@@ -385,7 +387,65 @@ venn <- ggvenn(DMPs, set_name_size = 10, stroke_size = 1,
        stroke_alpha = 0.8,
        set_name_color = c("White", "Black","Black","White"))
 
+plot_grid(venn, labels = "C", label_size = 27, hjust = -4.5)
 
+# get the cpgs of the differentially overlapping genes
+
+merge(base_pos, post_neg, by = "cpg") %>% 
+        merge(.,anno, by = "cpg") %>% 
+        dplyr::select(cpg, UCSC_RefGene_Name)
+
+merge(base_neg, post_pos, by = "cpg")%>% 
+        merge(.,anno, by = "cpg") %>% 
+        dplyr::select(cpg, UCSC_RefGene_Name)
+
+# find position of the cpgs in homogenate and myonuclei time DMPs
+
+DMPs_PH_vs_BH %>% 
+        rownames_to_column(var = "number") %>% 
+        dplyr::select(number, cpg) %>% 
+        merge(merge(base_pos, post_neg, by = "cpg"),.,by = "cpg") %>% 
+        select(cpg, number) %>% 
+        dplyr::arrange(number) -> x
+
+DMPs_PM_vs_BM %>% 
+        rownames_to_column(var = "number") %>% 
+        dplyr::select(number, cpg) %>% 
+        merge(merge(base_pos, post_neg, by = "cpg"),.,by = "cpg") %>% 
+        select(cpg, number) %>% 
+        dplyr::arrange(number) -> y
+
+merge(x,y, by = "cpg") %>% 
+        pull(cpg) -> z
+
+DMPs_PH_vs_BH %>% 
+        filter(cpg %in% z)
+
+DMPs_PM_vs_BM %>% 
+        filter(cpg %in% z)
+
+DMPs_PH_vs_BH %>% 
+        rownames_to_column(var = "number") %>% 
+        dplyr::select(number, cpg) %>% 
+        merge(merge(base_neg, post_pos, by = "cpg"),.,by = "cpg") %>% 
+        select(cpg, number) %>% 
+        dplyr::arrange(number) -> x
+
+DMPs_PM_vs_BM %>% 
+        rownames_to_column(var = "number") %>% 
+        dplyr::select(number, cpg) %>% 
+        merge(merge(base_neg, post_pos, by = "cpg"),.,by = "cpg") %>% 
+        select(cpg, number) %>% 
+        dplyr::arrange(number) -> y
+
+merge(x,y, by = "cpg") %>% 
+        pull(cpg) -> z
+
+DMPs_PH_vs_BH %>% 
+        filter(cpg %in% z)
+
+DMPs_PM_vs_BM %>% 
+        filter(cpg %in% z)
 ########################################################################################
 
 ### Heatmaps DMPs in islands at baseline and at post
@@ -525,7 +585,6 @@ som_data[,"kmeans"] <- k_means[,1]
 som_data %>% 
         filter(kmeans == "4") %>% nrow()
 
-tally(as.factor(som_data$kmeans))
 
 
 k1 <- som_data %>% 
@@ -552,7 +611,9 @@ k1 <- som_data %>%
         theme_bw(base_size = 20)+
         theme(axis.text.x = element_text(size = 15),
               legend.position = "none",
-              axis.title.x = element_blank())+
+              axis.title.x = element_blank(),
+              panel.grid.minor = element_blank())+
+        scale_y_continuous(n.breaks = 4)+
         geom_text(aes(label = round(m,2), y = m),position = position_dodge(width = 1), vjust = 1.5,fontface = "bold", size = 8)
 
 
@@ -655,6 +716,129 @@ kmeans_plot <- ggarrange(k1,k2,k3,k4,common.legend = TRUE, legend = "right", nro
 # plot venn and kmeans together
 plot <- plot_grid(venn, kmeans_plot, ncol = 1, rel_heights = c(2,1), labels = c("C",""), label_size = 27)
 
+ggsave2(plot, filename = "venn_kmeans.pdf",units = "cm", width = 19, height = 21, bg = "white")
 # plot with heatmap (doesnt wirk)
 plot_grid(plot_heat, plot)
 
+
+#################################################################################
+
+### total DMPs
+
+###################################################################################
+
+# count all DMPs and plot
+
+# count DMPs and plot
+
+DMPs_PH_vs_BH %>%  
+        dplyr::select(delta_M) %>% 
+        dplyr::summarise(hypo = sum(delta_M < 0),
+                         hyper = sum(delta_M > 0)) %>% 
+        mutate(comp = "BH_to_PH") -> x
+
+
+DMPs_PM_vs_BM %>%  
+        dplyr::select(delta_M) %>% 
+        dplyr::summarise(hypo = sum(delta_M < 0),
+                         hyper = sum(delta_M > 0)) %>% 
+        mutate(comp = "BM_to_PM") %>% 
+        base::rbind(x,.)->x
+
+
+
+
+
+x %>% 
+        mutate(percent_hyper = hyper/(hypo+hyper)*100,
+               percent_hypo = hypo/(hypo+hyper)*100) %>% 
+        ggplot(aes(x = comp))+
+        geom_bar(aes(y = -hypo), stat = "identity", position = "dodge", width = 0.6, fill = hypo_col)+
+        geom_bar(aes(y = hyper), stat = "identity", position = "dodge", width = 0.6, fill = hyper_col)+
+        geom_label(aes(x = comp, y = hyper, label = paste(hyper, "/", round(percent_hyper, 1), "%")), alpha = 0.8)+
+        geom_label(aes(x = comp, y = -hypo, label = paste(hypo, "/", round(percent_hypo, 1), "%")), alpha = 0.8)+
+        theme_classic() +
+        theme(axis.title.x = element_blank())+
+        labs(y = "DMPs after 7 weeks RT (un adj.p < 0.05" )
+
+
+# plot DMPs split into regulatory features
+
+hDMP <- DMPs_PH_vs_BH%>% 
+        merge(.,anno, by = "cpg") %>% 
+        group_by(Relation_to_Island) %>% 
+        dplyr::summarise(hypo = sum(delta_M < 0),
+                         hyper = sum(delta_M > 0),
+                         total = hyper+hypo,
+                         percent_hyper = (hyper/total)*100,
+                         percent_hypo = (hypo/total)*100) 
+
+mDMP <- DMPs_PM_vs_BM%>% 
+        merge(.,anno, by = "cpg") %>% 
+        group_by(Relation_to_Island) %>% 
+        dplyr::summarise(hypo = sum(delta_M < 0),
+                         hyper = sum(delta_M > 0),
+                         total = hyper+hypo,
+                         percent_hyper = (hyper/total)*100,
+                         percent_hypo = (hypo/total)*100)
+
+
+# plot homogenate post vs. homogenate baseline DMPs
+
+p1 <- ggplot(data = hDMP, aes(x = Relation_to_Island))+
+        geom_bar(aes(y = hyper), stat = "identity", width = 0.9, fill = hyper_col)+
+        geom_bar(aes(y = -hypo), stat = "identity", width = 0.9, fill = hypo_col)+
+        theme_classic()+
+        labs(y = "MYO + INT DMPs after 7 weeks RT")+
+        geom_label(aes(x = Relation_to_Island, y = -3000, label = total))+
+        geom_label(aes(x = Relation_to_Island, y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 1), "%")), vjust = c(0.3,-0.4,0.3,1.5,-0.4,0.3), alpha = 0.6)+
+        geom_label(aes(x = Relation_to_Island, y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 1), "%")), vjust = c(0.7,1.3,0.7,-0.6,1.3,0.7), alpha = 0.6)+
+        theme(axis.title.x = element_blank())
+
+# plot myonuclei post vs. myonuclei baseline DMPs
+
+p2 <- ggplot(data = mDMP, aes(x = Relation_to_Island))+
+        geom_bar(aes(y = hyper), stat = "identity", fill = hyper_col, width = 0.9)+
+        geom_bar(aes(y = -hypo), stat = "identity", fill = hypo_col, width = 0.9)+
+        theme_classic()+
+        labs(y = "MYO DMPs after 7 weeks RT")+
+        geom_label(aes(x = Relation_to_Island, y = -4400, label = total))+
+        geom_label(aes(x = Relation_to_Island, y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 1), "%")), vjust = c(0.3,-0.4,0.3,1.5,-0.4,0.3), alpha = 0.6)+
+        geom_label(aes(x = Relation_to_Island, y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 1), "%")), vjust = c(0.7,1.3,0.7,-0.6,1.3,0.7), alpha = 0.6)+
+        theme(axis.title.x = element_blank())+
+        scale_fill_identity(name = 'the fill', guide = "legend",labels = c("hypo", "hyper"),aes(y = 0, x = 7))
+
+
+
+plot_grid(p1,p2,nrow = 1, labels = c("A","B"))
+
+
+# isolate homogenate and myonuclei DMPs within promoter assosiated islands and plot together
+
+
+hDMP <- DMPs_PH_vs_BH %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island") %>% 
+        dplyr::summarise(hypo = sum(delta_M < 0),
+                         hyper = sum(delta_M > 0),
+                         total = hyper+hypo,
+                         percent_hyper = (hyper/total)*100,
+                         percent_hypo = (hypo/total)*100) %>% 
+        mutate(condition = "homo")
+
+mDMP <- DMPs_PM_vs_BM%>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island") %>% 
+        dplyr::summarise(hypo = sum(delta_M < 0),
+                         hyper = sum(delta_M > 0),
+                         total = hyper+hypo,
+                         percent_hyper = (hyper/total)*100,
+                         percent_hypo = (hypo/total)*100) %>% 
+        mutate(condition = "myo")
+
+rbind(hDMP, mDMP) %>% 
+        ggplot(aes(x = condition))+
+        geom_bar(aes(y = hyper), stat = "identity", fill = hyper_col)+
+        geom_bar(aes(y = -hypo), stat = "identity", fill = hypo_col)+
+        geom_label(aes(y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 1), "%")), alpha = 0.8)+
+        geom_label(aes(y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 1), "%")), alpha = 0.8)
