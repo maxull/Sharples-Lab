@@ -735,26 +735,26 @@ DMPs_PH_vs_BH %>%
         dplyr::select(delta_M) %>% 
         dplyr::summarise(hypo = sum(delta_M < 0),
                          hyper = sum(delta_M > 0)) %>% 
-        mutate(comp = "BH_to_PH") -> x
+        mutate(comp = "Homo") -> x
 
 
 DMPs_PM_vs_BM %>%  
         dplyr::select(delta_M) %>% 
         dplyr::summarise(hypo = sum(delta_M < 0),
                          hyper = sum(delta_M > 0)) %>% 
-        mutate(comp = "BM_to_PM") %>% 
+        mutate(comp = "Myo") %>% 
         base::rbind(x,.)->x
 
 
 
 
 
-x %>% 
+p1 <- x %>% 
         mutate(percent_hyper = hyper/(hypo+hyper)*100,
                percent_hypo = hypo/(hypo+hyper)*100) %>% 
         ggplot(aes(x = comp))+
-        geom_bar(aes(y = -hypo), stat = "identity", position = "dodge", width = 0.6, fill = hypo_col)+
-        geom_bar(aes(y = hyper), stat = "identity", position = "dodge", width = 0.6, fill = hyper_col)+
+        geom_bar(aes(y = -hypo), stat = "identity", position = "dodge", width = 0.8, fill = hypo_col)+
+        geom_bar(aes(y = hyper), stat = "identity", position = "dodge", width = 0.8, fill = hyper_col)+
         geom_label(aes(x = comp, y = hyper, label = paste(hyper, "/", round(percent_hyper, 1), "%")), alpha = 0.8)+
         geom_label(aes(x = comp, y = -hypo, label = paste(hypo, "/", round(percent_hypo, 1), "%")), alpha = 0.8)+
         theme_classic() +
@@ -785,24 +785,24 @@ mDMP <- DMPs_PM_vs_BM%>%
 
 # plot homogenate post vs. homogenate baseline DMPs
 
-p1 <- ggplot(data = hDMP, aes(x = Relation_to_Island))+
+p2 <- ggplot(data = hDMP, aes(x = Relation_to_Island))+
         geom_bar(aes(y = hyper), stat = "identity", width = 0.9, fill = hyper_col)+
         geom_bar(aes(y = -hypo), stat = "identity", width = 0.9, fill = hypo_col)+
         theme_classic()+
         labs(y = "MYO + INT DMPs after 7 weeks RT")+
-        geom_label(aes(x = Relation_to_Island, y = -3000, label = total))+
+        geom_label(aes(x = Relation_to_Island, y = -6000, label = total))+
         geom_label(aes(x = Relation_to_Island, y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 1), "%")), vjust = c(0.3,-0.4,0.3,1.5,-0.4,0.3), alpha = 0.6)+
         geom_label(aes(x = Relation_to_Island, y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 1), "%")), vjust = c(0.7,1.3,0.7,-0.6,1.3,0.7), alpha = 0.6)+
         theme(axis.title.x = element_blank())
 
 # plot myonuclei post vs. myonuclei baseline DMPs
 
-p2 <- ggplot(data = mDMP, aes(x = Relation_to_Island))+
+p3 <- ggplot(data = mDMP, aes(x = Relation_to_Island))+
         geom_bar(aes(y = hyper), stat = "identity", fill = hyper_col, width = 0.9)+
         geom_bar(aes(y = -hypo), stat = "identity", fill = hypo_col, width = 0.9)+
         theme_classic()+
         labs(y = "MYO DMPs after 7 weeks RT")+
-        geom_label(aes(x = Relation_to_Island, y = -4400, label = total))+
+        geom_label(aes(x = Relation_to_Island, y = -11000, label = total))+
         geom_label(aes(x = Relation_to_Island, y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 1), "%")), vjust = c(0.3,-0.4,0.3,1.5,-0.4,0.3), alpha = 0.6)+
         geom_label(aes(x = Relation_to_Island, y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 1), "%")), vjust = c(0.7,1.3,0.7,-0.6,1.3,0.7), alpha = 0.6)+
         theme(axis.title.x = element_blank())+
@@ -824,7 +824,7 @@ hDMP <- DMPs_PH_vs_BH %>%
                          total = hyper+hypo,
                          percent_hyper = (hyper/total)*100,
                          percent_hypo = (hypo/total)*100) %>% 
-        mutate(condition = "homo")
+        mutate(condition = "Homo")
 
 mDMP <- DMPs_PM_vs_BM%>% 
         merge(.,anno, by = "cpg") %>% 
@@ -834,11 +834,279 @@ mDMP <- DMPs_PM_vs_BM%>%
                          total = hyper+hypo,
                          percent_hyper = (hyper/total)*100,
                          percent_hypo = (hypo/total)*100) %>% 
-        mutate(condition = "myo")
+        mutate(condition = "Myo")
 
-rbind(hDMP, mDMP) %>% 
+p4 <- rbind(hDMP, mDMP) %>% 
         ggplot(aes(x = condition))+
-        geom_bar(aes(y = hyper), stat = "identity", fill = hyper_col)+
-        geom_bar(aes(y = -hypo), stat = "identity", fill = hypo_col)+
+        geom_bar(aes(y = hyper), stat = "identity", fill = hyper_col, width = 0.8)+
+        geom_bar(aes(y = -hypo), stat = "identity", fill = hypo_col, width = 0.8)+
         geom_label(aes(y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 1), "%")), alpha = 0.8)+
-        geom_label(aes(y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 1), "%")), alpha = 0.8)
+        geom_label(aes(y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 1), "%")), alpha = 0.8)+
+        theme_classic()+
+        theme(axis.title.x = element_blank())+
+        labs(y = "DMPs in Islands and Promoters")
+
+DMPs <- list(
+        Homogenate_hypo = DMPs_PH_vs_BH %>% 
+                filter(delta_M < 0) %>% 
+                pull(cpg),
+        Homogenate = DMPs_PH_vs_BH %>% 
+                filter(delta_M > 0) %>% 
+                pull(cpg),
+        Myonuclei = DMPs_PM_vs_BM %>% 
+                filter(delta_M < 0) %>% 
+                pull(cpg),
+        Myonuclei_hyper = DMPs_PM_vs_BM %>% 
+                filter(delta_M > 0) %>% 
+                pull(cpg)
+)
+
+p5 <- ggvenn(DMPs, set_name_size = 10, stroke_size = 1, set_name_color = c("White", "Black", "Black","White"),
+       fill_color = c("#453781FF", "#DCE319FF","#453781FF", "#DCE319FF"),text_size = 8,stroke_alpha = 0.8)
+
+p6 <- plot_grid(p5, labels = "C", label_x = 0.1, label_size = 14)
+
+
+# figure 8 in manuscript
+
+part1 <- plot_grid(p1,p4,p6, nrow = 1, labels = c("A", "B"), rel_widths = c(0.5,0.5,2))
+
+part2 <- plot_grid(p2,p3, nrow = 1, labels = c("D", "E"))
+
+DMP_RT_plot <- plot_grid(part1, part2, ncol = 1)
+
+ggsave2(DMP_RT_plot, filename = "DMP_RT_plot.pdf",units = "cm", width = 19, height = 21, bg = "white")
+
+
+####################################################################################################
+
+### volcano plots - most significant probes 
+
+####################################################################################################
+
+
+library(ggrepel)
+options()
+# DMPs in homogenate after RT    
+library(scales)
+
+# create functions to transform axis
+
+reverselog_trans <- function(base = exp(1)) {
+        trans <- function(x) -log(x, base)
+        inv <- function(x) base^(-x)
+        trans_new(paste0("reverselog-", format(base)), trans, inv, 
+                  log_breaks(base = base), 
+                  domain = c(1e-100, Inf))
+}
+
+# calculate log2 fold change on beta values og significant DMPs
+
+beta %>% 
+        as.data.frame() %>% 
+        dplyr::select("1BH","2BH","4BH","5BH","6BH","7BH","8BH","12BH",
+                      "1BM","2BM","4BM","5BM","6BM","7BM","8BM","12BM",
+                      "1PH","2PH","4PH","5PH","6PH","7PH","8PH","12PH",
+                      "1PM","2PM","4PM","5PM","6PM","7PM","8PM","12PM") %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% DMPs_PH_vs_BH$cpg) %>%
+        mutate(logFC = ((((`1PH`+`2PH`+`4PH`+`5PH`+`6PH`+`7PH`+`8PH`+`12PH`)/8)/
+                                    ((`1BH`+`2BH`+`4BH`+`5BH`+`6BH`+`7BH`+`8BH`+`12BH`)/8))-1)) %>% 
+        dplyr::select(cpg, logFC) -> logFC_homo
+
+set.seed(1)
+DMPs_PH_vs_BH %>% 
+        merge(., anno, by = "cpg") %>%
+        mutate(Gene = ifelse(delta_M < -0.8 | delta_M > 0.8 | p.value < 0.0001, as.character(UCSC_RefGene_Name), ""),
+               Gene = ifelse(Gene == "NA", "", Gene)) %>%
+        ggplot(aes(x = delta_M, y = p.value))+
+        geom_point(aes(color = abs(delta_M), shape = Relation_to_Island), size = 3)+
+        scale_color_viridis()+
+        scale_y_continuous(trans = reverselog_trans(10),
+                           labels = label_comma())+
+        scale_x_continuous(n.breaks = 6)+
+        geom_text_repel(aes(label = Gene), force = 2, max.overlaps = Inf, box.padding = 0.6, point.size = 2)+
+        theme_classic()+
+        theme(panel.grid.major.y = element_line(color = "red", 
+                                                size = 0.5,
+                                                linetype = 2),
+              axis.title.x = element_blank())+
+        labs(title = "Homogenate DMPs after 7 weeks of RT",
+             color = "delta_M",
+             y = "un-adj. P value")
+
+
+# get the dataframe
+
+DMPs_PH_vs_BH %>% 
+        merge(., anno, by = "cpg") %>%
+        mutate(Gene = ifelse(delta_M < -0.8 | delta_M > 0.8 | p.value < 0.0001, as.character(UCSC_RefGene_Name), ""),
+               Gene = ifelse(Gene == "NA", "", Gene)) %>%
+        filter(Gene != "") %>% 
+        dplyr::select(!7) %>% 
+        arrange(desc(-p.value)) %>% 
+        write.csv(file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/Homogenate_DMPs_after_RT_volcano-plot.csv")
+# DMPs in myonuclei after RT
+
+set.seed(1)
+DMPs_PM_vs_BM %>% 
+        merge(., anno, by = "cpg") %>%
+        mutate(Gene = ifelse(delta_M < -0.8 | delta_M > 0.8 | p.value < 0.0001, as.character(UCSC_RefGene_Name), ""),
+               Gene = ifelse(Gene == "NA", "", Gene)) %>%
+        ggplot(aes(x = delta_M, y = p.value))+
+        geom_point(aes(color = abs(delta_M), shape = Relation_to_Island), size = 3)+
+        scale_color_viridis()+
+        scale_y_continuous(trans = reverselog_trans(10),
+                           labels = label_comma())+
+        scale_x_continuous(n.breaks = 6)+
+        geom_text_repel(aes(label = Gene), force = 2, max.overlaps = Inf, box.padding = 0.6, point.size = 2)+
+        theme_classic()+
+        theme(panel.grid.major.y = element_line(color = "red", 
+                                                size = 0.5,
+                                                linetype = 2),
+              axis.title.x = element_blank())+
+        labs(title = "Myonuclei DMPs after 7 weeks of RT",
+             color = "delta_M",
+             y = "un-adj. P value")
+
+DMPs_PM_vs_BM %>% 
+        merge(., anno, by = "cpg") %>%
+        mutate(Gene = ifelse(delta_M < -0.8 | delta_M > 0.8 | p.value < 0.0001, as.character(UCSC_RefGene_Name), ""),
+               Gene = ifelse(Gene == "NA", "", Gene)) %>%
+        filter(Gene != "") %>% 
+        dplyr::select(!7) %>% 
+        arrange(desc(-p.value)) %>% 
+        write.csv(file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/Myonuclear_DMPs_after_RT_volcano-plot.csv")
+
+
+
+
+
+
+#####################################################################################################
+
+### horizontal mean +- confidence interval for the top 20 highest delta M
+
+##################################################################################################
+
+# load and merge homogenate
+"#453781FF", "#DCE319FF"
+
+# homogenate
+
+# plot the 10 highest and lowest delta_M values
+
+DMPs_PH_vs_BH %>% 
+        merge(.,anno,by = "cpg") %>% 
+        arrange(delta_M) %>% 
+        head(10)-> x
+        
+        
+
+p1 <- DMPs_PH_vs_BH %>% 
+        merge(.,anno,by = "cpg") %>% 
+        arrange(delta_M) %>% 
+        tail(10) %>% 
+        rbind(x,.) %>% 
+        mutate(name = fct_reorder(paste(cpg,";", UCSC_RefGene_Name), desc(delta_M)))%>%
+        ggplot(aes(x = delta_M, y = name)) +
+        geom_rect(aes(xmin = -Inf, xmax = 0, 
+                      ymin = -Inf, ymax = Inf), fill = "#453781FF", alpha = 0.05)+
+        geom_rect(aes(xmin = 0, xmax = Inf, 
+                      ymin = -Inf, ymax = Inf), fill = "#DCE319FF", alpha = 0.05)+
+        geom_point(size = 3)+
+        geom_errorbar(aes(xmin = conf.int_0.025, xmax = conf.int_0.975), width = 0.2, size = 1)+
+        geom_vline(xintercept = 0, color = "Red", size = 1.1) + 
+        theme_classic()+
+        theme(axis.title.y = element_blank())
+        
+        
+
+
+" plot the lowest 20 p.values"
+
+p2 <- DMPs_PH_vs_BH %>% 
+        merge(.,anno,by = "cpg") %>% 
+        arrange(p.value) %>% 
+        head(20) %>% 
+        mutate(name = fct_reorder(paste(cpg,";", UCSC_RefGene_Name), desc(delta_M)))%>%
+        ggplot(aes(x = delta_M, y = name)) +
+        geom_rect(aes(xmin = -Inf, xmax = 0, 
+                      ymin = -Inf, ymax = Inf), fill = "#453781FF", alpha = 0.05)+
+        geom_rect(aes(xmin = 0, xmax = Inf, 
+                      ymin = -Inf, ymax = Inf), fill = "#DCE319FF", alpha = 0.05)+
+        geom_point(size = 3)+
+        geom_errorbar(aes(xmin = conf.int_0.025, xmax = conf.int_0.975), width = 0.2, size = 1)+
+        geom_vline(xintercept = 0, color = "Red", size = 1.1) + 
+        theme_classic()+
+        theme(axis.title.y = element_blank())
+
+
+# myonuclei
+
+# plot the 10 highest and lowest delta_M values
+
+DMPs_PM_vs_BM %>% 
+        merge(.,anno,by = "cpg") %>% 
+        arrange(delta_M) %>% 
+        head(10)-> x
+
+
+
+p3 <- DMPs_PM_vs_BM %>% 
+        merge(.,anno,by = "cpg") %>% 
+        arrange(delta_M) %>% 
+        tail(10) %>% 
+        rbind(x,.) %>% 
+        mutate(name = fct_reorder(paste(cpg,";", UCSC_RefGene_Name), desc(delta_M)))%>%
+        ggplot(aes(x = delta_M, y = name)) +
+        geom_rect(aes(xmin = -Inf, xmax = 0, 
+                      ymin = -Inf, ymax = Inf), fill = "#453781FF", alpha = 0.05)+
+        geom_rect(aes(xmin = 0, xmax = Inf, 
+                      ymin = -Inf, ymax = Inf), fill = "#DCE319FF", alpha = 0.05)+
+        geom_point(size = 3)+
+        geom_errorbar(aes(xmin = conf.int_0.025, xmax = conf.int_0.975), width = 0.2, size = 1)+
+        geom_vline(xintercept = 0, color = "Red", size = 1.1) + 
+        theme_classic()+
+        theme(axis.title.y = element_blank())
+
+
+
+
+" plot the lowest 20 p.values"
+
+p4 <- DMPs_PM_vs_BM %>% 
+        merge(.,anno,by = "cpg") %>% 
+        arrange(p.value) %>% 
+        head(20) %>% 
+        mutate(name = fct_reorder(paste(cpg,";", UCSC_RefGene_Name), desc(delta_M)))%>%
+        ggplot(aes(x = delta_M, y = name)) +
+        geom_rect(aes(xmin = -Inf, xmax = 0, 
+                      ymin = -Inf, ymax = Inf), fill = "#453781FF", alpha = 0.05)+
+        geom_rect(aes(xmin = 0, xmax = Inf, 
+                      ymin = -Inf, ymax = Inf), fill = "#DCE319FF", alpha = 0.05)+
+        geom_point(size = 3)+
+        geom_errorbar(aes(xmin = conf.int_0.025, xmax = conf.int_0.975), width = 0.2, size = 1)+
+        geom_vline(xintercept = 0, color = "Red", size = 1.1) + 
+        theme_classic()+
+        theme(axis.title.y = element_blank())
+
+plot_grid(p1,p2,p3,p4, nrow = 1, labels = c("A","B","C","D"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
