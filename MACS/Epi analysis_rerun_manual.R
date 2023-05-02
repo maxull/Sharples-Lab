@@ -5,6 +5,15 @@
 ############################################################################################
 
 library(cowplot)
+library(dendextend)
+library(ggpubr)
+library(ggrepel)
+library(scales)
+library(tidyverse)
+library(ggplot2)
+library(stringr)
+
+setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/")
 
 ########################################################################
 
@@ -504,7 +513,7 @@ post_heatmap <- pheatmap(t(heatmap_beta[,18:33]), annotation_row = dfh_2, cluste
 
 #need to flip dendrogram in post heatmap
 
-library(dendextend)
+
 
 col_dend <- post_heatmap[[2]]
 
@@ -708,7 +717,7 @@ k4 <- som_data %>%
 
 
 
-library(ggpubr)
+
 
 # plot kmeans
 kmeans_plot <- ggarrange(k1,k2,k3,k4,common.legend = TRUE, legend = "right", nrow = 1,widths = c(1,0.9,0.9,0.9), labels = c("D", "","",""), font.label = list(size = 27))
@@ -884,11 +893,7 @@ ggsave2(DMP_RT_plot, filename = "DMP_RT_plot.pdf",units = "cm", width = 19, heig
 
 ####################################################################################################
 
-
-library(ggrepel)
-options()
-# DMPs in homogenate after RT    
-library(scales)
+# DMPs in homogenate after RT  
 
 # create functions to transform axis
 
@@ -1109,4 +1114,693 @@ plot_grid(p1,p2,p3,p4, nrow = 1, labels = c("A","B","C","D"))
 
 
 
+
+
+##############################################################################################
+
+### DMRs
+
+########################################################################################
+
+# I will use the DMRcate method from new oshlack workflow
+
+
+
+# create design matrix
+
+dfh %>% 
+        filter(condition == "BH" | condition == "PH") -> dfh3
+
+
+m_vals_homo <- B2M(beta) %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(dfh3)) 
+
+
+# Sample names
+sample_names <- c("1BH", "2BH", "4BH", "5BH", "6BH", "7BH", "8BH", "12BH",
+                  "1PH", "2PH", "4PH", "5PH", "6PH", "7PH", "8PH", "12PH")
+
+# Create a vector of group labels
+group_labels <- ifelse(grepl("B", sample_names), "Baseline", "Post")
+
+# Create a factor variable with the group labels
+group_factor <- factor(group_labels, levels = c("Baseline", "Post"))
+
+# Create the design matrix
+design_matrix <- model.matrix(~ group_factor)
+
+# Set column names
+colnames(design_matrix) <- c("Baseline", "Post")
+
+# Print the design matrix
+design_matrix
+
+annotated_data_homo <- cpg.annotate(datatype = "array", 
+                               object = as.matrix(m_vals_homo), 
+                               what = "M", 
+                               arraytype = "EPIC", 
+                               analysis.type = "differential", 
+                               design_matrix,
+                               fdr = "none", 
+                               pval = 0.05,
+                               coef = "group_factorPost")
+
+dmrcate_results <- dmrcate(annotated_data_homo, 
+                           lambda = 1000, 
+                           C = 2, 
+                           pcutoff = "fdr")
+
+
+results.ranges <- extractRanges(dmrcate_results)
+results.ranges %>% as.data.frame() -> DMRs_homo
+
+
+# plot DMR with lowest min smoothed FDR (gene MLNR)
+
+DMR.plot(ranges = results.ranges, dmr = 67146, CpGs = beta, phen.col = sample_names, 
+         what = "Beta", arraytype = "EPIC", genome = "hg19")
+
+
+# plot DMR with 2 lowest min smoothed FDR (gene GRAMD1C)
+
+DMR.plot(ranges = results.ranges, dmr = 69662, CpGs = beta, phen.col = sample_names, 
+         what = "Beta", arraytype = "EPIC", genome = "hg19")
+
+# plot DMR IGF2 
+
+DMR.plot(ranges = results.ranges, dmr = 58302, CpGs = beta, phen.col = sample_names, 
+         what = "Beta", arraytype = "EPIC", genome = "hg19")
+
+
+# Myonuclear DMRs
+
+# create design matrix
+
+dfh %>% 
+        filter(condition == "BM" | condition == "PM") -> dfh4
+
+
+m_vals_myo <- B2M(beta) %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(dfh4)) 
+
+
+# Sample names
+sample_names <- c("1BM", "2BM", "4BM", "5BM", "6BM", "7BM", "8BM", "12BM",
+                  "1PM", "2PM", "4PM", "5PM", "6PM", "7PM", "8PM", "12PM")
+
+# Create a vector of group labels
+group_labels <- ifelse(grepl("B", sample_names), "Baseline", "Post")
+
+# Create a factor variable with the group labels
+group_factor <- factor(group_labels, levels = c("Baseline", "Post"))
+
+# Create the design matrix
+design_matrix <- model.matrix(~ group_factor)
+
+
+# Print the design matrix
+design_matrix
+
+annotated_data_myo <- cpg.annotate(datatype = "array", 
+                                    object = as.matrix(m_vals_myo), 
+                                    what = "M", 
+                                    arraytype = "EPIC", 
+                                    analysis.type = "differential", 
+                                    design_matrix,
+                                    fdr = "none", 
+                                    pval = 0.05,
+                                    coef = "group_factorPost")
+
+dmrcate_results <- dmrcate(annotated_data_myo, 
+                           lambda = 1000, 
+                           C = 2, 
+                           pcutoff = "fdr")
+
+
+results.ranges <- extractRanges(dmrcate_results)
+results.ranges %>% as.data.frame() -> DMRs_myo
+
+
+# plot DMR with lowest min smoothed FDR (gene MLNR)
+
+DMR.plot(ranges = results.ranges, dmr = 67146, CpGs = beta, phen.col = sample_names, 
+         what = "Beta", arraytype = "EPIC", genome = "hg19")
+
+
+
+
+
+
+
+
+
+# create plot like in oshlack workflow
+
+
+# indicate which genome is being used
+
+gen <- "hg19"
+
+# the index of the DMR that we will plot 
+
+dmrIndex <- 58302
+
+# extract chromosome number and location from DMR results 
+chrom <- as.character(seqnames(results.ranges[dmrIndex]))
+start <- as.numeric(start(results.ranges[dmrIndex]))
+end <- as.numeric(end(results.ranges[dmrIndex]))
+# add 25% extra space to plot
+minbase <- start - (0.25*(end-start))
+maxbase <- end + (0.25*(end-start))
+
+# create plot
+
+iTrack <- IdeogramTrack(genome = gen, chromosome = chrom, name="")
+gTrack <- GenomeAxisTrack(col="black", cex=1, name="", fontcolor="black")
+
+# Order annotation by chromosome and position
+
+colnames(Illumina_anno)
+
+annEPIC <- Illumina_anno[order(Illumina_anno$CHR, Illumina_anno$MAPINFO),] %>% 
+        as.data.frame() %>% 
+        drop_na(MAPINFO)
+
+
+bValsOrd <- beta[match(annEPIC$Name,rownames(beta)),] 
+
+head(bValsOrd)
+# create genomic ranges object from methylation data
+
+cpgData <- GRanges(seqnames=Rle(annEPIC$CHR),
+                   ranges=IRanges(start=annEPIC$MAPINFO, end=annEPIC$MAPINFO),
+                   strand=Rle(rep("*",nrow(annEPIC))),
+                   betas=bValsOrd)
+as.data.frame(cpgData)-> x
+# extract data on CpGs in DMR
+cpgData <- subsetByOverlaps(cpgData, results.ranges[dmrIndex])
+
+
+
+# methylation data track
+methTrack <- DataTrack(range=cpgData, groups=c("Baseline", "Post"),genome = gen,
+                       chromosome=chrom, ylim=c(-0.05,1.05),
+                       type=c("a","p"), name="DNA Meth.\n(beta value)",
+                       background.panel="white", legend=TRUE, cex.title=0.8,
+                       cex.axis=0.8, cex.legend=0.8)
+
+# DMR position data track
+dmrTrack <- AnnotationTrack(start=start, end=end, genome=gen, name="DMR", 
+                            chromosome=chrom,fill="darkred")
+
+
+tracks <- list(iTrack, gTrack,dmrTrack)
+
+sizes <- c(2,2,2) # set up the relative sizes of the tracks
+plotTracks(tracks, from=minbase, to=maxbase, showTitle=TRUE, add53=TRUE, 
+           add35=TRUE, grid=TRUE, lty.grid=3, sizes = sizes, length(tracks))
+
+
+
+
+
+
+
+
+
+dmr <- GRanges(seqnames = chrom, ranges = IRanges(start = start, end = end))
+
+overlapping_cpgs <- findOverlaps(cpgData, dmr)
+
+
+# plot DMR manually
+
+
+Illumina_anno %>% 
+        filter(CHR == "11",
+               MAPINFO %in% 2158438:2165961) %>% 
+        dplyr::select(cpg = Name, MAPINFO) -> IGF2_dmps
+
+beta[rownames(beta) %in% IGF2_dmps$cpg,] %>% 
+        as.data.frame() %>% 
+        dplyr::select("1BH", "2BH", "4BH", "5BH", "6BH", "7BH", "8BH", "12BH",
+                      "1PH", "2PH", "4PH", "5PH", "6PH", "7PH", "8PH", "12PH",
+                      "1BM", "2BM", "4BM", "5BM", "6BM", "7BM", "8BM", "12BM",
+                      "1PM", "2PM", "4PM", "5PM", "6PM", "7PM", "8PM", "12PM") %>% 
+        mutate(BH = ((`1BH`+ `2BH`+ `4BH`+ `5BH`+ `6BH`+ `7BH`+ `8BH`+ `12BH`)/8),
+               PH = ((`1PH`+ `2PH`+ `4PH`+ `5PH`+ `6PH`+ `7PH`+ `8PH`+ `12PH`)/8),
+               BM = ((`1BM`+ `2BM`+ `4BM`+ `5BM`+ `6BM`+ `7BM`+ `8BM`+ `12BM`)/8),
+               PM = ((`1PM`+ `2PM`+ `4PM`+ `5PM`+ `6PM`+ `7PM`+ `8PM`+ `12PM`)/8)) %>% 
+        dplyr::select(BH,PH,BM,PM) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(.,IGF2_dmps, by = "cpg") %>% 
+        arrange(desc(-MAPINFO)) %>% 
+        pivot_longer(names_to = "Group", values_to = "beta", cols = 2:5) %>% 
+        ggplot(aes(x = MAPINFO, y = beta, color = Group, Group = Group))+
+        geom_point()+
+        geom_line()
+
+
+
+
+
+#################################################################################################
+
+### GSEA - KEGG
+
+#################################################################################################
+
+# create annotation file with only one gene name
+
+
+
+
+
+x <- Illumina_anno %>% 
+        mutate(UCSC_RefGene_Name = str_split(UCSC_RefGene_Name, ";", simplify = TRUE)[, 1]) 
+
+unique_gene <- unique(x$UCSC_RefGene_Name) 
+unique_gene <- Filter(function(x) x != "", unique_gene)
+
+gene_cpgs <- list()
+
+# create subset of probes annotated to individual genes
+
+for (i in 1:length(unique_gene)) {
+        y <- x %>% 
+                filter(UCSC_RefGene_Name == unique_gene[i]) %>% 
+                pull(Name)
+        gene_cpgs[[unique_gene[i]]] <- y
+        print(i)
+}
+
+
+
+# calculate mean delta M for each gene
+
+mean_change_df <- M_change[,39:40]
+
+
+# Assuming you have a data frame named 'mean_change_df' with columns 'PH_vs_BH' and 'PM_vs_BM', and rownames as probe names
+
+# Initialize an empty data frame to store the results
+results_df <- data.frame(
+        gene = character(length(unique_gene)),
+        mean_change_PH_vs_BH = numeric(length(unique_gene)),
+        mean_change_PM_vs_BM = numeric(length(unique_gene)),
+        stringsAsFactors = FALSE
+)
+
+# Loop through unique genes and calculate mean change
+for (i in 1:length(unique_gene)) {
+        gene <- unique_gene[i]
+        gene_probes <- gene_cpgs[[gene]]
+        
+        # Filter the mean_change_df to keep only the rows corresponding to the gene's probes
+        gene_mean_change <- mean_change_df[rownames(mean_change_df) %in% gene_probes, ]
+        
+        # Calculate the mean change for each contrast and store it in the results data frame
+        results_df[i, "gene"] <- gene
+        results_df[i, "mean_change_PH_vs_BH"] <- sum(gene_mean_change$PH_vs_BH) / length(gene_probes)
+        results_df[i, "mean_change_PM_vs_BM"] <- sum(gene_mean_change$PM_vs_BM) / length(gene_probes)
+        
+        print(i)
+}
+
+# View the results data frame
+results_df
+
+
+# Load the package
+library(org.Hs.eg.db)
+
+# Convert gene symbols to Entrez Gene IDs
+entrezIDs <- mapIds(org.Hs.eg.db, keys = results_df$gene, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first")
+
+as.data.frame(entrezIDs) %>% 
+        rownames_to_column(var = "gene") %>% 
+        merge(results_df,., by = "gene") %>% 
+        filter(entrezIDs != "<NA>") -> change_df
+
+rownames(change_df) <- change_df$entrezIDs
+change_df <- change_df[,-4]
+
+
+# run gage on pathway list
+
+# kegg
+
+data(kegg.sets.hs)
+
+### homogenate
+
+exprsMat <- as.matrix(change_df[2]) # homogenate
+
+kegg_res_homo <- gage(exprs = exprsMat, gsets = kegg.sets.hs, same.dir = TRUE, ref = NULL, samp = NULL)
+
+view(kegg_res_homo$less)                              ### view less methylated KEGG pathways post vs. Baseline
+view(kegg_res_homo$greater)                           ### view more methylated KEGG pathways post vs. Baseline
+
+### myonuclei
+
+exprsMat <- as.matrix(change_df[3]) # myonuclei
+
+kegg_res_myo <- gage(exprs = exprsMat, gsets = kegg.sets.hs, same.dir = TRUE, ref = NULL, samp = NULL)
+
+view(kegg_res_myo$less)                              ### view less methylated KEGG pathways post vs. Baseline
+view(kegg_res_myo$greater)                           ### view more methylated KEGG pathways post vs. Baseline
+
+
+###______________________________________________________
+
+### rerun with individual probes and gsameth function
+
+x$cpg = x$Name
+
+m_change_df <- M_change[39:40] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(., x, by = "cpg") %>% 
+        dplyr::select(1:3, UCSC_RefGene_Name)
+
+entrezIDs <- mapIds(org.Hs.eg.db, keys = m_change_df$UCSC_RefGene_Name, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first")
+
+exprsMat <- as.matrix(m_change_df[2])
+rownames(exprsMat) <- entrezIDs
+
+library(missMethyl)
+
+
+
+kegg_res_homo <- gsameth(sig.cpg = DMPs_PH_vs_BH$cpg,
+                         all.cpg = rownames(beta), 
+                         collection = kegg.sets.hs, 
+                         array.type = "EPIC")
+
+kegg_res_myo <- gsameth(sig.cpg = DMPs_PM_vs_BM$cpg,
+                         all.cpg = rownames(beta), 
+                         collection = kegg.sets.hs, 
+                         array.type = "EPIC")
+
+# rerun gsameth with only signalling and metabolic kegg pathways
+
+data("sigmet.idx.hs")
+kegg.subset = kegg.sets.hs[sigmet.idx.hs]
+
+kegg.subset_res_homo <- gsameth(sig.cpg = DMPs_PH_vs_BH$cpg,
+                         all.cpg = rownames(beta), 
+                         collection = kegg.subset, 
+                         array.type = "EPIC")
+
+kegg.subset_res_myo <- gsameth(sig.cpg = DMPs_PM_vs_BM$cpg,
+                        all.cpg = rownames(beta), 
+                        collection = kegg.subset, 
+                        array.type = "EPIC")
+
+# add direction of methylation for the entire pathway
+
+rownames(kegg.subset_res_myo)
+
+kegg.subset
+
+entrezIDs <- mapIds(org.Hs.eg.db, keys = results_df$gene, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first")
+results_df$entrezIDs <- entrezIDs
+
+pathway_dir = data.frame()
+
+for (i in 1:length(kegg.sets.hs)) {
+        pathway = names(kegg.sets.hs[i])
+        pathway_genes = kegg.sets.hs[[pathway]]
+        
+        gene_mean_change <- results_df[results_df$entrezIDs %in% pathway_genes,]
+        
+        pathway_dir[i, "pathway"] <- pathway
+        pathway_dir[i, "mean_change_PH_vs_BH"] <- sum(gene_mean_change$mean_change_PH_vs_BH) / length(pathway_genes)
+        pathway_dir[i, "mean_change_PM_vs_BM"] <- sum(gene_mean_change$mean_change_PM_vs_BM) / length(pathway_genes)
+        
+        print(i)
+}
+
+
+kegg.subsets_res_homo <- kegg.subset_res_homo %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir, by = "pathway") %>% 
+        mutate(dir = ifelse(mean_change_PH_vs_BH < 0, "hypo", "hyper")) %>% 
+        dplyr::select(1,2,3,4,5,6,8) %>% 
+        arrange(desc(-P.DE))
+
+write.csv(kegg.subset_res_homo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/kegg_signaling_metabolic_pathways_homogenate.csv")
+
+kegg.subsets_res_myo <- kegg.subset_res_myo %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir, by = "pathway") %>% 
+        mutate(dir = ifelse(mean_change_PM_vs_BM < 0, "hypo", "hyper")) %>% 
+        dplyr::select(1,2,3,4,5,7,8) %>% 
+        arrange(desc(-P.DE))
+
+write.csv(kegg.subset_res_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/kegg_signaling_metabolic_pathways_myonuclei.csv")
+
+
+# add direction to all kegg pathways
+
+kegg_res_homo <- kegg_res_homo %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir, by = "pathway") %>% 
+        mutate(dir = ifelse(mean_change_PH_vs_BH < 0, "hypo", "hyper")) %>% 
+        dplyr::select(1,2,3,4,5,6,8) %>% 
+        arrange(desc(-P.DE))
+
+write.csv(kegg_res_homo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/kegg_all_pathways_homogenate.csv")
+
+
+kegg_res_myo <- kegg_res_myo %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir, by = "pathway") %>% 
+        mutate(dir = ifelse(mean_change_PM_vs_BM < 0, "hypo", "hyper")) %>% 
+        dplyr::select(1,2,3,4,5,7,8) %>% 
+        arrange(desc(-P.DE))
+
+write.csv(kegg_res_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/kegg_all_pathways_myonuclei.csv")
+
+
+# plot the significant pathways for all 4 groups
+
+### Map KEGG pathways to png
+
+
+
+keggresids <- kegg_res_homo %>% 
+        filter(P.DE < 0.05) %>%
+        mutate(id = substr(pathway, start = 1, stop = 8)) %>% 
+        pull(id)
+
+res_df <- matrix(results_df[,2])
+rownames(res_df) <- results_df$entrezIDs
+
+scaled_values <- ifelse(res_df < 0,
+                        rescale(res_df, to = c(-1, 0)),
+                        rescale(res_df, to = c(0, 1)))
+
+rownames(scaled_values)<- rownames(res_df)
+
+setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA figures/KEGG_all_pathways_homogenate/")
+tmp = sapply(keggresids, function(pid) pathview(gene.data = scaled_values, pathway.id = pid, species = "hsa", low = "blue", mid = "grey", high = "yellow"))
+
+
+keggresids <- kegg_res_myo %>% 
+        filter(P.DE < 0.05) %>%
+        mutate(id = substr(pathway, start = 1, stop = 8)) %>% 
+        pull(id)
+
+res_df <- matrix(results_df[,3])
+rownames(res_df) <- results_df$entrezIDs
+
+scaled_values <- ifelse(res_df < 0,
+                        rescale(res_df, to = c(-1, 0)),
+                        rescale(res_df, to = c(0, 1)))
+setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA figures/KEGG_all_pathways_myonuclei/")
+tmp = sapply(keggresids, function(pid) pathview(gene.data = scaled_values, pathway.id = pid, species = "hsa", low = "blue", mid = "grey", high = "yellow"))
+
+
+keggresids <- kegg.subsets_res_homo %>% 
+        filter(P.DE < 0.05) %>%
+        mutate(id = substr(pathway, start = 1, stop = 8)) %>% 
+        pull(id)
+
+res_df <- matrix(results_df[,2])
+rownames(res_df) <- results_df$entrezIDs
+
+scaled_values <- ifelse(res_df < 0,
+                        rescale(res_df, to = c(-1, 0)),
+                        rescale(res_df, to = c(0, 1)))
+
+rownames(scaled_values)<- rownames(res_df)
+
+setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA figures/KEGG_sigmet_pathways_homogenate//")
+tmp = sapply(keggresids, function(pid) pathview(gene.data = scaled_values, pathway.id = pid, species = "hsa", low = "blue", mid = "grey", high = "yellow"))
+
+
+keggresids <- kegg.subsets_res_myo %>% 
+        filter(P.DE < 0.05) %>%
+        mutate(id = substr(pathway, start = 1, stop = 8)) %>% 
+        pull(id)
+
+res_df <- matrix(results_df[,3])
+rownames(res_df) <- results_df$entrezIDs
+
+scaled_values <- ifelse(res_df < 0,
+                        rescale(res_df, to = c(-1, 0)),
+                        rescale(res_df, to = c(0, 1)))
+setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA figures/KEGG_sigmet_pathways_myonuclei//")
+tmp = sapply(keggresids, function(pid) pathview(gene.data = scaled_values, pathway.id = pid, species = "hsa", low = "blue", mid = "grey", high = "yellow"))
+
+
+#########################################################################################
+
+### GSEA - GO (gene ontology)
+
+#########################################################################################
+
+
+data("go.sets.hs")
+
+GO_res_homo <- gsameth(sig.cpg = DMPs_PH_vs_BH$cpg,
+                      all.cpg = rownames(beta), 
+                      collection = go.sets.hs, 
+                      array.type = "EPIC")
+
+GO_res_myo <- gsameth(sig.cpg = DMPs_PM_vs_BM$cpg,
+        all.cpg = rownames(beta), 
+        collection = go.sets.hs, 
+        array.type = "EPIC")
+
+
+# add direction of methylation for GO pathways
+
+pathway_dir_go = data.frame()
+
+for (i in 1:length(go.sets.hs)) {
+        pathway = names(go.sets.hs[i])
+        pathway_genes = go.sets.hs[[pathway]]
+        
+        gene_mean_change <- results_df[results_df$entrezIDs %in% pathway_genes,]
+        
+        pathway_dir_go[i, "pathway"] <- pathway
+        pathway_dir_go[i, "mean_change_PH_vs_BH"] <- sum(gene_mean_change$mean_change_PH_vs_BH) / length(pathway_genes)
+        pathway_dir_go[i, "mean_change_PM_vs_BM"] <- sum(gene_mean_change$mean_change_PM_vs_BM) / length(pathway_genes)
+        
+        print(i)
+}
+
+data("go.subs.hs")
+
+BP_GO <- names(go.sets.hs[go.subs.hs$BP])
+CC_GO <- names(go.sets.hs[go.subs.hs$CC])
+MF_GO <- names(go.sets.hs[go.subs.hs$MF])
+
+GO_res_homo <- GO_res_homo %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir_go, by = "pathway") %>% 
+        mutate(dir = ifelse(mean_change_PH_vs_BH < 0, "hypo", "hyper")) %>% 
+        dplyr::select(1,2,3,4,5,6,8) %>% 
+        arrange(desc(-P.DE)) %>% 
+        mutate(subset = ifelse(pathway %in% BP_GO, "Biological processes", 
+                               ifelse(pathway %in% CC_GO, "Cellular components", "Molecular function"))) 
+
+write.csv(GO_res_homo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/GO_all_pathways_homogenate.csv")
+
+GO_res_myo <- GO_res_myo %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir_go, by = "pathway") %>% 
+        mutate(dir = ifelse(mean_change_PM_vs_BM < 0, "hypo", "hyper")) %>% 
+        dplyr::select(1,2,3,4,5,7,8) %>% 
+        arrange(desc(-P.DE)) %>% 
+        mutate(subset = ifelse(pathway %in% BP_GO, "Biological processes", 
+                                ifelse(pathway %in% CC_GO, "Cellular components", "Molecular function"))) 
+
+
+write.csv(GO_res_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/GO_all_pathways_myonuclei.csv")
+
+
+######################################################################################################
+
+### check for cell population shift
+
+##########################################################################################
+
+# Use the same method as Voisin et al. 2023 https://onlinelibrary.wiley.com/doi/10.1111/acel.13859
+
+# download the datasets from Rubenstein_skeletal_muscle gene sets in MSigDB
+
+
+
+library(xml2)
+
+
+B_CELLS <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_B_CELLS.v2023.1.Hs.xml")
+
+ENDOTHELIAL_CELLS <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_ENDOTHELIAL_CELLS.v2023.1.Hs.xml")
+
+FAP_CELLS <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_FAP_CELLS.v2023.1.Hs.xml")
+
+FBN1_FAP_CELLS <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_FBN1_FAP_CELLS.v2023.1.Hs.xml")
+
+MYELOID_CELLS <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_MYELOID_CELLS.v2023.1.Hs.xml")
+
+NK_CELLS <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_NK_CELLS.v2023.1.Hs.xml")
+
+PCV_ENDOTHELIAL_CELLS <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_PCV_ENDOTHELIAL_CELLS.v2023.1.Hs.xml")
+
+PERICYTES <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_PERICYTES.v2023.1.Hs.xml")
+
+SATELLITE_CELLS <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_SATELLITE_CELLS.v2023.1.Hs.xml")
+
+SMOOTH_MUSCLE_CELLS <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_SMOOTH_MUSCLE_CELLS.v2023.1.Hs.xml")
+
+T_CELLS <- read_xml("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MsigDB/RUBENSTEIN_SKELETAL_MUSCLE_T_CELLS.v2023.1.Hs.xml")
+
+
+
+cell_populations <- list()
+
+cell_populations["B_CELLS"] <- xml_attrs(xml_child(B_CELLS, 1))[["MEMBERS_EZID"]]
+cell_populations["ENDOTHELIAL_CELLS"] <- xml_attrs(xml_child(ENDOTHELIAL_CELLS, 1))[["MEMBERS_EZID"]]
+cell_populations["FAP_CELLS"] <- xml_attrs(xml_child(FAP_CELLS, 1))[["MEMBERS_EZID"]]
+cell_populations["FBN1_FAP_CELLS"] <- xml_attrs(xml_child(FBN1_FAP_CELLS, 1))[["MEMBERS_EZID"]]
+cell_populations["MYELOID_CELLS"] <- xml_attrs(xml_child(MYELOID_CELLS, 1))[["MEMBERS_EZID"]]
+cell_populations["NK_CELLS"] <- xml_attrs(xml_child(NK_CELLS, 1))[["MEMBERS_EZID"]]
+cell_populations["PCV_ENDOTHELIAL_CELLS"] <- xml_attrs(xml_child(PCV_ENDOTHELIAL_CELLS, 1))[["MEMBERS_EZID"]]
+cell_populations["PERICYTES"] <- xml_attrs(xml_child(PERICYTES, 1))[["MEMBERS_EZID"]]
+cell_populations["SATELLITE_CELLS"] <- xml_attrs(xml_child(SATELLITE_CELLS, 1))[["MEMBERS_EZID"]]
+cell_populations["SMOOTH_MUSCLE_CELLS"] <- xml_attrs(xml_child(SMOOTH_MUSCLE_CELLS, 1))[["MEMBERS_EZID"]]
+cell_populations["T_CELLS"] <- xml_attrs(xml_child(T_CELLS, 1))[["MEMBERS_EZID"]]
+
+
+split_string <- function(x) {
+        unlist(strsplit(x, split = ",", fixed = TRUE))
+}
+
+cell_populations <- lapply(cell_populations, split_string)
+
+
+# run over-representation analysis for homogenate 
+
+cell_population_genes_homo <- gsameth(sig.cpg = DMPs_PH_vs_BH$cpg,
+                       all.cpg = rownames(beta), 
+                       collection = cell_populations, 
+                       array.type = "EPIC")
+
+
+# run over-representation analysis for myonuclei 
+
+cell_population_genes_myo <- gsameth(sig.cpg = DMPs_PM_vs_BM$cpg,
+                                      all.cpg = rownames(beta), 
+                                      collection = cell_populations, 
+                                      array.type = "EPIC")
+
+
+write.csv(cell_population_genes_homo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/cell_population_genes_homogenate.csv")
+
+write.csv(cell_population_genes_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/cell_population_genes_myonuclei.csv")
 
