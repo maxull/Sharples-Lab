@@ -12,6 +12,8 @@ library(scales)
 library(tidyverse)
 library(ggplot2)
 library(stringr)
+library(missMethyl)
+library(ChAMP)
 
 setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/")
 
@@ -1150,8 +1152,6 @@ group_factor <- factor(group_labels, levels = c("Baseline", "Post"))
 # Create the design matrix
 design_matrix <- model.matrix(~ group_factor)
 
-# Set column names
-colnames(design_matrix) <- c("Baseline", "Post")
 
 # Print the design matrix
 design_matrix
@@ -1173,7 +1173,11 @@ dmrcate_results <- dmrcate(annotated_data_homo,
 
 
 results.ranges <- extractRanges(dmrcate_results)
-results.ranges %>% as.data.frame() -> DMRs_homo
+results.ranges %>% 
+        as.data.frame() %>% 
+        arrange(desc(-min_smoothed_fdr))-> DMRs_homo
+
+write.csv(DMRs_homo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/DMRs_Homogenate.csv")
 
 
 # plot DMR with lowest min smoothed FDR (gene MLNR)
@@ -1240,17 +1244,16 @@ dmrcate_results <- dmrcate(annotated_data_myo,
 
 
 results.ranges <- extractRanges(dmrcate_results)
-results.ranges %>% as.data.frame() -> DMRs_myo
+results.ranges %>% 
+        as.data.frame() %>% 
+        arrange(desc(-min_smoothed_fdr))-> DMRs_myo
 
+write.csv(DMRs_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/DMRs_myonuclei.csv")
 
 # plot DMR with lowest min smoothed FDR (gene MLNR)
 
 DMR.plot(ranges = results.ranges, dmr = 67146, CpGs = beta, phen.col = sample_names, 
          what = "Beta", arraytype = "EPIC", genome = "hg19")
-
-
-
-
 
 
 
@@ -1723,6 +1726,82 @@ GO_res_myo <- GO_res_myo %>%
 write.csv(GO_res_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/GO_all_pathways_myonuclei.csv")
 
 
+#################################################################################################
+
+### GSEA - MsigDB
+
+#################################################################################################
+
+# load MsigDB dataset from Champ package
+data("PathwayList")
+
+# convert symbol gene names to entrez ids
+
+MsigDB_champ <- list()
+
+for (i in 1:length(PathwayList)) {
+        x <- PathwayList[[i]]
+        
+        y <- mapIds(org.Hs.eg.db, keys = x, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first") %>% 
+                as.data.frame() %>% 
+                na.omit() %>% 
+                pull(.)
+        
+        MsigDB_champ[[names(PathwayList[i])]] <- y
+        print(i)
+        
+}
+
+# rewritten with skipping of errors
+
+for (i in 1:length(PathwayList)) {
+        tryCatch({
+                x <- PathwayList[[i]]
+                
+                y <- mapIds(org.Hs.eg.db, keys = x, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first") %>% 
+                        as.data.frame() %>% 
+                        na.omit() %>% 
+                        pull(.)
+                
+                MsigDB_champ[[names(PathwayList[i])]] <- y
+                print(i)
+        }, error = function(e) {
+                cat("Error in iteration", i, ":", conditionMessage(e), "\n")
+        })
+}
+
+
+
+library(missMethyl)
+
+
+
+
+MsigDB_res_homo <- gsameth(sig.cpg = DMPs_PH_vs_BH$cpg,
+                       all.cpg = rownames(beta), 
+                       collection = MsigDB_champ, 
+                       array.type = "EPIC")
+
+MsigDB_res_myo <- gsameth(sig.cpg = DMPs_PM_vs_BM$cpg,
+                      all.cpg = rownames(beta), 
+                      collection = MsigDB_champ, 
+                      array.type = "EPIC")
+
+# arrange MsigDB lists ascending
+
+MsigDB_res_homo <-  MsigDB_res_homo %>% 
+        as.data.frame() %>% 
+        arrange(desc(-P.DE))
+
+MsigDB_res_myo <-  MsigDB_res_myo %>% 
+        as.data.frame() %>% 
+        arrange(desc(-P.DE))
+
+write.csv(MsigDB_res_homo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/MsigDB_pathways_homogenate.csv")
+
+write.csv(MsigDB_res_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/MsigDB_pathways_myonuclei.csv")
+
+
 ######################################################################################################
 
 ### check for cell population shift
@@ -1803,4 +1882,48 @@ cell_population_genes_myo <- gsameth(sig.cpg = DMPs_PM_vs_BM$cpg,
 write.csv(cell_population_genes_homo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/cell_population_genes_homogenate.csv")
 
 write.csv(cell_population_genes_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/cell_population_genes_myonuclei.csv")
+
+
+
+#############################################################################################
+
+### search code
+
+#############################################################################################
+
+
+# find genes in pathway
+
+_________________________________________________
+# MsigDB
+
+pathway = "KEGG_FOCAL_ADHESION"      # write name of pathway
+
+# find average methylation of the individual genes
+
+results_df %>% 
+        filter(gene %in% PathwayList[[pathway]])
+
+
+_________________________________________________
+# KEGG
+
+pathway = "hsa04510 Focal adhesion"     # write name of pathway
+
+# find average methylation of the individual genes
+
+results_df %>% 
+        filter(entrezIDs %in% kegg.sets.hs[[pathway]])
+
+
+_________________________________________________
+# GO
+
+pathway = "GO:0048468 cell development"       # write name of pathway
+
+# find average methylation of the individual genes
+
+results_df %>% 
+        filter(entrezIDs %in% go.sets.hs[[pathway]])
+
 
