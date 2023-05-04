@@ -1659,6 +1659,60 @@ setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA 
 tmp = sapply(keggresids, function(pid) pathview(gene.data = scaled_values, pathway.id = pid, species = "hsa", low = "blue", mid = "grey", high = "yellow"))
 
 
+##################################################################################
+
+### KEGG plot
+
+############################################################################################
+
+# make horizontal plot of mean pathway change for top 20 most significant pathways in homogenate
+
+kegg_res_homo %>% 
+        arrange(desc(-P.DE)) %>% 
+        head(20) -> top_kegg
+
+pathway_levels = top_kegg %>% pull(pathway)
+
+kegg_res_myo %>% 
+        filter(pathway %in% top_kegg$pathway) %>% 
+        merge(top_kegg, ., by = "pathway") %>% 
+        dplyr::select(pathway, PH_vs_BH = mean_change_PH_vs_BH, PM_vs_BM = mean_change_PM_vs_BM) %>% 
+        pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
+        mutate(pathway = factor(pathway, levels = pathway_levels)) %>% 
+        ggplot(aes(y = pathway, x = mean_change, group = contrast, color = contrast))+
+        geom_point()+
+        geom_vline(xintercept = 0)+
+        theme_classic()+
+        theme(axis.title.y = element_blank())+
+        labs(title = "Topp 20 KEGG pathways in Homogenate")
+
+
+# repeat for KEGG subsets
+
+# add mean change
+
+kegg.subset_res_homo %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,kegg_res_homo, by = "pathway") %>%
+        dplyr::select(1,8,10) %>% 
+        arrange(desc(-P.DE.y)) %>% 
+        head(20) -> top_kegg.sub
+
+pathway_levels.sub = top_kegg.sub %>% pull(pathway)
+
+kegg_res_myo %>% 
+        filter(pathway %in% top_kegg.sub$pathway) %>% 
+        merge(top_kegg.sub, ., by = "pathway") %>% 
+        dplyr::select(pathway, PH_vs_BH = mean_change_PH_vs_BH, PM_vs_BM = mean_change_PM_vs_BM) %>% 
+        pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
+        mutate(pathway = factor(pathway, levels = pathway_levels.sub)) %>% 
+        ggplot(aes(y = pathway, x = mean_change, group = contrast, color = contrast))+
+        geom_point()+
+        geom_vline(xintercept = 0)+
+        theme_classic()+
+        theme(axis.title.y = element_blank())+
+        labs(title = "Topp 20 KEGG subset pathways in Homogenate")
+
 #########################################################################################
 
 ### GSEA - GO (gene ontology)
@@ -1925,5 +1979,150 @@ pathway = "GO:0048468 cell development"       # write name of pathway
 
 results_df %>% 
         filter(entrezIDs %in% go.sets.hs[[pathway]])
+
+
+_________________________________________________
+
+# fins probes in genes
+
+_________________________________________________
+
+gene_name <- "COL5A1"       # write gene name
+
+Probes <- anno %>% 
+        filter(UCSC_RefGene_Name == gene_name) 
+
+Chromosome <- merge(Probes, Illumina_anno, by = "cpg") %>% 
+        select(CHR) %>% 
+        unique()
+
+m_change_df %>% 
+        filter(UCSC_RefGene_Name == gene_name) %>%
+        merge(.,Illumina_anno, by = "cpg") %>% 
+        dplyr::select(cpg, PH_vs_BH, PM_vs_BM, MAPINFO, Relation_to_UCSC_CpG_Island) %>% 
+        pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
+        arrange(desc(MAPINFO)) %>% 
+        ggplot(aes(x = MAPINFO, y = mean_change, color = contrast, group = contrast))+
+        geom_hline(yintercept = 0)+
+        geom_point(aes(shape = Relation_to_UCSC_CpG_Island))+
+        geom_smooth(method = "loess", alpha = 0.5, se = FALSE)+
+        labs(title = paste(gene_name,";", "N Probes =", nrow(Probes), ";","CHR",Chromosome),
+             y = "mean M-value change",
+             x = "nucleotide")+
+        theme_classic()+
+        theme(axis.text.x = element_text(angle = 90))+
+        scale_x_continuous(n.breaks = 20)
+
+
+##################################################################
+
+### epigenetic age
+
+################################################################
+
+### MsetExProbes dataset from "Oshlack workflow - filtering and QC"
+
+
+
+
+
+epiage_horvath <- agep(beta, coeff=NULL, method="horvath")
+
+epiage_horvath %>% 
+        rownames_to_column(var = "participant") -> x
+
+epiage <- dfh %>% 
+        rownames_to_column(var = "participant") %>% 
+        merge(.,x, by = "participant")
+
+
+### boxplot of ages for the groups
+
+epiage %>% 
+        ggplot(aes(x = condition, y = horvath.age, fill = condition))+
+        geom_boxplot()+
+        theme_classic()
+
+
+###     MEAT 2.0 muscle tissue clock
+
+
+
+library(SummarizedExperiment); library(MEAT)
+
+
+
+
+### create Summarized experiment element for the epiage_estimation 
+### as seen below it can be run with and without a pheno dataframe
+
+cancer <- SummarizedExperiment(assays = list(beta = samp),
+                               colData = pheno)                 
+
+beta <- SummarizedExperiment(assays = list(beta = beta))
+
+
+### then the CpGs need to be "cleaned" so the dataset only contains the relevant 18747 CpG sites
+
+beta_clean <- clean_beta(SE = beta,
+                           version = "MEAT2.0")
+
+### calibrate beta values 
+
+
+
+beta_clean_calibrated <- BMIQcalibration(beta_clean)
+
+
+### then you estimate the epigenetic age with this function, where the "age_col_name" is optional, 
+###     but reqired if you wish to get difference and residuals between chronological age and predicted age
+
+
+epiage_meat <- epiage_estimation(SE = beta_clean,
+                                 age_col_name = NULL,
+                                 version = "MEAT2.0")
+
+epiage_meat_calibrated <- epiage_estimation(SE = beta_clean_calibrated,
+                                 age_col_name = NULL,
+                                 version = "MEAT2.0")
+
+### get only the age estimations
+
+
+DNAmage <- as.data.frame(epiage_meat$DNAmage)
+
+DNAmage_calibrated <- as.data.frame(epiage_meat_calibrated$DNAmage)
+
+### add to earlyer created participant data with horvath clock estimations
+
+
+
+epiage <- cbind(epiage, DNAmage)
+
+epiage <- cbind(epiage, DNAmage_calibrated) 
+
+# plot epiage
+
+epiage %>% 
+        ggplot(aes(x = condition, y = `epiage_meat$DNAmage`+20, fill = condition))+
+        geom_boxplot()+
+        theme_classic()
+
+epiage %>% 
+        ggplot(aes(x = condition, y = `epiage_meat_calibrated$DNAmage`, fill = condition))+
+        geom_boxplot()+
+        theme_classic()
+
+BH = epiage %>% filter(condition == "BH") %>% pull(`epiage_meat_calibrated$DNAmage`)
+PH = epiage %>% filter(condition == "PH") %>% pull(`epiage_meat_calibrated$DNAmage`)
+BM = epiage %>% filter(condition == "BM") %>% pull(`epiage_meat_calibrated$DNAmage`)
+PM = epiage %>% filter(condition == "PM") %>% pull(`epiage_meat_calibrated$DNAmage`)
+
+        
+t.test(x = PH, y = BH, paired = TRUE)
+t.test(x = PM, y = BM, paired = TRUE)
+
+
+
 
 
