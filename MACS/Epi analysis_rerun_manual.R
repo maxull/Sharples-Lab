@@ -1781,6 +1781,34 @@ write.csv(GO_res_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master
 
 
 #################################################################################################
+##############################################################################
+
+### GO plot
+
+############################################################################
+
+GO_res_homo %>% 
+        arrange(desc(-P.DE)) %>% 
+        head(20) -> top_go
+
+
+pathway_levels = top_go %>% pull(pathway)
+
+GO_res_myo %>% 
+        filter(pathway %in% top_go$pathway) %>% 
+        merge(top_go, ., by = "pathway") %>% 
+        dplyr::select(pathway, PH_vs_BH = mean_change_PH_vs_BH, PM_vs_BM = mean_change_PM_vs_BM, subset = subset.x) %>% 
+        pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
+        mutate(pathway = factor(pathway, levels = pathway_levels)) %>% 
+        ggplot(aes(y = pathway, x = mean_change, group = contrast, color = contrast))+
+        geom_point(aes(shape = subset))+
+        geom_vline(xintercept = 0)+
+        theme_classic()+
+        theme(axis.title.y = element_blank())+
+        labs(title = "Topp 20 GO pathways in Homogenate")
+
+
+############################################################################
 
 ### GSEA - MsigDB
 
@@ -1855,8 +1883,53 @@ write.csv(MsigDB_res_homo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/M
 
 write.csv(MsigDB_res_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/MsigDB_pathways_myonuclei.csv")
 
+# add mean methylation direction
+
+# add direction of methylation for GO pathways
+
+pathway_dir_MsigDB = data.frame()
+
+for (i in 1:length(MsigDB_champ)) {
+        pathway = names(MsigDB_champ[i])
+        pathway_genes = MsigDB_champ[[pathway]]
+        
+        gene_mean_change <- results_df[results_df$entrezIDs %in% pathway_genes,]
+        
+        pathway_dir_MsigDB[i, "pathway"] <- pathway
+        pathway_dir_MsigDB[i, "mean_change_PH_vs_BH"] <- sum(gene_mean_change$mean_change_PH_vs_BH) / length(pathway_genes)
+        pathway_dir_MsigDB[i, "mean_change_PM_vs_BM"] <- sum(gene_mean_change$mean_change_PM_vs_BM) / length(pathway_genes)
+        
+        print(i)
+}
 
 ######################################################################################################
+
+### MsigDB plot
+
+###########################################################################
+
+MsigDB_res_homo %>% 
+        rownames_to_column(var = "pathway") %>% 
+        arrange(desc(-P.DE)) %>% 
+        head(20) -> top_MsigDB
+
+
+
+pathway_levels = top_MsigDB %>% pull(pathway)
+
+top_MsigDB %>% 
+        merge(.,pathway_dir_MsigDB, by = "pathway") %>% 
+        dplyr::select(pathway, PH_vs_BH = mean_change_PH_vs_BH, PM_vs_BM = mean_change_PM_vs_BM) %>% 
+        pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
+        mutate(pathway = factor(pathway, levels = rev(pathway_levels))) %>% 
+        ggplot(aes(y = pathway, x = mean_change, group = contrast, color = contrast))+
+        geom_point()+
+        geom_vline(xintercept = 0)+
+        theme_classic()+
+        theme(axis.title.y = element_blank())+
+        labs(title = "Topp 20 MsigDB pathways in Homogenate")
+
+###########################################################################
 
 ### check for cell population shift
 
@@ -1937,8 +2010,47 @@ write.csv(cell_population_genes_homo, file = "C:/Users/maxul/Documents/Skole/Mas
 
 write.csv(cell_population_genes_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/cell_population_genes_myonuclei.csv")
 
+# cell population direction
 
+pathway_dir_cells = data.frame()
 
+for (i in 1:length(cell_populations)) {
+        pathway = names(cell_populations[i])
+        pathway_genes = cell_populations[[pathway]]
+        
+        gene_mean_change <- results_df[results_df$entrezIDs %in% pathway_genes,]
+        
+        pathway_dir_cells[i, "cell_population"] <- pathway
+        pathway_dir_cells[i, "mean_change_PH_vs_BH"] <- sum(gene_mean_change$mean_change_PH_vs_BH) / length(pathway_genes)
+        pathway_dir_cells[i, "mean_change_PM_vs_BM"] <- sum(gene_mean_change$mean_change_PM_vs_BM) / length(pathway_genes)
+        
+        print(i)
+}
+
+# plot cell populations
+set.seed(1)
+cell_population_genes_homo %>% 
+        rownames_to_column(var = "cell_population") %>% 
+        merge(.,pathway_dir_cells, by = "cell_population") %>% 
+        arrange(desc(-P.DE)) %>%     #pull(cell_population) -> cell_levels
+        dplyr::select(cell_population, PH_vs_BH = mean_change_PH_vs_BH, PM_vs_BM = mean_change_PM_vs_BM, pval_homo = P.DE) %>% 
+        merge(.,rownames_to_column(cell_population_genes_myo, var = "cell_population"), by = "cell_population" ) %>% 
+        dplyr::select(1:4,pval_myo = P.DE) %>% 
+        pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
+        mutate(pval = ifelse(contrast == "PH_vs_BH", pval_homo, pval_myo)) %>% 
+        mutate(cell_population = factor(cell_population, levels = rev(cell_levels))) %>% 
+        ggplot(aes(y = cell_population, x = mean_change, group = contrast, color = contrast))+
+        geom_point()+
+        geom_vline(xintercept = 0)+
+        theme_classic()+
+        theme(axis.title.y = element_blank())+
+        labs(title = "Cell population gene lists")+
+        geom_text_repel(aes(label = paste("p =",round(pval,2))))
+        
+        
+        
+        
+        
 #############################################################################################
 
 ### search code
