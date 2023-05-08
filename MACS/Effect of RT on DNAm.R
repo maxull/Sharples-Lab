@@ -836,3 +836,15 @@ p2 <- rbind(hDMP, mDMP) %>%
         labs(y = "DMPs after 7 weeks RT (un adj.p < 0.05" )
 
 plot_grid(p1,p2, nrow = 1)
+
+
+# read adams new paired t-terst data
+
+adams_dmps_t_test <- read_tsv(col_names = TRUE, file = "C:/Users/maxul/Downloads/Myonuclei Post vs. Baseline_Paired T test_v2 Baseline denominator+ unadj p 0.05.txt")
+
+dmps <- list(
+        adams_dmps = adams_dmps_t_test %>% filter(Relation_to_UCSC_CpG_Island == "Island" & Regulatory_Feature_Group == "Promoter_Associated") %>% pull('Probeset ID'),
+        max_dmps = DMPs_PM_vs_BM %>% merge(., anno, by = "cpg") %>% filter(Relation_to_Island == "Island" & Regulatory_Feature_Group == "Promoter_Associated") %>% pull(cpg)
+)
+library(ggvenn)
+ggvenn(dmps, set_name_size = 10, stroke_size = 1, text_size = 8)

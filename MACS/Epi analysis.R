@@ -1789,38 +1789,6 @@ for (i in 1:length(unique_gene)) {
 
 
 
-1:10
-
-for (i in 1:10) {
-        
-        
-        print(i)
-        
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 saveRDS(unique_cpg, "unique_cpg.RDATA")
 
 

@@ -14,6 +14,7 @@ library(ggplot2)
 library(stringr)
 library(missMethyl)
 library(ChAMP)
+library(pathview)
 
 setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/")
 
@@ -951,8 +952,9 @@ DMPs_PH_vs_BH %>%
                Gene = ifelse(Gene == "NA", "", Gene)) %>%
         filter(Gene != "") %>% 
         dplyr::select(!7) %>% 
-        arrange(desc(-p.value)) %>% 
+        arrange(desc(-p.value)) %>% pull(cpg) -> y
         write.csv(file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/Homogenate_DMPs_after_RT_volcano-plot.csv")
+
 # DMPs in myonuclei after RT
 
 set.seed(1)
@@ -982,13 +984,42 @@ DMPs_PM_vs_BM %>%
                Gene = ifelse(Gene == "NA", "", Gene)) %>%
         filter(Gene != "") %>% 
         dplyr::select(!7) %>% 
-        arrange(desc(-p.value)) %>% 
+        arrange(desc(-p.value)) %>% pull(cpg) -> x
         write.csv(file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/Myonuclear_DMPs_after_RT_volcano-plot.csv")
 
 
 
+# get probe/gene data on homogenate and myonuclei DMPs in same dataframe
+        
+        myo_int <- readRDS("DMPs_PH_vs_BH.RDATA")
+        myo <- readRDS("DMPs_PM_vs_BM.RDATA")
+        
+myo_int %>% 
+        filter(cpg %in% y) %>% 
+        mutate(sample = "MYO+INT") %>% 
+        rbind(., myo %>% filter(cpg %in% y) %>%  mutate(sample = "MYO"))
 
+myo %>% 
+        filter(cpg %in% x) %>% 
+        mutate(sample = "MYO") %>% 
+        rbind(., myo_int %>% filter(cpg %in% x) %>%  mutate(sample = "MYO+INT"))
 
+anno %>% 
+        filter(cpg %in% x | cpg %in% y)
+
+myo_int%>% 
+        filter(cpg %in% y) %>% 
+        mutate(sample = "MYO+INT") %>% 
+        merge(.,myo, by = "cpg") %>% 
+        mutate("myo_vs_myo_int" = delta_M.y-delta_M.x) %>% 
+        filter(delta_M.x < 0 & delta_M.y < 0) %>% 
+        merge(., anno, by = "cpg") %>% pull(UCSC_RefGene_Name)
+
+myo_int %>% 
+        filter(cpg %in% y)
+
+merge(DMPs_PH_vs_BH, DMPs_PM_vs_BM, by = "cpg") %>% nrow()
+nrow(DMPs_PM_vs_BM)
 
 #####################################################################################################
 
@@ -1457,6 +1488,7 @@ change_df <- change_df[,-4]
 
 data(kegg.sets.hs)
 
+
 ### homogenate
 
 exprsMat <- as.matrix(change_df[2]) # homogenate
@@ -1494,22 +1526,27 @@ rownames(exprsMat) <- entrezIDs
 
 library(missMethyl)
 
+# check for updated KEGG sets
+library(gage)
+KEGG_new <- kegg.gsets(species = "hsa", id.type = "kegg", check.new=TRUE)
+
 
 
 kegg_res_homo <- gsameth(sig.cpg = DMPs_PH_vs_BH$cpg,
                          all.cpg = rownames(beta), 
-                         collection = kegg.sets.hs, 
+                         collection = KEGG_new$kg.sets, 
                          array.type = "EPIC")
 
 kegg_res_myo <- gsameth(sig.cpg = DMPs_PM_vs_BM$cpg,
                          all.cpg = rownames(beta), 
-                         collection = kegg.sets.hs, 
+                         collection = KEGG_new$kg.sets, 
                          array.type = "EPIC")
 
 # rerun gsameth with only signalling and metabolic kegg pathways
 
-data("sigmet.idx.hs")
-kegg.subset = kegg.sets.hs[sigmet.idx.hs]
+subset <- KEGG_new[["sigmet.idx"]]
+
+kegg.subset = KEGG_new$kg.sets[subset]
 
 kegg.subset_res_homo <- gsameth(sig.cpg = DMPs_PH_vs_BH$cpg,
                          all.cpg = rownames(beta), 
@@ -1532,9 +1569,9 @@ results_df$entrezIDs <- entrezIDs
 
 pathway_dir = data.frame()
 
-for (i in 1:length(kegg.sets.hs)) {
-        pathway = names(kegg.sets.hs[i])
-        pathway_genes = kegg.sets.hs[[pathway]]
+for (i in 1:length(KEGG_new$kg.sets)) {
+        pathway = names(KEGG_new$kg.sets[i])
+        pathway_genes = KEGG_new$kg.sets[[pathway]]
         
         gene_mean_change <- results_df[results_df$entrezIDs %in% pathway_genes,]
         
@@ -1678,7 +1715,7 @@ kegg_res_myo %>%
         merge(top_kegg, ., by = "pathway") %>% 
         dplyr::select(pathway, PH_vs_BH = mean_change_PH_vs_BH, PM_vs_BM = mean_change_PM_vs_BM) %>% 
         pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
-        mutate(pathway = factor(pathway, levels = pathway_levels)) %>% 
+        mutate(pathway = factor(pathway, levels = rev(pathway_levels))) %>% 
         ggplot(aes(y = pathway, x = mean_change, group = contrast, color = contrast))+
         geom_point()+
         geom_vline(xintercept = 0)+
@@ -1703,15 +1740,16 @@ pathway_levels.sub = top_kegg.sub %>% pull(pathway)
 kegg_res_myo %>% 
         filter(pathway %in% top_kegg.sub$pathway) %>% 
         merge(top_kegg.sub, ., by = "pathway") %>% 
-        dplyr::select(pathway, PH_vs_BH = mean_change_PH_vs_BH, PM_vs_BM = mean_change_PM_vs_BM) %>% 
-        pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
-        mutate(pathway = factor(pathway, levels = pathway_levels.sub)) %>% 
-        ggplot(aes(y = pathway, x = mean_change, group = contrast, color = contrast))+
-        geom_point()+
+        dplyr::select(pathway, "MYO+INT" = mean_change_PH_vs_BH, MYO = mean_change_PM_vs_BM) %>% 
+        pivot_longer(names_to = "Sample", values_to = "mean_change", cols = 2:3) %>% 
+        mutate(pathway = factor(pathway, levels = rev(pathway_levels.sub))) %>% 
+        ggplot(aes(y = pathway, x = mean_change, group = Sample, color = Sample))+
+        geom_point(size = 1.5)+
         geom_vline(xintercept = 0)+
         theme_classic()+
-        theme(axis.title.y = element_blank())+
-        labs(title = "Topp 20 KEGG subset pathways in Homogenate")
+        theme(axis.title.y = element_blank(), 
+              axis.title.x = element_blank(),
+              legend.position = "right")
 
 #########################################################################################
 
@@ -2028,6 +2066,7 @@ for (i in 1:length(cell_populations)) {
 }
 
 # plot cell populations
+
 set.seed(1)
 cell_population_genes_homo %>% 
         rownames_to_column(var = "cell_population") %>% 
@@ -2038,14 +2077,15 @@ cell_population_genes_homo %>%
         dplyr::select(1:4,pval_myo = P.DE) %>% 
         pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
         mutate(pval = ifelse(contrast == "PH_vs_BH", pval_homo, pval_myo)) %>% 
+        mutate(pval = ifelse(pval <0.06, paste("p =",round(pval, 2)), "")) %>% 
         mutate(cell_population = factor(cell_population, levels = rev(cell_levels))) %>% 
         ggplot(aes(y = cell_population, x = mean_change, group = contrast, color = contrast))+
-        geom_point()+
+        geom_point(size = 2)+
         geom_vline(xintercept = 0)+
         theme_classic()+
         theme(axis.title.y = element_blank())+
         labs(title = "Cell population gene lists")+
-        geom_text_repel(aes(label = paste("p =",round(pval,2))))
+        geom_text_repel(aes(label = pval))
         
         
         
@@ -2099,13 +2139,13 @@ _________________________________________________
 
 _________________________________________________
 
-gene_name <- "COL5A1"       # write gene name
+gene_name <- "IGF2"       # write gene name
 
 Probes <- anno %>% 
         filter(UCSC_RefGene_Name == gene_name) 
 
 Chromosome <- merge(Probes, Illumina_anno, by = "cpg") %>% 
-        select(CHR) %>% 
+        dplyr::select(CHR) %>% 
         unique()
 
 m_change_df %>% 
@@ -2123,7 +2163,27 @@ m_change_df %>%
              x = "nucleotide")+
         theme_classic()+
         theme(axis.text.x = element_text(angle = 90))+
-        scale_x_continuous(n.breaks = 20)
+        scale_x_continuous(n.breaks = 20)+
+        geom_vline(xintercept = tss_data %>% 
+                           as.data.frame() %>% 
+                           filter(external_gene_name == gene_name) %>% 
+                           pull(transcription_start_site) , color = "red")
+
+# add TSS to figure
+
+BiocManager::install("biomaRt")
+
+library(biomaRt)
+
+ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+tss_data <- getBM(attributes = c("ensembl_gene_id", "external_gene_name", "transcription_start_site", "chromosome_name", "strand"),
+                  mart = ensembl)
+
+tss_data %>% 
+        as.data.frame() %>% 
+        filter(external_gene_name == gene_name) %>% 
+        pull(transcription_start_site) %>% mean()
 
 
 ##################################################################
