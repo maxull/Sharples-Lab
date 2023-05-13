@@ -15,8 +15,13 @@ library(stringr)
 library(missMethyl)
 library(ChAMP)
 library(pathview)
+library(FedData)
+library(lme4)
+library(lmerTest)
 
 setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/")
+
+beta <- readRDS(file = "beta.RDATA")
 
 ########################################################################
 
@@ -731,6 +736,93 @@ plot <- plot_grid(venn, kmeans_plot, ncol = 1, rel_heights = c(2,1), labels = c(
 ggsave2(plot, filename = "venn_kmeans.pdf",units = "cm", width = 19, height = 21, bg = "white")
 # plot with heatmap (doesnt wirk)
 plot_grid(plot_heat, plot)
+
+#############################################################################
+
+### Kmeans plot of 901 overlapping DMPs in myo+int and myo
+
+##########################################################################
+
+# isolate beta values of 901 cpgs
+
+# identify cpgs
+
+common_dmps <- merge(DMPs_PH_vs_BH, DMPs_PM_vs_BM, by = "cpg") %>% 
+        pull(cpg) 
+
+som_data <-B2M(beta)%>% 
+        as.data.frame() %>% 
+        mutate(avg_BH = round((`1BH`+`2BH`+`4BH`+`5BH`+`6BH`+`7BH`+`8BH`+`12BH`)/8,2),
+               avg_BM = round((`1BM`+`2BM`+`4BM`+`5BM`+`6BM`+`7BM`+`8BM`+`12BM`)/8,2),
+               avg_PH = round((`1PH`+`2PH`+`4PH`+`5PH`+`6PH`+`7PH`+`8PH`+`12PH`)/8,2),
+               avg_PM = round((`1PM`+`2PM`+`4PM`+`5PM`+`6PM`+`7PM`+`8PM`+`12PM`)/8,2)) %>% 
+        dplyr::select(avg_BH, avg_BM, avg_PH, avg_PM) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        dplyr::filter(cpg %in% common_dmps) %>% 
+        mutate(change_homo = avg_PH-avg_BH, 
+               change_myo = avg_PM-avg_BM) %>% 
+        pivot_longer(names_to = "sample", values_to = "average", cols = 2:7) %>% 
+        filter(sample %in% c("change_homo","change_myo")) %>% 
+        pivot_wider(names_from = sample, values_from = average) %>% 
+        as.data.frame()
+
+ 
+
+
+rownames(som_data) <- som_data[,1]
+som_data <- som_data[,-1]
+
+
+### run kmeans clustering on som_data
+
+
+
+set.seed(1)
+
+
+xyss <- vector()
+
+for (i in 1:10) {
+        xyss[i] <- sum(kmeans(som_data,i)$withinss)
+}
+plot(1:10, xyss, type = "b", main = "clusters of M-value profiles", xlab = "number of clusters", ylab = "XYSS")
+
+# elbow at ~4 clusters
+
+# make cluster with identified elbow
+set.seed(1)
+kmeans <- kmeans(som_data, 4, iter.max = 300, nstart = 10)
+
+# add cluster number to som data and replot
+
+k_means <-as.data.frame(kmeans$cluster)
+
+som_data[,"kmeans"] <- k_means[,1]
+
+
+# remake som plot with individual y axis scaling
+
+# count cluster DMPs
+
+som_data %>% 
+        filter(kmeans == "4") %>% nrow()
+
+
+# quick plot
+
+som_data %>% 
+        pivot_longer(names_to = "condition", values_to = "mean_M", cols = 1:4) %>% 
+        mutate(condition = factor(condition, levels = c("avg_BH", "avg_BM", "avg_PH", "avg_PM")),
+               cluster = factor(kmeans)) %>% 
+        dplyr::group_by(cluster,condition) %>% 
+        dplyr::summarize(m = mean(mean_M),
+                         s = sd(mean_M)) %>% 
+        ggplot(aes(x = condition, y = m))+
+        geom_line(aes(group = cluster))+
+        geom_errorbar(aes(ymin = m-s,
+                          ymax = m+s), width = 0.2)+
+        facet_grid(~cluster)
+
 
 
 #################################################################################
@@ -1696,6 +1788,52 @@ setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA 
 tmp = sapply(keggresids, function(pid) pathview(gene.data = scaled_values, pathway.id = pid, species = "hsa", low = "blue", mid = "grey", high = "yellow"))
 
 
+
+# plot WNT pathway in homo and myo
+
+hsa04310
+
+# get the min and max M value within the pathway
+pathway = "hsa04310 Wnt signaling pathway"     # write name of pathway
+
+# find average methylation of the individual genes
+
+results_df %>% 
+        filter(entrezIDs %in% kegg.subset[[pathway]]) %>%  pull(entrezIDs) -> x
+
+
+min(results_df[entrezIDs %in% x,2:3])
+max(results_df[entrezIDs %in% x,2:3])
+
+
+
+
+res_df <- matrix(results_df[,2])
+rownames(res_df) <- results_df$entrezIDs
+
+scaled_values <- ifelse(res_df < 0,
+                        rescale(res_df, to = c(-1, 0), from = c(-0.09638417, 0)),
+                        rescale(res_df, to = c(0, 1), from = c(0,0.09510493)))
+
+rownames(scaled_values)<- rownames(res_df)
+
+setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA figures/")
+tmp = sapply("hsa04310", function(pid) pathview(gene.data = scaled_values, pathway.id = "hsa04310", species = "hsa", low = "blue", mid = "grey", high = "yellow"))
+
+res_df <- matrix(results_df[,3])
+rownames(res_df) <- results_df$entrezIDs
+
+
+
+scaled_values <- ifelse(res_df < 0,
+                        rescale(res_df, to = c(-1, 0), from = c(-0.09638417, 0)),
+                        rescale(res_df, to = c(0, 1), from = c(0,0.09510493)))
+
+rownames(scaled_values)<- rownames(res_df)
+
+setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA figures/")
+tmp = sapply("hsa04310", function(pid) pathview(gene.data = scaled_values, pathway.id = pid, species = "hsa", low = "blue", mid = "grey", high = "yellow"))
+
 ##################################################################################
 
 ### KEGG plot
@@ -1818,7 +1956,7 @@ GO_res_myo <- GO_res_myo %>%
 write.csv(GO_res_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/GO_all_pathways_myonuclei.csv")
 
 
-#################################################################################################
+
 ##############################################################################
 
 ### GO plot
@@ -2114,13 +2252,40 @@ results_df %>%
 _________________________________________________
 # KEGG
 
-pathway = "hsa04510 Focal adhesion"     # write name of pathway
+pathway = "hsa04152 AMPK signaling pathway"     # write name of pathway
 
 # find average methylation of the individual genes
 
 results_df %>% 
-        filter(entrezIDs %in% kegg.sets.hs[[pathway]])
+        filter(entrezIDs %in% kegg.subset[[pathway]]) %>% 
+        mutate(difference = mean_change_PM_vs_BM-mean_change_PH_vs_BH) %>% 
+        arrange(desc(abs(difference))) %>% 
+        summarise(mean_homo = mean(mean_change_PH_vs_BH),
+                  mean_myo = mean(mean_change_PM_vs_BM))
 
+
+
+pathway = "hsa04020 Calcium signaling pathway"     # write name of pathway
+
+# find average methylation of the individual genes
+
+results_df %>% 
+        filter(entrezIDs %in% kegg.subset[[pathway]]) %>% 
+        mutate(difference = mean_change_PM_vs_BM-mean_change_PH_vs_BH) %>% 
+        arrange(desc(abs(difference))) %>% 
+        summarise(mean_homo = mean(mean_change_PH_vs_BH),
+                  mean_myo = mean(mean_change_PM_vs_BM))
+
+pathway = "hsa04310 Wnt signaling pathway"     # write name of pathway
+
+# find average methylation of the individual genes
+
+results_df %>% 
+        filter(entrezIDs %in% kegg.subset[[pathway]]) %>% 
+        mutate(difference = mean_change_PM_vs_BM-mean_change_PH_vs_BH) %>% 
+        arrange(desc(abs(difference))) %>% 
+        summarise(mean_homo = mean(mean_change_PH_vs_BH),
+                  mean_myo = mean(mean_change_PM_vs_BM))
 
 _________________________________________________
 # GO
@@ -2130,7 +2295,7 @@ pathway = "GO:0048468 cell development"       # write name of pathway
 # find average methylation of the individual genes
 
 results_df %>% 
-        filter(entrezIDs %in% go.sets.hs[[pathway]])
+        filter(entrezIDs %in% go.sets.hs[[pathway]]) 
 
 
 _________________________________________________
@@ -2139,7 +2304,7 @@ _________________________________________________
 
 _________________________________________________
 
-gene_name <- "IGF2"       # write gene name
+gene_name <- "FZD10"       # write gene name
 
 Probes <- anno %>% 
         filter(UCSC_RefGene_Name == gene_name) 
@@ -2163,7 +2328,7 @@ m_change_df %>%
              x = "nucleotide")+
         theme_classic()+
         theme(axis.text.x = element_text(angle = 90))+
-        scale_x_continuous(n.breaks = 20)+
+        scale_x_continuous(n.breaks = 20)
         geom_vline(xintercept = tss_data %>% 
                            as.data.frame() %>% 
                            filter(external_gene_name == gene_name) %>% 
@@ -2187,6 +2352,480 @@ tss_data %>%
 
 
 ##################################################################
+
+### linear regression of individual genes in Wnt pathway
+
+###############################################################################
+
+library(lme4)
+library(lmerTest)
+library(emmeans)
+
+# identify genes in pathway and probes in genes
+
+
+pathway = "hsa04310 Wnt signaling pathway"    
+
+# find average methylation of the individual genes
+
+results_df %>% 
+        filter(entrezIDs %in% kegg.subset[[pathway]]) %>% 
+        mutate(difference = mean_change_PM_vs_BM-mean_change_PH_vs_BH) %>% 
+        arrange(desc(abs(difference))) -> Wnt
+
+
+
+for (i in 1:length(Wnt$gene)) {
+        
+        tryCatch({
+        anno %>% 
+                filter(UCSC_RefGene_Name == Wnt[i,1]) %>% 
+                pull(cpg) -> x
+        
+        M_change[,1:32] %>% 
+                rownames_to_column(var = "cpg") %>% 
+                filter(cpg %in% x) %>% 
+                pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+                mutate(Condition = substr_right(FP, 2),
+                       ID = as.factor(str_sub(FP, end = -3)),
+                       Timepoint = as.factor(str_sub(Condition, end = 1)),
+                       Sample = as.factor(substr_right(Condition, 1))) %>% 
+                dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+                as.data.frame() %>% 
+                lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+        
+        model <- coef(summary(rmaModel)) %>%  tail(1) %>% as.data.frame()
+        
+        Wnt[i,"p.val(time*sample)"] <- model$`Pr(>|t|)`
+        print(i)
+        }, error= function(e) {
+                cat("Error in iteration", i, ":", conditionMessage(e), "\n")
+        })
+        
+        
+}
+
+# get list of genes that are significnat for time and sample
+
+Wnt %>% 
+        dplyr::select(1:5, p.val = 6) %>% 
+        filter(p.val < 0.05) %>% pull(gene)
+
+# plot emmeans for these genes
+
+Wnt_sig = c("FRAT2",   "DVL3" ,   "WNT1"  ,  "AXIN1"   ,"CCDC88C", "CSNK2B" , "LGR6"  ,  "CHD8"  ,  "CTBP1")
+
+
+# FRAT2
+
+anno %>% 
+        filter(UCSC_RefGene_Name == Wnt_sig[1]) %>% 
+        pull(cpg) -> x
+        
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+# plot the estimated marginal means 
+
+
+p1 <- est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
+       
+
+
+# DVL3
+anno %>% 
+        filter(UCSC_RefGene_Name == Wnt_sig[2]) %>% 
+        pull(cpg) -> x
+
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+# plot the estimated marginal means 
+
+
+p2 <- est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
+# WNT1
+anno %>% 
+        filter(UCSC_RefGene_Name == Wnt_sig[3]) %>% 
+        pull(cpg) -> x
+
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+# plot the estimated marginal means 
+
+
+p3 <- est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
+# AXIN1
+anno %>% 
+        filter(UCSC_RefGene_Name == Wnt_sig[4]) %>% 
+        pull(cpg) -> x
+
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+# plot the estimated marginal means 
+
+
+p4 <- est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
+# CCDC88C
+anno %>% 
+        filter(UCSC_RefGene_Name == Wnt_sig[5]) %>% 
+        pull(cpg) -> x
+
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample, pbkrtest.limit = 4992, lmerTest.limit = 4992)
+
+# plot the estimated marginal means 
+
+
+p5 <- est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
+# CSNK2B
+anno %>% 
+        filter(UCSC_RefGene_Name == Wnt_sig[6]) %>% 
+        pull(cpg) -> x
+
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+# plot the estimated marginal means 
+
+
+p6 <- est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
+# LGR6
+anno %>% 
+        filter(UCSC_RefGene_Name == Wnt_sig[7]) %>% 
+        pull(cpg) -> x
+
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+# plot the estimated marginal means 
+
+
+p7 <- est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
+# CHD8
+anno %>% 
+        filter(UCSC_RefGene_Name == Wnt_sig[8]) %>% 
+        pull(cpg) -> x
+
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+# plot the estimated marginal means 
+
+
+p8 <- est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
+# CTBP1
+anno %>% 
+        filter(UCSC_RefGene_Name == Wnt_sig[9]) %>% 
+        pull(cpg) -> x
+
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+# plot the estimated marginal means 
+
+
+p9 <- est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
+
+
+library(ggpubr)
+fig <- ggarrange(p1+rremove("ylab"),
+          p2+rremove("ylab"),
+          p3+rremove("ylab"),
+          p4+rremove("ylab"),
+          p5+rremove("ylab"),
+          p6+rremove("ylab"),
+          p7+rremove("ylab"),
+          p8+rremove("ylab"),
+          p9+rremove("ylab"), 
+          nrow = 1, labels = c("C","D","E","F","G","H","I","J","K"), common.legend = TRUE, 
+          hjust = 0.09, font.label = list(size = 25))
+
+annotate_figure(fig, left = "emmenas M-value")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     
+##############################################################################
 
 ### epigenetic age
 
