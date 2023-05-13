@@ -2252,14 +2252,14 @@ results_df %>%
 _________________________________________________
 # KEGG
 
-pathway = "hsa04152 AMPK signaling pathway"     # write name of pathway
+pathway = "hsa04150 mTOR signaling pathway"     # write name of pathway
 
 # find average methylation of the individual genes
 
 results_df %>% 
         filter(entrezIDs %in% kegg.subset[[pathway]]) %>% 
         mutate(difference = mean_change_PM_vs_BM-mean_change_PH_vs_BH) %>% 
-        arrange(desc(abs(difference))) %>% 
+        arrange(desc(abs(mean_change_PM_vs_BM))) %>% 
         summarise(mean_homo = mean(mean_change_PH_vs_BH),
                   mean_myo = mean(mean_change_PM_vs_BM))
 
@@ -2415,6 +2415,44 @@ Wnt %>%
 
 Wnt_sig = c("FRAT2",   "DVL3" ,   "WNT1"  ,  "AXIN1"   ,"CCDC88C", "CSNK2B" , "LGR6"  ,  "CHD8"  ,  "CTBP1")
 
+# supplementary file
+sig = data.frame()
+
+for (i in 1:length(Wnt_sig)) {
+        
+        anno %>% 
+                filter(UCSC_RefGene_Name == Wnt_sig[i]) %>% 
+                pull(cpg) -> x
+        
+        M_change[,1:32] %>% 
+                rownames_to_column(var = "cpg") %>% 
+                filter(cpg %in% x) %>% 
+                pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+                mutate(Condition = substr_right(FP, 2),
+                       ID = as.factor(str_sub(FP, end = -3)),
+                       Timepoint = as.factor(str_sub(Condition, end = 1)),
+                       Sample = as.factor(substr_right(Condition, 1))) %>% 
+                dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+                as.data.frame() %>% 
+                lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+        
+        est <- emmeans(rmaModel, specs = ~Timepoint|Sample, pbkrtest.limit = 4992, lmerTest.limit = 4992)
+        
+        sig <- summary(est) %>% 
+                dplyr::select(Sample, Timepoint, emmean, SE, df, lower.CL, upper.CL) %>% 
+                mutate(gene = Wnt_sig[i]) %>% 
+                rbind(sig,.)
+        
+        print(i)
+}
+
+# fix sig dataframe and save to csv
+
+sig %>% 
+        mutate(Sample = ifelse(Sample == "H", "MYO+INT", "MYO"),
+               Timepoint = ifelse(Timepoint == "B", "Baseline", "Post")) %>% 
+        dplyr::select(gene, 1:7) %>% 
+        write.csv(file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/Wnt_emmeans.csv")
 
 # FRAT2
 
@@ -2441,6 +2479,8 @@ qqnorm(resid(rmaModel));qqline(resid(rmaModel))
 plot(rmaModel)
 
 est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+
 
 # plot the estimated marginal means 
 

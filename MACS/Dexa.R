@@ -40,8 +40,11 @@ t.test(df$`Mager(g)_Total_Baseline`,df$`Mager(g)_Total_Post`, paired = TRUE)
 
 t.test(df$`Mager(g)_Left_Leg_Post`, df$`Mager(g)_Left_Leg_Baseline`, paired = TRUE)
 
+t.test(df$`Mager(g)_Legs_Baseline`, df$`Mager(g)_Legs_Post`, paired = TRUE)
 
-
+df %>% 
+        summarise(m = mean(df$'lean_legs_change_%'),
+                  s = sd(df$'lean_legs_change_%'))
               
 df2 <- df %>% 
         select(1, 27:31) %>% 
