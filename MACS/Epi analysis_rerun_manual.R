@@ -1094,7 +1094,7 @@ myo_int %>%
 myo %>% 
         filter(cpg %in% x) %>% 
         mutate(sample = "MYO") %>% 
-        rbind(., myo_int %>% filter(cpg %in% x) %>%  mutate(sample = "MYO+INT"))
+        rbind(., myo_int %>% filter(cpg %in% x) %>%  mutate(sample = "MYO+INT")) %>% merge(.,anno, by = "cpg")
 
 anno %>% 
         filter(cpg %in% x | cpg %in% y)
@@ -1834,6 +1834,61 @@ rownames(scaled_values)<- rownames(res_df)
 setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA figures/")
 tmp = sapply("hsa04310", function(pid) pathview(gene.data = scaled_values, pathway.id = pid, species = "hsa", low = "blue", mid = "grey", high = "yellow"))
 
+
+# plot leukocyte transedothelial migration pathway
+
+
+# get the min and max M value within the pathway
+pathway = "hsa04670 Leukocyte transendothelial migration"     # write name of pathway
+
+# find average methylation of the individual genes
+
+results_df %>% 
+        filter(entrezIDs %in% kegg.subset[[pathway]]) %>%  pull(entrezIDs) -> x
+
+
+min(results_df[entrezIDs %in% x,2:3])
+max(results_df[entrezIDs %in% x,2:3])
+
+
+
+
+res_df <- matrix(results_df[,2])
+rownames(res_df) <- results_df$entrezIDs
+
+scaled_values <- ifelse(res_df < 0,
+                        rescale(res_df, to = c(-1, 0), from = c(-0.1313915, 0)),
+                        rescale(res_df, to = c(0, 1), from = c(0,0.05768334)))
+
+rownames(scaled_values)<- rownames(res_df)
+
+setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA figures/")
+tmp = sapply("hsa04670", function(pid) pathview(gene.data = scaled_values, pathway.id = "hsa04670", species = "hsa", low = "blue", mid = "grey", high = "yellow"))
+
+res_df <- matrix(results_df[,3])
+rownames(res_df) <- results_df$entrezIDs
+
+
+
+scaled_values <- ifelse(res_df < 0,
+                        rescale(res_df, to = c(-1, 0), from = c(-0.1313915, 0)),
+                        rescale(res_df, to = c(0, 1), from = c(0,0.05768334)))
+
+rownames(scaled_values)<- rownames(res_df)
+
+setwd("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/GSEA figures/")
+tmp = sapply("hsa04670", function(pid) pathview(gene.data = scaled_values, pathway.id = "hsa04670", species = "hsa", low = "blue", mid = "grey", high = "yellow"))
+
+
+# check number of overlap between MYO+INT and MYO pathways
+
+merge(kegg_res_homo %>% filter(P.DE < 0.05), 
+      kegg_res_myo %>% filter(P.DE < 0.05), by = "pathway") %>% 
+        mutate(same = ifelse(dir.x == dir.y, "same", "diff")) %>% 
+        filter(same == "diff")
+
+
+
 ##################################################################################
 
 ### KEGG plot
@@ -2394,9 +2449,9 @@ for (i in 1:length(Wnt$gene)) {
                 as.data.frame() %>% 
                 lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
         
-        model <- coef(summary(rmaModel)) %>%  tail(1) %>% as.data.frame()
+        model <- coef(summary(rmaModel)) %>%  tail(3) %>% head(1) %>% as.data.frame()
         
-        Wnt[i,"p.val(time*sample)"] <- model$`Pr(>|t|)`
+        Wnt[i,"p.val(timepoint)"] <- model$`Pr(>|t|)`
         print(i)
         }, error= function(e) {
                 cat("Error in iteration", i, ":", conditionMessage(e), "\n")

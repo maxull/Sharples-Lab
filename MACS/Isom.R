@@ -412,24 +412,24 @@ isom_percent <- isom_df2 %>%
 
 
 ext_plot <- ggplot(data = isom_percent, aes(x = angle, y = mean_percent/100))+
-        geom_point(size = 2)+
+        geom_point(size = 4)+
         geom_errorbar(data = isom_percent, aes(ymin = ((mean_percent - sd_percent)/100),
-                                             ymax = ((mean_percent + sd_percent)/100)), width = 0.2)+
-        geom_text(data = isom_percent, aes(label = paste0(format(round(mean_percent, 2), nsmall = 2),"%"), fontface = "bold", hjust = -0.3))+
-        geom_point(data = isom_df2, aes(x = angle, y = percent_change/100, color = FP), size = 2)+
-        theme_classic(base_size = 15)+
+                                             ymax = ((mean_percent + sd_percent)/100)), width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        geom_text(data = isom_percent, aes(label = paste0(format(round(mean_percent, 2), nsmall = 2),"%"), fontface = "bold", hjust = -0.3), size = 6)+
+        geom_point(data = isom_df2, aes(x = angle, y = percent_change/100, color = FP), size = 3)+
+
         scale_y_continuous(labels = percent,
                            limits = c(-0.5,1),
                            expand = c(0,0))+
+        scale_x_discrete(labels = c(expr(30*degree),expr(60*degree), expr(90*degree) ))+
         geom_hline(yintercept = 0, alpha = 0.5, linewidth = 1)+
         theme(axis.title.x = element_blank(),
                 axis.ticks.x = element_blank(),
               axis.line.x = element_blank(),
-              axis.text.x = element_text(size = 15, vjust = 8),
-              plot.title = element_text(size = 15),
+              axis.text.x = element_text(size = 17, vjust = 8),
               legend.position = "none")+
-        labs(y = "% change",
-             title = "ISOM extention")
+        labs(y = "% Change")
                 
 
 
@@ -470,25 +470,25 @@ isom_percent_flex <- df_flex_3 %>%
                   sd_percent = sd(percent_change))
 
 
-flex_plot <- ggplot(data = isom_percent_flex, aes(x = angle, y = mean_percent/100))+
-        geom_point(size = 2)+
+flex_plot <- 
+ggplot(data = isom_percent_flex, aes(x = angle, y = mean_percent/100))+
+        geom_point(size = 4)+
         geom_errorbar(data = isom_percent_flex, aes(ymin = ((mean_percent - sd_percent)/100),
-                                               ymax = ((mean_percent + sd_percent)/100)), width = 0.2)+
-        geom_text(data = isom_percent_flex, aes(label = paste0(format(round(mean_percent, 2), nsmall = 2),"%"), fontface = "bold", hjust = -0.3))+
-        geom_point(data = df_flex_3, aes(x = angle, y = percent_change/100, color = FP), size = 2)+
-        theme_classic(base_size = 15)+
+                                               ymax = ((mean_percent + sd_percent)/100)), width = 0.2, size = 1.2)+
+        geom_text(data = isom_percent_flex, aes(label = paste0(format(round(mean_percent, 2), nsmall = 2),"%"), fontface = "bold", hjust = -0.3), size = 6)+
+        geom_point(data = df_flex_3, aes(x = angle, y = percent_change/100, color = FP), size = 3)+
+        theme_classic(base_size = 20)+
         scale_y_continuous(labels  = percent,
                            limits = c(-0.5,1),
                            expand = c(0,0))+
+        scale_x_discrete(labels = c(expr(30*degree),expr(60*degree), expr(90*degree) ))+
         geom_hline(yintercept = 0, alpha = 0.5, linewidth = 1)+
         theme(axis.title.x = element_blank(),
               axis.ticks.x = element_blank(),
               axis.line.x = element_blank(),
-              axis.text.x = element_text(size = 15, vjust = 8),
-              plot.title = element_text(size = 15),
-              legend.position = "none",
-              axis.title.y = element_blank())+
-        labs(title = "ISOM flection")
+              axis.text.x = element_text(size = 17, vjust = 8),
+              legend.position = "none")+
+        labs(y = "% Change")
 
 
 # plot extention and flection together
@@ -510,3 +510,31 @@ df_flex_change <- df_flex %>%
         filter(test == c("change_30", "change_60", "change_90")) %>% 
         separate(test, into = c("timepoint", "angle"))
 
+
+# plot all figures together
+
+library(cowplot)
+library(ggpubr)
+
+
+p2 <- plot_grid(ext_plot, flex_plot, dexa_plot, csa_plot, nrow = 1, labels = c("B","C","D","E"), rel_widths = c(1.19,1.18,1.7,1), label_size = 25)
+
+plot_grid(p1,p2, ncol = 1, labels = c("A",""), label_size = 25)
+
+
+
+# get mean and sd N change
+
+isom_df %>% 
+        filter(reps == 1 & angle == 60) %>%
+        dplyr::select(FP, t_max, timepoint) %>% 
+        mutate(timepoint = paste("t", timepoint, sep = "_")) %>% 
+        filter(t_max > 20) %>% 
+        pivot_wider(names_from = timepoint, values_from = t_max) %>%
+        mutate(change = t_3-t_2,
+               percent_change = change/t_2) %>% 
+        na.omit() %>% 
+        summarise(m = mean(change),
+                  mp = mean(percent_change),
+                  s = sd(change))
+ext_plot

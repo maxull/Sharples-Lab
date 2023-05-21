@@ -42,7 +42,21 @@ t.test(x = session3$v_total, y = session16$v_total, paired = TRUE)
 RT_data %>% 
         filter(v_total != 0) %>% 
         na.omit() -> RT_df
-        
+
+# calculate mean and sd increase in totral volume from week 0-7
+
+RT_df %>% 
+        dplyr::select(FP, Session,  v_total) %>%
+        mutate(Session = paste("Session_", Session, sep = "")) %>% 
+        pivot_wider(names_from = Session, values_from = v_total) %>% 
+        mutate(change = Session_16-Session_3, 
+               change_percent = change/Session_3) %>%
+        dplyr::select(change, change_percent) %>% 
+        na.omit() %>% 
+        summarise(m = mean(change),
+                  s = sd(change),
+                  mp = mean(change_percent),
+                  sp = sd(change_percent))
 
 
 p1 <- ggplot(data = RT_df, aes(x = Session-2, y  = v_total))+
@@ -96,21 +110,21 @@ RT_mean <- RT_df %>%
 # replot figure with norm data
 
 p2 <- ggplot(data = RT_df, aes(x = Session-2, y  = norm_total))+
-        geom_point(alpha = 0.2, size = 2, aes(color = FP))+
-        geom_line(data = RT_df, aes(y = norm_total, group = FP, color = FP), alpha = 0.2, size = 1.2)+
-        geom_point(data = RT_mean, aes(x = Session-2, y = mean), size = 3)+
-        geom_errorbar(data = RT_mean, aes(x = Session-2, ymin = (mean-sd), ymax = (mean+sd)), inherit.aes = FALSE, width = 0.2, size = 1)+
-        geom_line(data = RT_mean, aes(y = mean), size = 1.2)+
+        geom_point(alpha = 0.2, size = 3, aes(color = FP))+
+        geom_line(data = RT_df, aes(y = norm_total, group = FP, color = FP), alpha = 0.2, size = 1.5)+
+        geom_point(data = RT_mean, aes(x = Session-2, y = mean), size = 4)+
+        geom_errorbar(data = RT_mean, aes(x = Session-2, ymin = (mean-sd), ymax = (mean+sd)), inherit.aes = FALSE, width = 0.2, size = 1.2)+
+        geom_line(data = RT_mean, aes(y = mean), size = 1.5)+
         scale_y_continuous(expand = c(0,0),
                            limits = c(0,450),
                            n.breaks = 10)+
         scale_x_continuous(n.breaks = 16,
                            expand = c(0.03,0))+
-        theme_classic()+
+        theme_classic(base_size = 20)+
         labs(y = "norm Volume Load (KG*REPS*SETS/LEAN MASS)",
              x = "Training session")+
-        geom_text(data = RT_mean, aes(label = as.integer(mean), x = Session-2, y = mean-sd), inherit.aes = FALSE, vjust = 3, size = 3)+
-        theme(legend.title = element_blank())
+        geom_text(data = RT_mean, aes(label = as.integer(mean), x = Session-2, y = mean-sd), inherit.aes = FALSE, vjust = 3, size = 6)+
+        theme(legend.position =  "none")
 
 ggsave(p2, filename = "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Figures/Norm Volume load.png", 
        dpi = 400,

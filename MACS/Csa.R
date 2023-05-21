@@ -53,6 +53,15 @@ df %>%
         pivot_wider(names_from = timepoint, values_from = mean) %>% 
         filter(muscle == "VL") -> df_vl
 
+df_vl %>% 
+        mutate(change = T3-T2) %>% pull(change) -> x
+        summarize(m = mean(change),
+                  s = sd(change))
+
+mean(x)        
+sd(x)
+
+
 # run a paired t-test on the T3 and T2 columns of the new dataframe
 t.test(df_vl$T3, df_vl$T2, paired = T)
 
@@ -79,26 +88,23 @@ mean_df2 <- df2 %>%
         summarise(mean = mean(change),
                   sd = sd(change))
 
-ggplot(data = mean_df2, aes(x = muscle, y = mean/100))+
-        geom_point(size = 3)+
+csa_plot <- ggplot(data = mean_df2, aes(x = muscle, y = mean/100))+
+        geom_point(size = 4)+
         geom_errorbar(data = mean_df2, aes(ymin = ((mean/100)-(sd/100)),
-                                           ymax = ((mean/100)+(sd/100))), width = 0.2)+
-        geom_text(data = mean_df2, aes(label = paste0(format(round(mean, 2), nsmall = 2),"%")), fontface = "bold", hjust = -0.3)+
-        geom_point(data = df2, aes(y = change/100, color = FP), size = 2)+
-        theme_classic(base_size = 15)+
+                                           ymax = ((mean/100)+(sd/100))), width = 0.2, size = 1.2)+
+        geom_text(data = mean_df2, aes(label = paste0(format(round(mean, 2), nsmall = 2),"%")), fontface = "bold", hjust = -0.3, size = 6)+
+        geom_point(data = df2, aes(y = change/100, color = FP), size = 3)+
+        theme_classic(base_size = 20)+
         scale_y_continuous(labels = scales::percent,
                            limits = c(0,0.3),
                            expand = c(0,0),
                            n.breaks = 6)+
-        geom_hline(yintercept = 0, alpha = 0.5, size = 1)+
         theme(axis.title.x = element_blank(),
               axis.ticks.x = element_blank(),
-              axis.line.x = element_blank(),
               axis.text.x = element_text(size = 15, vjust = 0),
               plot.title = element_text(size = 15),
               legend.position = "none")+
-        labs(y = "% change",
-             title = "CSA")
+        labs(y = "% Change")
         
 
 ########################################################################

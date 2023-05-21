@@ -121,21 +121,21 @@ df_percent <- lean_dexa_change %>%
         
 dexa_plot <- 
 ggplot(df_percent, aes(x = measure, y = mean_percent))+
-        geom_point(size = 2)+
+        geom_point(size = 4)+
         geom_errorbar(data = df_percent, aes(ymin = (mean_percent - sd_percent),
-                          ymax = (mean_percent + sd_percent)), width = 0.2)+
-        geom_text(data = df_percent, aes(label = paste0(format(round(mean_percent*100, 2), nsmall = 2),"%"), fontface = "bold", hjust = -0.3))+
-        geom_point(data = df_change, aes(x = measure, y = percent_change/100, color = FP), size = 2)+
-        theme_classic(base_size = 15)+
+                          ymax = (mean_percent + sd_percent)), width = 0.2, size = 1.2)+
+        geom_text(data = df_percent, aes(label = paste0(format(round(mean_percent*100, 2), nsmall = 2),"%"), fontface = "bold", hjust = -0.3), size = 6)+
+        geom_point(data = df_change, aes(x = measure, y = percent_change/100, color = FP), size = 3)+
+        theme_classic(base_size = 20)+
         scale_y_continuous(labels = percent,
                            limits = c(-0.005,0.13),
                            expand = c(0,0))+
+        scale_x_discrete(labels = c("Arms","Legs","Left Leg","Right Leg", "Whole Body"))+
         theme(axis.text.x = element_text(size = 15, angle = 45, hjust = 0.9),
               axis.title.x = element_blank(),
               plot.title = element_text(size = 15),
               legend.position = "none")+
-        labs(y = "% change",
-             title = "DEXA")
+        labs(y = "% Change")
 
 
 plot_grid(isom_plot, dexa_plot, ncol = 1)
