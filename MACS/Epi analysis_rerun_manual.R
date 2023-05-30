@@ -18,6 +18,8 @@ library(pathview)
 library(FedData)
 library(lme4)
 library(lmerTest)
+library(ggvenn)
+library(viridis)
 
 setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/")
 
@@ -205,7 +207,7 @@ n_count <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>%
 p_count <- merge(baseline_dmps, change_b_vals_baseline, by.x = "cpg") %>% 
         filter(dir == "Positive_skew") %>%
         mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
-        summarise(count(.,Relation_to_Island)) %>% 
+        summarise(dplyr::count(.,Relation_to_Island)) %>% 
         as.data.frame() 
 
 df <- data.frame(
@@ -221,13 +223,12 @@ p1 <- ggplot(df, aes(x = category)) +
         geom_label(aes(label = as.integer(neg_skew)*-1, x = category, y = -15000), size = 4, alpha = 0.8, nudge_y = -3000)+
         geom_label(aes(label = as.integer(pos_skew), x = category, y = 15000), size = 4, alpha = 0.8, nudge_y = 3000)+
         coord_flip()+
-        theme_classic()+
+        theme_classic(base_size = 20)+
         theme(legend.title = element_blank(),
               axis.title.y = element_blank(),
               axis.title.x = element_text(hjust = 0.58))+
         scale_y_continuous(n.breaks = 6)+
-        labs(y = "Number of DMPs",
-             title = "Baseline DMPs in Myonuclei vs. Homogenate")
+        labs(y = "Number of DMPs")
 
 
 # find number of significant cpgs that were altered more than <0.01 B < 0.1 B < 0.2 B <
@@ -241,7 +242,7 @@ change_b_vals_baseline %>%
                              ifelse(change >0.01 & change < 0.1, "0.01<0.1", 
                                     ifelse(change > 0.1 & change < 0.2, "0.1<0.2", 
                                            ifelse(change > 0.2 & change < 0.3, "0.2<0.3",">0.3"))))) %>% 
-        summarise(count(.,skew)) -> df1
+        summarise(dplyr::count(.,skew)) -> df1
 
 df2 <- data.frame(category = factor(df1[,1], levels = c("<0.01", "0.01<0.1", "0.1<0.2", "0.2<0.3", ">0.3")),
                   count = df1[,2])
@@ -250,9 +251,8 @@ library(scales)
 p3 <- ggplot(data = df2, aes(x = category))+
         geom_bar(aes(y = count), stat = "identity")+
         geom_text(aes(label = count, y = count), vjust = -0.5)+
-        theme_classic()+
-        labs(title = "number of DMPs by skewed B-values at baseline",
-             x = "B-value skew")+
+        theme_classic(base_size = 20)+
+        labs(x = "B-value skew")+
         theme(axis.title.y = element_blank())+
         scale_y_continuous(trans = "log2", expand  = c(0, 1), n.breaks = 9)
 
@@ -283,13 +283,13 @@ change_b_vals_post <- beta[,rownames(dfh_2)] %>%
 n_count2 <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>% 
         filter(dir == "Negative_skew") %>%
         mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
-        summarise(count(.,Relation_to_Island)) %>% 
+        summarise(dplyr::count(.,Relation_to_Island)) %>% 
         as.data.frame()
 
 p_count2 <- merge(post_dmps, change_b_vals_post, by.x = "cpg") %>% 
         filter(dir == "Positive_skew") %>% 
         mutate(Relation_to_Island = factor(Relation_to_Island, levels = c("S_Shelf","N_Shelf","Island", "S_Shore", "N_Shore", "OpenSea"))) %>% 
-        summarise(count(.,Relation_to_Island)) %>% 
+        summarise(dplyr::count(.,Relation_to_Island)) %>% 
         as.data.frame() 
 
 df2 <- data.frame(
@@ -304,14 +304,13 @@ p2 <- ggplot(df2, aes(x = category)) +
         geom_label(aes(label = as.integer(neg_skew)*-1, x = category, y = -17000), size = 4, alpha = 0.8, nudge_y = -3000)+
         geom_label(aes(label = as.integer(pos_skew), x = category, y = 16000), size = 4, alpha = 0.8, nudge_y = 3000)+
         coord_flip()+
-        theme_classic()+
+        theme_classic(base_size = 20)+
         theme(legend.title = element_blank(),
               axis.title.y = element_blank(),
               axis.title.x = element_text(hjust = 0.58))+
         scale_y_continuous(labels = label_comma(),
                            n.breaks = 7)+
-        labs(y = "Number of DMPs",
-             title = "Post DMPs in Myonuclei vs. Homogenate")
+        labs(y = "Number of DMPs")
 
 
 # find number of significant cpgs that were altered more than <0.01 B < 0.1 B < 0.2 B <
@@ -325,7 +324,7 @@ change_b_vals_post %>%
                              ifelse(change >0.01 & change < 0.1, "0.01<0.1", 
                                     ifelse(change > 0.1 & change < 0.2, "0.1<0.2", 
                                            ifelse(change > 0.2 & change < 0.3, "0.2<0.3",">0.3"))))) %>% 
-        summarise(count(.,skew)) -> df3
+        summarise(dplyr::count(.,skew)) -> df3
 
 df4 <- data.frame(category = factor(df3[,1], levels = c("<0.01", "0.01<0.1", "0.1<0.2", "0.2<0.3", ">0.3")),
                   count = df3[,2])
@@ -333,14 +332,13 @@ df4 <- data.frame(category = factor(df3[,1], levels = c("<0.01", "0.01<0.1", "0.
 p4 <- ggplot(data = df4, aes(x = category))+
         geom_bar(aes(y = count), stat = "identity")+
         geom_text(aes(label = count, y = count), vjust = -0.5)+
-        theme_classic()+
-        labs(title = "number of DMPs by skewed B-values at post",
-             x = "B-value skew")+
+        theme_classic(base_size = 20)+
+        labs(x = "B-value skew")+
         theme(axis.title.y = element_blank())+
         scale_y_continuous(trans = "log2", expand  = c(0, 1), n.breaks = 9)
 
 
-plot_grid(p1,p3,p2,p4, rel_widths = c(1.5,1), labels = c("A", "B", "C", "D"))
+plot_grid(p1,p3,p2,p4, rel_widths = c(1.5,1), labels = c("A", "B", "C", "D"), label_size = 20)
 
 
 
@@ -358,7 +356,7 @@ DMPs_BM_vs_BH %>%
 DMPs_PM_vs_PH %>% 
         as.data.frame() %>% 
         merge(., anno, by = "cpg") %>% 
-        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island") %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" ) %>% 
         nrow()
 
 
@@ -463,6 +461,16 @@ DMPs_PH_vs_BH %>%
 
 DMPs_PM_vs_BM %>% 
         filter(cpg %in% z)
+
+# create supplementary csv of overlapping 20 DMPs in venn diagram figure 6A
+
+DMPs_BM_vs_BH %>% 
+        mutate()
+
+merge(base_neg, post_pos, by = "cpg") %>% pull(cpg)
+merge(base_pos, post_neg, by = "cpg") %>% pull(cpg)
+
+
 ########################################################################################
 
 ### Heatmaps DMPs in islands at baseline and at post
@@ -835,6 +843,10 @@ som_data %>%
 
 # count DMPs and plot
 
+hypo_col = "#453781FF"
+hyper_col = "#DCE319FF"
+
+
 DMPs_PH_vs_BH %>%  
         dplyr::select(delta_M) %>% 
         dplyr::summarise(hypo = sum(delta_M < 0),
@@ -861,7 +873,8 @@ p1 <- x %>%
         geom_bar(aes(y = hyper), stat = "identity", position = "dodge", width = 0.8, fill = hyper_col)+
         geom_label(aes(x = comp, y = hyper, label = paste(hyper, "/", round(percent_hyper, 1), "%")), alpha = 0.8)+
         geom_label(aes(x = comp, y = -hypo, label = paste(hypo, "/", round(percent_hypo, 1), "%")), alpha = 0.8)+
-        theme_classic() +
+        theme_classic(base_size = 20) +
+        scale_x_discrete(labels = c("MYO+INT","MYO"))+
         theme(axis.title.x = element_blank())+
         labs(y = "DMPs after 7 weeks RT (un adj.p < 0.05" )
 
@@ -892,11 +905,11 @@ mDMP <- DMPs_PM_vs_BM%>%
 p2 <- ggplot(data = hDMP, aes(x = Relation_to_Island))+
         geom_bar(aes(y = hyper), stat = "identity", width = 0.9, fill = hyper_col)+
         geom_bar(aes(y = -hypo), stat = "identity", width = 0.9, fill = hypo_col)+
-        theme_classic()+
+        theme_classic(base_size = 20)+
         labs(y = "MYO + INT DMPs after 7 weeks RT")+
         geom_label(aes(x = Relation_to_Island, y = -6000, label = total))+
-        geom_label(aes(x = Relation_to_Island, y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 1), "%")), vjust = c(0.3,-0.4,0.3,1.5,-0.4,0.3), alpha = 0.6)+
-        geom_label(aes(x = Relation_to_Island, y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 1), "%")), vjust = c(0.7,1.3,0.7,-0.6,1.3,0.7), alpha = 0.6)+
+        geom_label(aes(x = Relation_to_Island, y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 0), "%")), vjust = c(0.3,-0.4,0.3,1.5,-0.4,0.3), alpha = 0.6)+
+        geom_label(aes(x = Relation_to_Island, y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 0), "%")), vjust = c(0.7,1.3,0.7,-0.6,1.3,0.7), alpha = 0.6)+
         theme(axis.title.x = element_blank())
 
 # plot myonuclei post vs. myonuclei baseline DMPs
@@ -904,11 +917,11 @@ p2 <- ggplot(data = hDMP, aes(x = Relation_to_Island))+
 p3 <- ggplot(data = mDMP, aes(x = Relation_to_Island))+
         geom_bar(aes(y = hyper), stat = "identity", fill = hyper_col, width = 0.9)+
         geom_bar(aes(y = -hypo), stat = "identity", fill = hypo_col, width = 0.9)+
-        theme_classic()+
+        theme_classic(base_size = 20)+
         labs(y = "MYO DMPs after 7 weeks RT")+
         geom_label(aes(x = Relation_to_Island, y = -11000, label = total))+
-        geom_label(aes(x = Relation_to_Island, y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 1), "%")), vjust = c(0.3,-0.4,0.3,1.5,-0.4,0.3), alpha = 0.6)+
-        geom_label(aes(x = Relation_to_Island, y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 1), "%")), vjust = c(0.7,1.3,0.7,-0.6,1.3,0.7), alpha = 0.6)+
+        geom_label(aes(x = Relation_to_Island, y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 0), "%")), vjust = c(0.3,-0.4,0.3,1.5,-0.4,0.3), alpha = 0.6)+
+        geom_label(aes(x = Relation_to_Island, y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 0), "%")), vjust = c(0.7,1.3,0.7,-0.6,1.3,0.7), alpha = 0.6)+
         theme(axis.title.x = element_blank())+
         scale_fill_identity(name = 'the fill', guide = "legend",labels = c("hypo", "hyper"),aes(y = 0, x = 7))
 
@@ -946,7 +959,8 @@ p4 <- rbind(hDMP, mDMP) %>%
         geom_bar(aes(y = -hypo), stat = "identity", fill = hypo_col, width = 0.8)+
         geom_label(aes(y = hyper, label = paste(hyper, "/" ,round(percent_hyper, 1), "%")), alpha = 0.8)+
         geom_label(aes(y = -hypo, label = paste(hypo, "/" ,round(percent_hypo, 1), "%")), alpha = 0.8)+
-        theme_classic()+
+        theme_classic(base_size = 20) +
+        scale_x_discrete(labels = c("MYO+INT","MYO"))+
         theme(axis.title.x = element_blank())+
         labs(y = "DMPs in Islands and Promoters")
 
@@ -954,10 +968,10 @@ DMPs <- list(
         Homogenate_hypo = DMPs_PH_vs_BH %>% 
                 filter(delta_M < 0) %>% 
                 pull(cpg),
-        Homogenate = DMPs_PH_vs_BH %>% 
+        "MYO+INT" = DMPs_PH_vs_BH %>% 
                 filter(delta_M > 0) %>% 
                 pull(cpg),
-        Myonuclei = DMPs_PM_vs_BM %>% 
+        "MYO" = DMPs_PM_vs_BM %>% 
                 filter(delta_M < 0) %>% 
                 pull(cpg),
         Myonuclei_hyper = DMPs_PM_vs_BM %>% 
@@ -968,19 +982,25 @@ DMPs <- list(
 p5 <- ggvenn(DMPs, set_name_size = 10, stroke_size = 1, set_name_color = c("White", "Black", "Black","White"),
        fill_color = c("#453781FF", "#DCE319FF","#453781FF", "#DCE319FF"),text_size = 8,stroke_alpha = 0.8)
 
-p6 <- plot_grid(p5, labels = "C", label_x = 0.1, label_size = 14)
+p6 <- plot_grid(p5, labels = "B", label_x = 0.1, label_size = 25)
 
 
 # figure 8 in manuscript
 
-part1 <- plot_grid(p1,p4,p6, nrow = 1, labels = c("A", "B"), rel_widths = c(0.5,0.5,2))
+part1 <- plot_grid(p1,p5, nrow = 1, labels = c("A", "B"), rel_widths = c(0.65,1), label_size = 25)
 
-part2 <- plot_grid(p2,p3, nrow = 1, labels = c("D", "E"))
+part2 <- plot_grid(p3,p2,p4, nrow = 1, labels = c("C","D", "E"), rel_widths = c(1,1,0.5), label_size = 25)
 
 DMP_RT_plot <- plot_grid(part1, part2, ncol = 1)
 
 ggsave2(DMP_RT_plot, filename = "DMP_RT_plot.pdf",units = "cm", width = 19, height = 21, bg = "white")
 
+
+# count promoter DMPs at baseline
+
+DMPs_BM_vs_BH %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated") %>%  nrow()
 
 ####################################################################################################
 
@@ -1026,13 +1046,12 @@ DMPs_PH_vs_BH %>%
                            labels = label_comma())+
         scale_x_continuous(n.breaks = 6)+
         geom_text_repel(aes(label = Gene), force = 2, max.overlaps = Inf, box.padding = 0.6, point.size = 2)+
-        theme_classic()+
+        theme_classic(base_size = 20)+
         theme(panel.grid.major.y = element_line(color = "red", 
                                                 size = 0.5,
                                                 linetype = 2),
               axis.title.x = element_blank())+
-        labs(title = "Homogenate DMPs after 7 weeks of RT",
-             color = "delta_M",
+        labs(color = "delta M", shape = "Relation to CpG Island",
              y = "un-adj. P value")
 
 
@@ -1104,8 +1123,9 @@ myo_int%>%
         mutate(sample = "MYO+INT") %>% 
         merge(.,myo, by = "cpg") %>% 
         mutate("myo_vs_myo_int" = delta_M.y-delta_M.x) %>% 
-        filter(delta_M.x < 0 & delta_M.y < 0) %>% 
-        merge(., anno, by = "cpg") %>% pull(UCSC_RefGene_Name)
+        filter(delta_M.x < 0 & delta_M.y > 0) %>% 
+        merge(., anno, by = "cpg") %>% 
+        arrange(desc(myo_vs_myo_int))
 
 myo_int %>% 
         filter(cpg %in% y)
@@ -2275,10 +2295,13 @@ cell_population_genes_homo %>%
         ggplot(aes(y = cell_population, x = mean_change, group = contrast, color = contrast))+
         geom_point(size = 2)+
         geom_vline(xintercept = 0)+
-        theme_classic()+
-        theme(axis.title.y = element_blank())+
-        labs(title = "Cell population gene lists")+
-        geom_text_repel(aes(label = pval))
+        theme_classic(base_size = 20)+
+        scale_y_discrete(labels = gsub("_"," ", rev(cell_levels)))+
+        theme(axis.title.y = element_blank(), 
+              axis.title.x = element_blank())+
+        geom_text_repel(aes(label = pval))+
+        labs(color = "Sample")+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))
         
         
         
@@ -2359,7 +2382,7 @@ _________________________________________________
 
 _________________________________________________
 
-gene_name <- "FZD10"       # write gene name
+gene_name <- "TMEM5"       # write gene name
 
 Probes <- anno %>% 
         filter(UCSC_RefGene_Name == gene_name) 
@@ -2903,23 +2926,110 @@ annotate_figure(fig, left = "emmenas M-value")
 
 
 
+# run WNT9a
+
+anno %>% 
+        filter(UCSC_RefGene_Name == "TNF") %>% 
+        pull(cpg) -> x
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ cpg +  Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+model <- coef(summary(rmaModel)) %>%  tail(3) %>% head(1) %>% as.data.frame()
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+# plot the estimated marginal means 
 
 
+est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
+
+# rerun wth only island probes
+
+anno %>% 
+        filter(UCSC_RefGene_Name == "WNT9A" & Relation_to_Island == "Island") %>% 
+        pull(cpg) -> x
+
+x = "cg21467614"
+
+M_change[,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Condition = substr_right(FP, 2),
+               ID = as.factor(str_sub(FP, end = -3)),
+               Timepoint = as.factor(str_sub(Condition, end = 1)),
+               Sample = as.factor(substr_right(Condition, 1))) %>% 
+        dplyr::select(cpg, ID, Timepoint, Sample, M_value) %>% 
+        as.data.frame() %>% 
+        lmer(M_value ~ #cpg +  
+                     Timepoint*Sample + (1|ID), data = .) -> rmaModel
+
+model <- coef(summary(rmaModel)) %>%  tail(3) %>% head(1) %>% as.data.frame()
+
+qqnorm(resid(rmaModel));qqline(resid(rmaModel))
+
+plot(rmaModel)
+
+est <- emmeans(rmaModel, specs = ~Timepoint|Sample)
+
+# plot the estimated marginal means 
 
 
+est %>%
+        data.frame() %>%
+        mutate(Timepoint = factor(Timepoint, levels = c("B", "P"))) %>%
+        ggplot(aes(Timepoint, emmean, group = Sample, color = Sample)) + 
+        geom_line(position = position_dodge(width = 0.2), size = 1.2) +
+        geom_point(position = position_dodge(width = 0.2), size = 4)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), 
+                      position = position_dodge(width = 0.2), 
+                      width = 0.2, size = 1.2)+
+        theme_classic(base_size = 20)+
+        scale_x_discrete(labels = c("Baseline", "Post"))+
+        scale_color_discrete(labels = c("MYO+INT","MYO"))+
+        theme(axis.title.x = element_blank())
 
 
+Illumina_anno  %>% 
+        select(Name, 16, 21,22) %>% 
+        filter(UCSC_RefGene_Name == "WNT9A") %>% 
+        pull(cpg) -> x
 
+DMPs_PH_vs_BH %>% 
+        filter(cpg %in% x)
 
+DMPs_PM_vs_BM %>% 
+        filter(cpg %in% x) %>% 
+        merge(.,anno, by = "cpg")
 
-
-
-
-
-
-
-
-     
+anno %>% 
+        filter(UCSC_RefGene_Name %in% c("TNF", "DIF", "TNF-alpha", "TNFA", "TNFSF2", "TNLG1F"))
 ##############################################################################
 
 ### epigenetic age

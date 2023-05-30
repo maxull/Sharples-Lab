@@ -116,3 +116,84 @@ ihc2 %>%
                                      ymax = m+s, x = Timepoint),inherit.aes = FALSE, width = 0.2)+
         theme_classic()+
         theme(axis.title.x = element_blank())
+
+
+# t test on fCSA
+
+t.test(mean_fCSA~Timepoint, paired = TRUE, data = ihc) 
+
+# Load necessary libraries
+library(knitr)
+library(kableExtra)
+
+# Convert Timepoint to factor
+ihc$Timepoint <- as.factor(ihc$Timepoint)
+
+# Conduct t-test
+result <- t.test(mean_fCSA~Timepoint, paired = TRUE, data = ihc)
+
+# Calculate mean, standard deviation, and percent change for each time point
+baseline <- subset(ihc, Timepoint == "Baseline")
+post <- subset(ihc, Timepoint == "Post")
+
+mean_baseline <- round(mean(baseline$mean_fCSA), 2)
+sd_baseline <- round(sd(baseline$mean_fCSA), 2)
+
+mean_post <- round(mean(post$mean_fCSA), 2)
+sd_post <- round(sd(post$mean_fCSA), 2)
+
+percent_change <- round((mean_post - mean_baseline) / mean_baseline * 100, 2)
+
+# Create a data frame for the APA style table
+apa_table <- data.frame(
+        Timepoint = c("Baseline", "Post", "T-test Results"),
+        Mean = c(mean_baseline, mean_post, paste("t(", result$parameter, ") =", round(result$statistic, 2))),
+        SD = c(sd_baseline, sd_post, paste("p =", round(result$p.value, 4))),
+        PercentChange = c("", percent_change, ""),
+        stringsAsFactors = FALSE
+)
+
+# Create APA style table using kable
+kable(apa_table, format = "html", col.names = c("Timepoint", "Mean", "Standard Deviation", "Percent Change"),
+      align = c("l", "r", "r", "r")) %>%
+        kable_styling("striped", full_width = F)
+
+# Load necessary libraries
+library(knitr)
+library(kableExtra)
+
+# Convert Timepoint to factor
+ihc$Timepoint <- as.factor(ihc$Timepoint)
+
+
+
+     
+# Conduct t-test
+result <- t.test(myo_per_fiber~Timepoint, paired = TRUE, data = ihc)
+
+# Calculate mean, standard deviation, and percent change for each time point
+baseline <- subset(ihc, Timepoint == "Baseline")
+post <- subset(ihc, Timepoint == "Post")
+
+mean_baseline <- round(mean(baseline$myo_per_fiber), 2)
+sd_baseline <- round(sd(baseline$myo_per_fiber), 2)
+
+mean_post <- round(mean(post$myo_per_fiber), 2)
+sd_post <- round(sd(post$myo_per_fiber), 2)
+
+percent_change <- round((mean_post - mean_baseline) / mean_baseline * 100, 2)
+
+# Create a data frame for the APA style table
+apa_table <- data.frame(
+        Timepoint = c("Baseline", "Post", "T-test Results"),
+        Mean = c(mean_baseline, mean_post, paste("t(", result$parameter, ") =", round(result$statistic, 2))),
+        SD = c(sd_baseline, sd_post, paste("p =", round(result$p.value, 4))),
+        PercentChange = c("", percent_change, ""),
+        stringsAsFactors = FALSE
+)
+
+# Create APA style table using kable
+kable(apa_table, format = "html", col.names = c("Timepoint", "Mean", "Standard Deviation", "Percent Change"),
+      align = c("l", "r", "r", "r")) %>%
+        kable_styling("striped", full_width = F)
+

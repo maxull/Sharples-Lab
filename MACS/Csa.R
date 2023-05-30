@@ -40,8 +40,7 @@ df %>%
         geom_line(aes(group = FP))+
         geom_errorbar(aes(ymin = mean-sd,
                           ymax = mean+sd), width = 0.2)+
-        facet_grid(~muscle) %>% 
-        filter(muscle == "VL")-> df_vl
+        facet_grid(~muscle) 
 
                 
 # run t.test on change from T2 to T3
@@ -54,13 +53,13 @@ df %>%
         filter(muscle == "VL") -> df_vl
 
 df_vl %>% 
-        mutate(change = T3-T2) %>% pull(change) -> x
-        summarize(m = mean(change),
+        dplyr::mutate(change = T3-T2,
+               percent_change = change/T2) %>% pull(percent_change) -> x
+        dplyr::summarize(m = mean(change),
                   s = sd(change))
 
-mean(x)        
+mean(x)
 sd(x)
-
 
 # run a paired t-test on the T3 and T2 columns of the new dataframe
 t.test(df_vl$T3, df_vl$T2, paired = T)
@@ -105,7 +104,19 @@ csa_plot <- ggplot(data = mean_df2, aes(x = muscle, y = mean/100))+
               plot.title = element_text(size = 15),
               legend.position = "none")+
         labs(y = "% Change")
-        
+
+df %>% 
+        group_by(FP, timepoint, muscle) %>% 
+        summarise(mean = mean(cm2)) %>% 
+        pivot_wider(names_from = timepoint, values_from = mean) %>% 
+        mutate(baseline = (T1+T2)/2,
+               change = T3-baseline,
+               percent_change = (change/baseline)*100) %>% 
+        group_by(muscle) %>% 
+        summarise(m = mean(change),
+                  s = sd(change),
+                  m_p = mean(percent_change),
+                  s_p = sd(percent_change))
 
 ########################################################################
 
