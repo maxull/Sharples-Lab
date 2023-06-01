@@ -197,3 +197,53 @@ kable(apa_table, format = "html", col.names = c("Timepoint", "Mean", "Standard D
       align = c("l", "r", "r", "r")) %>%
         kable_styling("striped", full_width = F)
 
+
+
+########################################################################
+
+### load all nuclei/fiber data
+
+nuclei <- read_excel("C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/IHC/Max_totalnuclei summary.xlsx")
+
+nuclei
+
+ihc$nuc_per_fiber <- nuclei$`Total Nuclei (myovision extract)`
+
+ihc %>% 
+        mutate(int_per_fiber = nuc_per_fiber-myo_per_fiber) %>% 
+        dplyr::select(FP, Timepoint, myo_per_fiber, nuc_per_fiber, int_per_fiber) %>% 
+        pivot_longer(names_to = "Nuclei", values_to = "mean_per_fiber", cols = 3:5)  %>% 
+        group_by(Timepoint, Nuclei) %>% 
+        summarize(m = mean(mean_per_fiber),
+                  s = sd(mean_per_fiber)) %>% 
+        ggplot(aes(x = as.factor(Timepoint), y = m, group = Nuclei, color = Nuclei))+
+        geom_point(position = position_dodge(width = 0.2),color = "Black", size = 3)+
+        geom_line(position = position_dodge(width = 0.2), size = 2)+
+        geom_errorbar(aes(ymin = m-s, ymax = m+s), width = 0.2, position = position_dodge(width = 0.2)) + 
+        geom_point(data = ihc2, aes(x = Timepoint, y = mean_per_fiber, color = Nuclei, group = Nuclei), alpha = 0.8, position = position_dodge(width = 0.2))
+        geom_line(data = ihc2, aes(x = Timepoint, y = mean_per_fiber, color = Nuclei, group = as.factor(FP)), alpha = 0.8, position = position_dodge(width = 0.2))
+        
+
+
+ihc %>% 
+        mutate(int_per_fiber = nuc_per_fiber-myo_per_fiber,
+               mean_fCSA = mean_fCSA/1000) %>% 
+        mutate(myo_per_fiber = myo_per_fiber/mean_fCSA,
+               nuc_per_fiber = nuc_per_fiber/mean_fCSA,
+               int_per_fiber = int_per_fiber/mean_fCSA) %>% 
+        dplyr::select(FP, Timepoint, myo_per_fiber, nuc_per_fiber, int_per_fiber) %>% 
+        pivot_longer(names_to = "Nuclei", values_to = "mean_per_fiber", cols = 3:5) %>% 
+        group_by(Timepoint, Nuclei) %>% 
+        summarize(m = mean(mean_per_fiber),
+                  s = sd(mean_per_fiber)) %>% 
+        ggplot(aes(x = as.factor(Timepoint), y = m, group = Nuclei, color = Nuclei))+
+        geom_point(position = position_dodge(width = 0.2),color = "Black", size = 3)+
+        geom_line(position = position_dodge(width = 0.2), size = 2)+
+        geom_errorbar(aes(ymin = m-s, ymax = m+s), width = 0.2, position = position_dodge(width = 0.2)) + 
+        geom_point(data = ihc3, aes(x = Timepoint, y = mean_per_fiber, color = Nuclei, group = Nuclei), alpha = 0.8, position = position_dodge(width = 0.2))
+        
+
+
+
+
+

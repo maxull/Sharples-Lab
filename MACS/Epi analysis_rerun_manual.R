@@ -1080,13 +1080,12 @@ DMPs_PM_vs_BM %>%
                            labels = label_comma())+
         scale_x_continuous(n.breaks = 6)+
         geom_text_repel(aes(label = Gene), force = 2, max.overlaps = Inf, box.padding = 0.6, point.size = 2)+
-        theme_classic()+
+        theme_classic(base_size = 20)+
         theme(panel.grid.major.y = element_line(color = "red", 
                                                 size = 0.5,
                                                 linetype = 2),
               axis.title.x = element_blank())+
-        labs(title = "Myonuclei DMPs after 7 weeks of RT",
-             color = "delta_M",
+        labs(color = "delta M", shape = "Relation to CpG Island",
              y = "un-adj. P value")
 
 DMPs_PM_vs_BM %>% 
@@ -1105,15 +1104,30 @@ DMPs_PM_vs_BM %>%
         myo_int <- readRDS("DMPs_PH_vs_BH.RDATA")
         myo <- readRDS("DMPs_PM_vs_BM.RDATA")
         
-myo_int %>% 
-        filter(cpg %in% y) %>% 
-        mutate(sample = "MYO+INT") %>% 
-        rbind(., myo %>% filter(cpg %in% y) %>%  mutate(sample = "MYO"))
+myo %>% 
+        filter(cpg %in% x) %>% 
+        mutate(sample = "MYO") %>% 
+        rbind(., myo_int %>% filter(cpg %in% x) %>%  mutate(sample = "MYO_INT"))
+
+
+
+# MYO DMPS: hypo MYO - Hyper MYO+INT
+myo %>% 
+        filter(cpg %in% x) %>% 
+        mutate(sample = "MYO") %>% 
+        merge(., myo_int %>% filter(cpg %in% x) %>%  mutate(sample = "MYO+INT"), by = "cpg") %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(delta_M.x <0 & delta_M.y > 0) %>% pull(UCSC_RefGene_Name)
+
+# MYO DMPS: hyper MYO - Hypo MYO+INT
 
 myo %>% 
         filter(cpg %in% x) %>% 
         mutate(sample = "MYO") %>% 
-        rbind(., myo_int %>% filter(cpg %in% x) %>%  mutate(sample = "MYO+INT")) %>% merge(.,anno, by = "cpg")
+        merge(., myo_int %>% filter(cpg %in% x) %>%  mutate(sample = "MYO+INT"), by = "cpg") %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(delta_M.x >0 & delta_M.y < 0) %>% pull(UCSC_RefGene_Name)
+
 
 anno %>% 
         filter(cpg %in% x | cpg %in% y)
