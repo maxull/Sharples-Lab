@@ -4,6 +4,10 @@
 ###                                                                                      ###
 ############################################################################################
 
+
+#This script contains the majority of the analysis code for the master thesis of Max Ullrich
+
+
 library(cowplot)
 library(dendextend)
 library(ggpubr)
