@@ -259,3 +259,38 @@ d <- estimateTagwiseDisp(d)
 names(d)
 
 
+# use exact test to etimate difference between common and tag wise dispersion between genes ~ sex
+
+resEdgeR.common <- exactTest(d, pair = c("female" , "male"), dispersion = "common")
+
+
+resEdgeR.tagwise <- exactTest(d, pair = c("female" , "male"), dispersion = "tagwise")
+
+
+# get results
+
+topTags(resEdgeR.common)
+
+topTags(resEdgeR.tagwise)
+
+library(tidyverse)
+as.data.frame(resEdgeR.common$table) %>% 
+        mutate(FDR = p.adjust(PValue, method = "fdr")) %>% 
+        filter(FDR <=0.05) %>% 
+        arrange(FDR) %>%  rownames() -> common
+
+as.data.frame(resEdgeR.tagwise$table) %>% 
+        mutate(FDR = p.adjust(PValue, method = "fdr")) %>% 
+        filter(FDR <=0.05) %>% 
+        arrange(FDR) %>%  rownames() -> tagwise      
+
+# check overlap between common and tagwise genes
+
+df <- list(common = common, 
+           tagwise = tagwise)
+
+library(ggvenn)
+
+ggvenn(df)
+
+
