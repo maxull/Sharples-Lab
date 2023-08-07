@@ -259,7 +259,7 @@ d <- estimateTagwiseDisp(d)
 names(d)
 
 
-# use exact test to etimate difference between common and tag wise dispersion between genes ~ sex
+# use exact test to estimate difference between common and tag wise dispersion between genes ~ sex
 
 resEdgeR.common <- exactTest(d, pair = c("female" , "male"), dispersion = "common")
 
@@ -294,3 +294,35 @@ library(ggvenn)
 ggvenn(df)
 
 
+# add gene symbol name to differential gene expressions 
+
+
+# get ensembl and gene names
+
+ensembl <- useEnsembl(biomart = "genes")
+
+
+ensembl.con <- useMart("ensembl", dataset = 'hsapiens_gene_ensembl')
+
+gene_ids <- getBM(attributes = c('ensembl_gene_id', 'external_gene_name'), mart = ensembl.con) 
+
+colnames(gene_ids) <- c("ENTREZID", "GENE_NAME")
+        
+
+
+# merge dataframes
+
+as.data.frame(resEdgeR.common$table) %>% 
+        mutate(FDR = p.adjust(PValue, method = "fdr")) %>% 
+        filter(FDR <=0.05) %>%
+        rownames_to_column(var = "ENTREZID") %>% 
+        merge(., gene_ids, by = "ENTREZID") %>% 
+        arrange(-abs(logFC)) 
+        
+
+as.data.frame(resEdgeR.tagwise$table) %>% 
+        mutate(FDR = p.adjust(PValue, method = "fdr")) %>% 
+        filter(FDR <=0.05) %>%
+        rownames_to_column(var = "ENTREZID") %>% 
+        merge(., gene_ids, by = "ENTREZID") %>% 
+        arrange(-abs(logFC)) 
