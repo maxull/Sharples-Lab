@@ -92,7 +92,7 @@ plotDensities(exprs(GSE28422_eset), legend = FALSE)
 # plot pca
 
 
-pca.out <- prcomp(t(exprs(GSE28422_eset)), scale. = FALSE)
+pca.out <- prcomp(t(log2(exprs(GSE28422_eset))), scale. = FALSE)
 
 # check proportion of variability explained by pca 1-50
 
@@ -158,7 +158,7 @@ metadata_GSE28422 %>%
         mutate(timepoint = ifelse(`training state:ch1`== "Untrained", "Pre", "Post")) %>% 
         dplyr::select(timepoint, description.1) %>% 
         mutate(FP = sapply(strsplit(description.1, split = "_"),"[", 6)) %>% 
-        dplyr::select(timepoint, FP)  -> df
+        dplyr::select(timepoint, FP)  ->  df
         
 
 FP <- factor(df$FP)
