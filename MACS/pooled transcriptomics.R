@@ -31,6 +31,8 @@ library(limma)
 library(Biobase)
 library(biomaRt)
 library(tweeDEseq)
+library(affy)
+
 
 # set working directory to a local, and not github connected folder
 
@@ -39,8 +41,37 @@ setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptom
 # get raw data and pheno data from GEO
 
 
+
+
+#
+
+
+# annotate affymetrix probes
+
+mart <- useMart("ENSEMBL_MART_ENSEMBL")
+
+mart <- useDataset("hsapiens_gene_ensembl", mart)
+
+annotLookup <- getBM(
+        mart=mart,
+        attributes=c(
+                "affy_hg_u133_plus_2",
+                "ensembl_gene_id",
+                "gene_biotype",
+                "external_gene_name"),
+        filter = "affy_hg_u133_plus_2",
+        values = rownames(GSE47881_exprs))
+
+
+#################################################################################################
+
+
 # study 1 https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE28422
 # Raue et al. (2012)
+
+#################################################################################################
+
+
 
 GSE28422 <- getGEO(GEO = "GSE28422", GSEMatrix = TRUE)
 
@@ -71,7 +102,6 @@ cel_files <- list.files("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/P
            full.names = TRUE, 
            pattern = "*.CEL")
 
-library(affy)
 
 # read data GSE28422
 
@@ -199,53 +229,70 @@ GSE28422_res %>%
 
 
 
+#################################################################################################
 
-# annotate probes
+# study 2 https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE47881
+# Phillips et al. (2013)
 
-mart <- useMart("ENSEMBL_MART_ENSEMBL")
-
-mart <- useDataset("hsapiens_gene_ensembl", mart)
-
-annotLookup <- getBM(
-        mart=mart,
-        attributes=c(
-                "affy_hg_u133_plus_2",
-                "ensembl_gene_id",
-                "gene_biotype",
-                "external_gene_name"),
-        filter = "affy_hg_u133_plus_2",
-        values = rownames(GSE28422_exprs))
+#################################################################################################
 
 
-# there are less annotated "gene name", so will use ensmbl id for now
+# get metadata
 
-# remove .CEL from colnames
+GSE47881 <- getGEO(GEO = "GSE47881", GSEMatrix = TRUE)
 
-names(pm) <- gsub(pattern = ".CEL", replacement = "", names(pm))
-
-
+metadata_GSE47881 <- pData(phenoData(GSE47881[[1]]))
 
 
-# filter GSE28422 for low read counts
+# have to manually download raw data
 
-GSE28422.f <- filterCounts(pm,
-                           cpm.cutoff = 0.5,
-                           n.samples.cutoff = 2,
-                           mean.cpm.cutoff = 0)
+# untar the file and save in directory
 
+untar(tarfile = "/Users/maxul/Downloads/GSE47881_RAW.tar",
+      exdir = "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptomics/GSE47881")
 
-# normalize 
+# unpack .gz files
 
-scaled <- scale(GSE28422.f, scale = FALSE)
+# get list of files
 
-plotDensities(object = scaled, legend = FALSE)
-
+gz_files <- list.files("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptomics/GSE47881", full.names = TRUE)
 
 
+for (i in 1:length(gz_files)) {
+        gunzip(filename = gz_files[i], remove = TRUE)
+        print(i)
+}
 
-# run PCA
+# list .CEL files
 
-pca.out <- prcomp(t(GSE28422.f), scale. = TRUE)
+cel_files <- list.files("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptomics/GSE47881", 
+                        full.names = TRUE, 
+                        pattern = "*.CEL")
+
+
+# read data GSE28422
+
+GSE47881_raw <- read.affybatch(cel_files)
+
+
+GSE47881_eset <- expresso(GSE47881_raw,
+                          bg.correct = TRUE, bgcorrect.method = "rma",               # RMA is background correct method correcting probe intensities by a global method
+                          normalize.method = "quantiles",
+                          pmcorrect.method = "pmonly",
+                          summary.method = "avgdiff")                               # computed average
+
+
+# create expression dataframe
+
+exprs(GSE47881_eset)
+
+plotDensities(log2(exprs(GSE47881_eset)), legend = FALSE)
+
+
+# plot pca
+
+
+pca.out <- prcomp(t(log2(exprs(GSE47881_eset))), scale. = FALSE)
 
 # check proportion of variability explained by pca 1-50
 
@@ -280,7 +327,7 @@ distances <- mahalanobis(pca.out$x[,1:2], colMeans(pca.out$x[,1:2]), cov(pca.out
 outliers <- which(distances > qchisq(0.975, df = 3))
 
 # Print the row names of the outliers
-print(colnames(GSE28422.f)[outliers])
+print(colnames(exprs(GSE47881_eset))[outliers])
 
 # Plot the first two principal components, highlighting the outliers
 library(ggplot2)
@@ -291,16 +338,57 @@ ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
         labs(x = "PC1", y = "PC2", title = "First Two Principal Components with Outliers Highlighted")
 
 
-GSE28422.ff <- GSE28422.f[,!(colnames(NormByCQN.f) %in% names(outliers))]
+# no outliers in GSE47881
+
+GSE47881_exprs <- log2(exprs(GSE47881_eset))
+
+
+# clean up col names/sample IDs så they are just the GSM kode
+
+colnames(GSE47881_exprs) <- sapply(strsplit(colnames(GSE47881_exprs), split = "_"), "[", 1)
 
 
 
-# study 2 https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE47881
-# Phillips et al. (2013)
+# identify pre-post samples
+
+metadata_GSE47881 %>% 
+        mutate(age = as.numeric(`age:ch1`),
+               FP = `patientid:ch1`,
+               timepoint = ifelse(`time:ch1` == "pre-training", "Pre", "Post")) %>% 
+        dplyr::select(FP, timepoint, age) %>% 
+        filter(age < 35, FP != "NB021")->  df
+
+# create designmatrix for ebayes model
+
+FP <- factor(df$FP)
+timepoint <- factor(df$timepoint, levels = c("Pre", "Post"))
+
+
+design <- model.matrix(~FP+timepoint)
 
 
 
+GSE47881_exprs %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(df)) %>% 
+        lmFit(., design) -> fit
 
+
+fit <- eBayes(fit)
+
+
+
+GSE47881_res <- topTable(fit, coef = "timepointPost",number = Inf) %>% 
+        filter(P.Value < 0.05) %>% 
+        rownames_to_column(var = "affy_hg_u133_plus_2") %>% 
+        merge(.,annotLookup, by = "affy_hg_u133_plus_2") %>% 
+        arrange(-abs(logFC)) 
+
+GSE47881_res[!duplicated(GSE47881_res$logFC),]
+
+
+GSE28422_res %>% 
+        distinct(affy_hg_u133_plus_2, logFC, .keep_all = TRUE) 
 
 
 
