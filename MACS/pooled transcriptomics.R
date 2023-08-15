@@ -392,3 +392,258 @@ GSE28422_res %>%
 
 
 
+
+
+#################################################################################################
+
+
+# study 3 https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi
+# Bamman et al. 2007 / Thalacker-Mercer et al. 2013
+
+#################################################################################################
+
+
+
+GSE42507 <- getGEO(GEO = "GSE42507", GSEMatrix = TRUE)
+
+metadata_GSE42507 <- pData(phenoData(GSE42507[[1]]))
+
+
+
+write.csv(metadata_GSE42507, file = "/Users/maxul/Downloads/GSE42507.csv")
+
+
+# there was only baseline data in GEO, waiting for answer from Dan/Adam incase there is pre-post data
+
+
+
+
+#################################################################################################
+
+
+# MetaMex studies
+
+# GSE24235 # post is 24h after acute RT, so will skip this one
+# GSE28422 # already done
+# GSE28422 # already done
+# GSE28998 # baseline and post samples are 4h post acute exercise, so will skip this one
+# EMEXP740
+# GSE106865
+# GSE106865
+# GSE106865
+# GSE8479
+
+#################################################################################################
+
+
+
+
+#################################################################################################
+
+#metamex 1: GSE24235
+
+#################################################################################################
+
+
+
+GSE24235 <- getGEO(GEO = "GSE24235", GSEMatrix = TRUE)
+
+metadata_GSE24235 <- pData(phenoData(GSE24235[[1]]))
+
+# post is 24h after acute RT, so will skip this one
+
+
+
+#################################################################################################
+
+#metamex 4: GSE28998
+
+#################################################################################################
+
+
+
+GSE28998 <- getGEO(GEO = "GSE28998", GSEMatrix = TRUE)
+
+metadata_GSE28998 <- pData(phenoData(GSE28998[[1]]))
+
+# baseline and post samples are 4h post acute exercise, so will skip this one
+
+
+
+#################################################################################################
+
+#metamex 5: GSE106865
+
+#################################################################################################
+
+
+
+GSE106865 <- getGEO(GEO = "GSE106865", GSEMatrix = TRUE)
+
+metadata_GSE106865 <- pData(phenoData(GSE106865[[1]]))
+
+
+# read raw .idat files
+
+
+untar("/Users/maxul/Downloads/GSE106865_RAW.tar", exdir = "./GSE106865/")
+
+files <- list.files("./GSE106865/", full.names = TRUE)
+
+for (i in 1:length(files)) {
+        gunzip(filename = files[i], remove = TRUE)
+        print(i)
+        
+}
+
+idat_files <- list.files("./GSE106865/", pattern = "*.idat", full.names = TRUE)
+
+GSE106865_idat <- read.idat(idat_files, bgxfile = "HumanHT-12_V4_0_R2_15002873_B.bgx", bgxpath = "/Users/maxul/Downloads/")
+
+
+GSE106865_idat$E %>% colnames() -> x
+        sapply(strsplit(x, split = "/"),"[", 3) -> x
+                sapply(strsplit(x, split = "_"),"[",1)  -> names
+
+
+colnames(GSE106865_idat$E) <- names
+
+GSE106865_exprs <-  neqc(GSE106865_idat)  # normalize and background correct expression values, and log2 transformed
+
+
+GSE106865_exprs$E
+
+
+
+
+
+
+
+plotDensities(GSE106865_exprs$E, legend = FALSE)
+
+
+# plot pca
+
+
+pca.out <- prcomp(t(GSE106865_exprs$E), scale. = FALSE)
+
+# check proportion of variability explained by pca 1-50
+
+# Extract the proportion of variance explained by each principal component
+var_explained <- pca.out$sdev^2 / sum(pca.out$sdev^2)
+
+# Create a data frame for plotting
+df <- data.frame(Component = 1:length(var_explained), Variance = var_explained)
+
+# Keep only the first 50 principal components
+df <- df[1:50,]
+
+# Plot
+library(ggplot2)
+ggplot(df, aes(x = Component, y = Variance)) +
+        geom_bar(stat = "identity") +
+        scale_x_continuous(breaks = 1:50) +
+        labs(x = "Principal Component", y = "Proportion of Variance Explained",
+             title = "Variance Explained by Principal Components")
+
+
+plot(pca.out$x[,1:2])
+
+
+# check for outliers
+
+# Compute Mahalanobis distances for the first two principal components
+distances <- mahalanobis(pca.out$x[,1:2], colMeans(pca.out$x[,1:2]), cov(pca.out$x[,1:2]))
+
+# Identify outliers as samples with a Mahalanobis distance greater than a certain threshold
+# Here, I'm using the 97.5 percentile of the Chi-square distribution with 3 degrees of freedom as the threshold
+outliers <- which(distances > qchisq(0.975, df = 3))
+
+# Print the row names of the outliers
+print(colnames(GSE106865_exprs$E)[outliers])
+
+# Plot the first two principal components, highlighting the outliers
+library(ggplot2)
+library(ggrepel)
+ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
+        geom_point() +
+        geom_text_repel(data = data.frame(pca.out$x)[outliers,], aes(label = rownames(data.frame(pca.out$x))[outliers])) +
+        labs(x = "PC1", y = "PC2", title = "First Two Principal Components with Outliers Highlighted")
+
+
+# remove outliers
+
+GSE28422_exprs <- log2(exprs(GSE28422_eset))
+
+GSE106865_exprs.f <- GSE106865_exprs$E[,!(colnames(GSE106865_exprs$E) %in% names(outliers))]
+
+
+
+pca.out <- prcomp(t(GSE106865_exprs.f), scale. = FALSE)
+
+plot(pca.out$x[,1:2])
+
+
+
+# get the GSM's for pre post samples
+
+metadata_GSE106865 %>% 
+        dplyr::select(1) %>% 
+        mutate(FP = paste("FP", sapply(strsplit(title, split = "_"), "[", 5), sep = ""),
+               timepoint = sapply(strsplit(title, split = "_"), "[", 7),
+               timepoint = ifelse(timepoint == "pre", "Pre", "Post"),
+               trainingstatus = sapply(strsplit(title, split = "_"), "[", 6)) %>% 
+        filter(timepoint == "Pre") %>% 
+        mutate(timepoint = factor(ifelse(trainingstatus == "untrained", "Pre", "Post"), levels = c("Pre", "Post"))) %>%
+        dplyr::select(2,3) -> df
+
+
+
+
+
+
+
+FP <- factor(df$FP)
+timepoint <- factor(df$timepoint, levels = c("Pre", "Post"))
+
+
+design <- model.matrix(~FP+timepoint)
+
+
+GSE106865_exprs$E %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(df)) %>% 
+        lmFit(., design) -> fit
+
+
+fit <- eBayes(fit)
+
+
+
+GSE106865_res <- topTable(fit, coef = "timepointPost",number = Inf, adjust.method = "BH") %>% 
+        filter(P.Value < 0.05) %>%  
+        arrange(-abs(logFC)) 
+
+
+# annotate illumina identifyers to gene name and ensembl
+
+BiocManager::install("illuminaHumanv4.db")
+
+library(illuminaHumanv4.db)
+
+GSE106865_res %>% 
+        rownames_to_column(var = "Ilmn_ID") %>% 
+        mutate(Gene = mget(Ilmn_ID, envir = illuminaHumanv4SYMBOL))
+
+
+df = data.frame(Gene=unlist(mget(x = paste("ILMN_",rownames(GSE106865_res), sep = ""),envir = illuminaHumanv4ENSEMBL, ifnotfound = NA))) %>% unique()
+
+help('select')
+
+
+# to do 
+
+# annotate illumina ids correctly! Current method returned only 18 unique Ids out of >4000 diff expressed genes
+
+
+
