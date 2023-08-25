@@ -23,6 +23,9 @@
 
 #       step 3: identify genes of interest, and confim differential gene expression by qPCR
 
+BiocManager::install("GEOquery")
+
+
 
 library(GEOquery)
 library(tidyverse)
@@ -32,7 +35,8 @@ library(Biobase)
 library(biomaRt)
 library(tweeDEseq)
 library(affy)
-
+library(ggplot2)
+library(ggrepel)
 
 # set working directory to a local, and not github connected folder
 
@@ -136,7 +140,7 @@ df <- data.frame(Component = 1:length(var_explained), Variance = var_explained)
 df <- df[1:50,]
 
 # Plot
-library(ggplot2)
+
 ggplot(df, aes(x = Component, y = Variance)) +
         geom_bar(stat = "identity") +
         scale_x_continuous(breaks = 1:50) +
@@ -160,8 +164,7 @@ outliers <- which(distances > qchisq(0.975, df = 3))
 print(colnames(exprs(GSE28422_eset))[outliers])
 
 # Plot the first two principal components, highlighting the outliers
-library(ggplot2)
-library(ggrepel)
+
 ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
         geom_point() +
         geom_text_repel(data = data.frame(pca.out$x)[outliers,], aes(label = rownames(data.frame(pca.out$x))[outliers])) +
@@ -306,7 +309,7 @@ df <- data.frame(Component = 1:length(var_explained), Variance = var_explained)
 df <- df[1:50,]
 
 # Plot
-library(ggplot2)
+
 ggplot(df, aes(x = Component, y = Variance)) +
         geom_bar(stat = "identity") +
         scale_x_continuous(breaks = 1:50) +
@@ -330,8 +333,7 @@ outliers <- which(distances > qchisq(0.975, df = 3))
 print(colnames(exprs(GSE47881_eset))[outliers])
 
 # Plot the first two principal components, highlighting the outliers
-library(ggplot2)
-library(ggrepel)
+
 ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
         geom_point() +
         geom_text_repel(data = data.frame(pca.out$x)[outliers,], aes(label = rownames(data.frame(pca.out$x))[outliers])) +
@@ -539,7 +541,7 @@ df <- data.frame(Component = 1:length(var_explained), Variance = var_explained)
 df <- df[1:50,]
 
 # Plot
-library(ggplot2)
+
 ggplot(df, aes(x = Component, y = Variance)) +
         geom_bar(stat = "identity") +
         scale_x_continuous(breaks = 1:50) +
@@ -563,8 +565,7 @@ outliers <- which(distances > qchisq(0.975, df = 3))
 print(colnames(GSE106865_exprs$E)[outliers])
 
 # Plot the first two principal components, highlighting the outliers
-library(ggplot2)
-library(ggrepel)
+
 ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
         geom_point() +
         geom_text_repel(data = data.frame(pca.out$x)[outliers,], aes(label = rownames(data.frame(pca.out$x))[outliers])) +
@@ -631,19 +632,26 @@ BiocManager::install("illuminaHumanv4.db")
 
 library(illuminaHumanv4.db)
 
+illumina_keys <- as.data.frame(illuminaHumanv4ENSEMBLREANNOTATED)
+
 GSE106865_res %>% 
-        rownames_to_column(var = "Ilmn_ID") %>% 
-        mutate(Gene = mget(Ilmn_ID, envir = illuminaHumanv4SYMBOL))
+        mutate(IlluminaID = paste("ILMN_",rownames(GSE106865_res), sep = "")) %>% 
+        merge(.,illumina_keys, by = "IlluminaID")
 
 
-df = data.frame(Gene=unlist(mget(x = paste("ILMN_",rownames(GSE106865_res), sep = ""),envir = illuminaHumanv4ENSEMBL, ifnotfound = NA))) %>% unique()
-
-help('select')
 
 
-# to do 
 
-# annotate illumina ids correctly! Current method returned only 18 unique Ids out of >4000 diff expressed genes
+# annotate with older package based on https://doi.org/10.1093/nar/gkp942
+
+BiocManager::install("illuminaHumanv4BeadID.db")
+library(illuminaHumanv2BeadID.db)
 
 
+x <- as.data.frame(illuminaHumanv2BeadIDENSEMBL)
+
+
+GSE106865_res %>% 
+        mutate(probe_id = rownames(GSE106865_res)) %>% 
+        merge(.,x, by = "probe_id")
 
