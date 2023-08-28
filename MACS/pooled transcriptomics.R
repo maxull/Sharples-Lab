@@ -430,10 +430,8 @@ write.csv(metadata_GSE42507, file = "/Users/maxul/Downloads/GSE42507.csv")
 # GSE28422 # already done
 # GSE28998 # baseline and post samples are 4h post acute exercise, so will skip this one
 # EMEXP740
-# GSE106865
-# GSE106865
-# GSE106865
-# GSE8479
+# GSE106865 # done
+# GSE8479 
 
 #################################################################################################
 
@@ -654,4 +652,221 @@ x <- as.data.frame(illuminaHumanv2BeadIDENSEMBL)
 GSE106865_res %>% 
         mutate(probe_id = rownames(GSE106865_res)) %>% 
         merge(.,x, by = "probe_id")
+
+
+#################################################################################################
+
+#metamex 6: GSE8479
+
+#################################################################################################
+
+
+GSE8479 <- getGEO(GEO = "GSE8479", GSEMatrix = TRUE)
+
+metadata_GSE8479 <- pData(phenoData(GSE8479[[1]]))
+
+
+
+
+GSE8479_csv <- read.csv("/Users/maxul/Downloads/GSE8479_NonNormalizedMelovetalCoded.csv")
+
+# format csv data for normalization and background correction with neqc function
+
+exprs <- as.matrix(GSE8479_csv[,grep("AVG_Signal", colnames(GSE8479_csv))])
+
+detP <- as.matrix(GSE8479_csv[,grep("Detection.Pval", colnames(GSE8479_csv))])
+
+
+GSE8479_exprs <- neqc(exprs, detection.p = detP)
+
+rownames(GSE8479_exprs) <- GSE8479_csv[,3] 
+
+
+plotDensities(GSE8479_exprs, legend = FALSE)
+
+
+
+
+
+
+
+# plot pca
+
+
+pca.out <- prcomp(t(GSE8479_exprs), scale. = FALSE)
+
+# check proportion of variability explained by pca 1-50
+
+# Extract the proportion of variance explained by each principal component
+var_explained <- pca.out$sdev^2 / sum(pca.out$sdev^2)
+
+# Create a data frame for plotting
+df <- data.frame(Component = 1:length(var_explained), Variance = var_explained)
+
+# Keep only the first 50 principal components
+df <- df[1:50,]
+
+# Plot
+
+ggplot(df, aes(x = Component, y = Variance)) +
+        geom_bar(stat = "identity") +
+        scale_x_continuous(breaks = 1:50) +
+        labs(x = "Principal Component", y = "Proportion of Variance Explained",
+             title = "Variance Explained by Principal Components")
+
+
+plot(pca.out$x[,1:2])
+
+
+# check for outliers
+
+# Compute Mahalanobis distances for the first two principal components
+distances <- mahalanobis(pca.out$x[,1:2], colMeans(pca.out$x[,1:2]), cov(pca.out$x[,1:2]))
+
+# Identify outliers as samples with a Mahalanobis distance greater than a certain threshold
+# Here, I'm using the 97.5 percentile of the Chi-square distribution with 3 degrees of freedom as the threshold
+outliers <- which(distances > qchisq(0.975, df = 3))
+
+# Print the row names of the outliers
+print(colnames(GSE8479_exprs)[outliers])
+
+# Plot the first two principal components, highlighting the outliers
+
+ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
+        geom_point() +
+        geom_text_repel(data = data.frame(pca.out$x)[outliers,], aes(label = rownames(data.frame(pca.out$x))[outliers])) +
+        labs(x = "PC1", y = "PC2", title = "First Two Principal Components with Outliers Highlighted")
+
+
+
+# weird pca plot results (clustering) 
+
+# label samples to check for patterns
+
+
+
+
+
+
+ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
+        geom_point() +
+        geom_text_repel(data = data.frame(pca.out$x), aes(label = rownames(data.frame(pca.out$x)))) +
+        labs(x = "PC1", y = "PC2", title = "First Two Principal Components with Outliers Highlighted")
+
+
+# post exercise is clusterd together... 
+
+
+metadata_GSE8479 <- metadata_GSE8479 %>% 
+        mutate(ID = sapply(strsplit(title, split =  " "), "[", 3)) %>% 
+        mutate(timepoint = ifelse((grepl("EB", ID)), "Post", "Pre")) %>%  
+        mutate(ID = gsub("EB", "", ID))
+
+# get ID of post samples
+
+metadata_GSE8479 %>% 
+        filter(timepoint == "Post") %>% 
+        pull(ID) -> x
+
+metadata_GSE8479 %>% 
+        filter(ID %in% x) %>% rownames()-> z
+
+
+# relabel expression set to GSM code
+
+
+metadata_GSE8479 %>% 
+        mutate(ID = sapply(strsplit(title, split =  " "), "[", 3)) -> df
+
+
+colnames(GSE8479_exprs) %>% 
+        as.data.frame() %>% 
+        mutate(ID = gsub("AVG_Signal", "", .),
+               ID = gsub("\\.", "", ID)) %>% 
+        merge(df, ., by = "ID") %>% 
+        dplyr::select(geo_accession,"colnames(GSE8479_exprs)"  = ".") %>% 
+        merge(as.data.frame(colnames(GSE8479_exprs)), ., by = "colnames(GSE8479_exprs)") -> df2
+        
+
+
+# Assuming your first dataframe is named df2
+new_colnames <- df2$geo_accession[match(colnames(GSE8479_exprs), df2$'colnames(GSE8479_exprs)')]
+
+# Rename the columns of GSE8479_exprs
+colnames(GSE8479_exprs) <- new_colnames
+
+
+
+# keep only pre-post samples
+
+GSE8479_exprs.f <- GSE8479_exprs[,z]
+
+
+# rerun pca on only pre-post samples
+
+
+pca.out <- prcomp(t(GSE8479_exprs.f), scale. = FALSE)
+
+plot(pca.out$x[,1:2])
+
+
+        
+
+
+FP <- factor(metadata_GSE8479[z,]$ID)
+timepoint <- factor(metadata_GSE8479[z,]$timepoint, levels = c("Pre", "Post"))
+
+
+design <- model.matrix(~FP+timepoint)
+
+
+GSE8479_exprs.f %>% 
+        as.data.frame() %>% 
+        lmFit(., design) -> fit
+
+
+fit <- eBayes(fit)
+
+
+
+GSE8479_res <- topTable(fit, coef = "timepointPost",number = Inf, adjust.method = "BH") %>% 
+        filter(P.Value < 0.05) %>%  
+        arrange(-abs(logFC)) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
