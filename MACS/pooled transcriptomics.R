@@ -66,6 +66,8 @@ annotLookup <- getBM(
         filter = "affy_hg_u133_plus_2",
         values = rownames(GSE47881_exprs))
 
+saveRDS(annotLookup, file = "./annotLookup.RDATA")
+
 
 #################################################################################################
 
@@ -219,7 +221,7 @@ GSE28422_res <- topTable(fit, coef = "timepointPost",number = Inf) %>%
         merge(.,annotLookup, by = "affy_hg_u133_plus_2") %>% 
         arrange(-abs(logFC)) 
 
-GSE28422_res[!duplicated(GSE28422_res$logFC),]
+GSE28422_res.f <- GSE28422_res[!duplicated(GSE28422_res$logFC),]
 
 
 GSE28422_res %>% 
@@ -229,7 +231,7 @@ GSE28422_res %>%
 
 
 
-
+saveRDS(GSE28422_res.f, file = "./GSE28422_res.f.RDATA")
 
 
 #################################################################################################
@@ -386,14 +388,13 @@ GSE47881_res <- topTable(fit, coef = "timepointPost",number = Inf) %>%
         merge(.,annotLookup, by = "affy_hg_u133_plus_2") %>% 
         arrange(-abs(logFC)) 
 
-GSE47881_res[!duplicated(GSE47881_res$logFC),]
-
-
-GSE28422_res %>% 
-        distinct(affy_hg_u133_plus_2, logFC, .keep_all = TRUE) 
+GSE47881_res.f <- GSE47881_res[!duplicated(GSE47881_res$logFC),]
 
 
 
+
+
+saveRDS(GSE47881_res.f, file = "./GSE47881_res.f.RDATA")
 
 
 #################################################################################################
@@ -425,13 +426,13 @@ write.csv(metadata_GSE42507, file = "/Users/maxul/Downloads/GSE42507.csv")
 
 # MetaMex studies
 
-# GSE24235 # post is 24h after acute RT, so will skip this one
+# GSE24235 # post is 24h after acute RT, but will include
 # GSE28422 # already done
 # GSE28422 # already done
 # GSE28998 # baseline and post samples are 4h post acute exercise, so will skip this one
 # EMEXP740
 # GSE106865 # done
-# GSE8479 
+# GSE8479 # done (only older subjects have pre-post samples)
 
 #################################################################################################
 
@@ -450,7 +451,172 @@ GSE24235 <- getGEO(GEO = "GSE24235", GSEMatrix = TRUE)
 
 metadata_GSE24235 <- pData(phenoData(GSE24235[[1]]))
 
-# post is 24h after acute RT, so will skip this one
+
+
+
+
+# untar the file and save in directory
+
+untar(tarfile = "/Users/maxul/Downloads/GSE24235_RAW.tar",
+      exdir = "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptomics/GSE24235")
+
+# unpack .gz files
+
+# get list of files
+
+gz_files <- list.files("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptomics/GSE24235", full.names = TRUE)
+
+
+for (i in 1:length(gz_files)) {
+        gunzip(filename = gz_files[i], remove = TRUE)
+        print(i)
+}
+
+# list .CEL files
+
+cel_files <- list.files("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptomics/GSE24235", 
+                        full.names = TRUE, 
+                        pattern = "*.CEL")
+
+
+# read data GSE28422
+
+GSE24235_raw <- read.affybatch(cel_files)
+
+
+GSE24235_eset <- expresso(GSE24235_raw,
+                          bg.correct = TRUE, bgcorrect.method = "rma",               # RMA is background correct method correcting probe intensities by a global method
+                          normalize.method = "quantiles",
+                          pmcorrect.method = "pmonly",
+                          summary.method = "avgdiff")                               # computed average
+
+
+# create expression dataframe
+
+exprs(GSE24235_eset)
+
+plotDensities(log2(exprs(GSE24235_eset)), legend = FALSE)
+
+
+# plot pca
+
+
+pca.out <- prcomp(t(log2(exprs(GSE24235_eset))), scale. = FALSE)
+
+# check proportion of variability explained by pca 1-50
+
+# Extract the proportion of variance explained by each principal component
+var_explained <- pca.out$sdev^2 / sum(pca.out$sdev^2)
+
+# Create a data frame for plotting
+df <- data.frame(Component = 1:length(var_explained), Variance = var_explained)
+
+# Keep only the first 50 principal components
+df <- df[1:50,]
+
+# Plot
+
+ggplot(df, aes(x = Component, y = Variance)) +
+        geom_bar(stat = "identity") +
+        scale_x_continuous(breaks = 1:50) +
+        labs(x = "Principal Component", y = "Proportion of Variance Explained",
+             title = "Variance Explained by Principal Components")
+
+
+plot(pca.out$x[,1:2])
+
+
+# check for outliers
+
+# Compute Mahalanobis distances for the first two principal components
+distances <- mahalanobis(pca.out$x[,1:2], colMeans(pca.out$x[,1:2]), cov(pca.out$x[,1:2]))
+
+# Identify outliers as samples with a Mahalanobis distance greater than a certain threshold
+# Here, I'm using the 97.5 percentile of the Chi-square distribution with 3 degrees of freedom as the threshold
+outliers <- which(distances > qchisq(0.975, df = 3))
+
+# Print the row names of the outliers
+print(colnames(exprs(GSE24235_eset))[outliers])
+
+# Plot the first two principal components, highlighting the outliers
+
+ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
+        geom_point() +
+        geom_text_repel(data = data.frame(pca.out$x)[outliers,], aes(label = rownames(data.frame(pca.out$x))[outliers])) +
+        labs(x = "PC1", y = "PC2", title = "First Two Principal Components with Outliers Highlighted")
+
+
+# no outliers in GSE24235
+
+GSE24235_exprs <- log2(exprs(GSE24235_eset))
+
+
+# clean up col names/sample IDs så they are just the GSM kode
+
+colnames(GSE24235_exprs) <- gsub(".CEL", "", colnames(GSE24235_exprs))
+
+
+sapply(strsplit(colnames(GSE24235_exprs), split = "."), "[", 1)
+
+
+
+# identify pre-post samples
+
+metadata_GSE24235 %>% 
+        mutate(FP = sapply(strsplit(title, split = "_"),"[", 3),
+               FP = paste("FP", substr(FP, start = 1, stop = 4))) %>% 
+        mutate(timepoint = ifelse(`condition:ch1` == "24h post acute resistance exercise following 12-week resistance training",
+                                  "Post", ifelse(`condition:ch1` == "resting", "Pre", "4h"))) %>% 
+        filter(timepoint != "4h") %>% 
+        group_by(FP) %>% 
+        filter(any(timepoint == "Pre") & any(timepoint == "Post")) %>% 
+        ungroup() %>% 
+        dplyr::select(geo_accession, FP, timepoint) -> df
+        
+        
+
+
+# create designmatrix for ebayes model
+
+FP <- factor(df$FP)
+timepoint <- factor(df$timepoint, levels = c("Pre", "Post"))
+
+
+design <- model.matrix(~FP+timepoint)
+
+
+
+GSE24235_exprs %>% 
+        as.data.frame() %>% 
+        dplyr::select(df$geo_accession) %>% 
+        lmFit(., design) -> fit
+
+
+fit <- eBayes(fit)
+
+
+
+GSE24235_res <- topTable(fit, coef = "timepointPost",number = Inf) %>% 
+        filter(P.Value < 0.05) %>% 
+        rownames_to_column(var = "affy_hg_u133_plus_2") %>% 
+        merge(.,annotLookup, by = "affy_hg_u133_plus_2") %>% 
+        arrange(-abs(logFC)) 
+
+GSE24235_res.f <- GSE24235_res[!duplicated(GSE24235_res$logFC),]
+
+
+
+
+
+
+saveRDS(GSE24235_res.f, file = "./GSE24235_res.f.RDATA")
+
+
+
+
+
+
+
 
 
 
@@ -646,17 +812,20 @@ BiocManager::install("illuminaHumanv4BeadID.db")
 library(illuminaHumanv2BeadID.db)
 
 
-x <- as.data.frame(illuminaHumanv2BeadIDENSEMBL)
+x <- as.data.frame(illuminaHumanv2BeadIDALIAS2PROBE)
 
 
 GSE106865_res %>% 
         mutate(probe_id = rownames(GSE106865_res)) %>% 
-        merge(.,x, by = "probe_id")
+        merge(.,x, by = "probe_id") -> GSE106865_res.f
+
+
+saveRDS(GSE106865_res.f, file = "./GSE106865_res.f.RDATA")
 
 
 #################################################################################################
 
-#metamex 6: GSE8479
+#metamex 6: GSE8479 (only older subjects have pre-post samples)
 
 #################################################################################################
 
@@ -836,37 +1005,146 @@ GSE8479_res <- topTable(fit, coef = "timepointPost",number = Inf, adjust.method 
 
 
 
+saveRDS(GSE8479_res, file = "./GSE8479_res.RDATA")
 
 
 
 
 
+##########################################################################################
+
+# summarize pre-post results in venn diagram
+
+##########################################################################################
+
+
+library(ggvenn)
+
+
+# make list with GSE names and Gene symbol names
+
+
+venn_df <- list(GSE106865 = GSE106865_res.f %>% filter(abs(logFC) > 0) %>% pull(alias_symbol) %>%  length(),
+                GSE24235 = GSE24235_res.f %>% filter(abs(logFC) > 0)  %>% pull(external_gene_name)%>% length(),
+                GSE28422 = GSE28422_res.f%>% filter(abs(logFC) > 0)  %>% pull(external_gene_name)%>% length(),
+                GSE47881 = GSE47881_res.f%>% filter(abs(logFC) > 0)  %>% pull(external_gene_name)%>%  length())
+
+
+ggvenn(venn_df, text_size = 8)
+
+
+# remake venn with negative fold change
+
+
+venn_df_neg <- list(GSE106865 = GSE106865_res.f %>% filter(logFC <= 0) %>% pull(alias_symbol)%>% unique(),
+                GSE24235 = GSE24235_res.f %>% filter(logFC <= 0) %>% pull(external_gene_name)%>% unique(),
+                GSE28422 = GSE28422_res.f%>% filter(logFC <= 0) %>% pull(external_gene_name)%>% unique(),
+                GSE47881 = GSE47881_res.f%>% filter(logFC <= 0) %>% pull(external_gene_name)%>% unique())
+
+ggvenn(venn_df_neg)
+
+# remake venn with positive fold change
+
+
+venn_df_pos <- list(GSE106865 = GSE106865_res.f %>% filter(logFC >= 0) %>% pull(alias_symbol)%>% unique(),
+                    GSE24235 = GSE24235_res.f %>% filter(logFC >= 0) %>% pull(external_gene_name)%>% unique(),
+                    GSE28422 = GSE28422_res.f%>% filter(logFC >= 0) %>% pull(external_gene_name)%>% unique(),
+                    GSE47881 = GSE47881_res.f%>% filter(logFC >= 0) %>% pull(external_gene_name)%>% unique())
+
+ggvenn(venn_df_pos)
 
 
 
+# Compute overlaps
+overlaps <- list(
+        A = setdiff(venn_df$GSE106865, unlist(venn_df[-1])),
+        B = setdiff(venn_df$GSE24235, unlist(venn_df[c(-2)])),
+        C = setdiff(venn_df$GSE28422, unlist(venn_df[c(-3)])),
+        D = setdiff(venn_df$GSE47881, unlist(venn_df[c(-4)])),
+        AB = intersect(venn_df$GSE106865, venn_df$GSE24235),
+        AC = intersect(venn_df$GSE106865, venn_df$GSE28422),
+        AD = intersect(venn_df$GSE106865, venn_df$GSE47881),
+        BC = intersect(venn_df$GSE24235, venn_df$GSE28422),
+        BD = intersect(venn_df$GSE24235, venn_df$GSE47881),
+        CD = intersect(venn_df$GSE28422, venn_df$GSE47881),
+        ABC = Reduce(intersect, venn_df[c("GSE106865", "GSE24235", "GSE28422")]),
+        ABD = Reduce(intersect, venn_df[c("GSE106865", "GSE24235", "GSE47881")]),
+        ACD = Reduce(intersect, venn_df[c("GSE106865", "GSE28422", "GSE47881")]),
+        BCD = Reduce(intersect, venn_df[c("GSE24235", "GSE28422", "GSE47881")]),
+        ABCD = Reduce(intersect, venn_df)
+)
 
 
 
+# Compute overlaps
+overlaps_neg <- list(
+        A = setdiff(venn_df_neg$GSE106865, unlist(venn_df_neg[-1])),
+        B = setdiff(venn_df_neg$GSE24235, unlist(venn_df_neg[c(-2)])),
+        C = setdiff(venn_df_neg$GSE28422, unlist(venn_df_neg[c(-3)])),
+        D = setdiff(venn_df_neg$GSE47881, unlist(venn_df_neg[c(-4)])),
+        AB = intersect(venn_df_neg$GSE106865, venn_df_neg$GSE24235),
+        AC = intersect(venn_df_neg$GSE106865, venn_df_neg$GSE28422),
+        AD = intersect(venn_df_neg$GSE106865, venn_df_neg$GSE47881),
+        BC = intersect(venn_df_neg$GSE24235, venn_df_neg$GSE28422),
+        BD = intersect(venn_df_neg$GSE24235, venn_df_neg$GSE47881),
+        CD = intersect(venn_df_neg$GSE28422, venn_df_neg$GSE47881),
+        ABC = Reduce(intersect, venn_df_neg[c("GSE106865", "GSE24235", "GSE28422")]),
+        ABD = Reduce(intersect, venn_df_neg[c("GSE106865", "GSE24235", "GSE47881")]),
+        ACD = Reduce(intersect, venn_df_neg[c("GSE106865", "GSE28422", "GSE47881")]),
+        BCD = Reduce(intersect, venn_df_neg[c("GSE24235", "GSE28422", "GSE47881")]),
+        ABCD = Reduce(intersect, venn_df_neg)
+)
+
+
+# Compute overlaps
+overlaps_pos <- list(
+        A = setdiff(venn_df_pos$GSE106865, unlist(venn_df_pos[-1])),
+        B = setdiff(venn_df_pos$GSE24235, unlist(venn_df_pos[c(-2)])),
+        C = setdiff(venn_df_pos$GSE28422, unlist(venn_df_pos[c(-3)])),
+        D = setdiff(venn_df_pos$GSE47881, unlist(venn_df_pos[c(-4)])),
+        AB = intersect(venn_df_pos$GSE106865, venn_df_pos$GSE24235),
+        AC = intersect(venn_df_pos$GSE106865, venn_df_pos$GSE28422),
+        AD = intersect(venn_df_pos$GSE106865, venn_df_pos$GSE47881),
+        BC = intersect(venn_df_pos$GSE24235, venn_df_pos$GSE28422),
+        BD = intersect(venn_df_pos$GSE24235, venn_df_pos$GSE47881),
+        CD = intersect(venn_df_pos$GSE28422, venn_df_pos$GSE47881),
+        ABC = Reduce(intersect, venn_df_pos[c("GSE106865", "GSE24235", "GSE28422")]),
+        ABD = Reduce(intersect, venn_df_pos[c("GSE106865", "GSE24235", "GSE47881")]),
+        ACD = Reduce(intersect, venn_df_pos[c("GSE106865", "GSE28422", "GSE47881")]),
+        BCD = Reduce(intersect, venn_df_pos[c("GSE24235", "GSE28422", "GSE47881")]),
+        ABCD = Reduce(intersect, venn_df_pos)
+)
+
+
+overlaps$ABCD
+overlaps_neg$ABCD
+overlaps_pos$ABCD
+
+
+GSE47881_res.f %>% 
+        filter(external_gene_name %in% overlaps$ABCD)
+
+GSE24235_res.f %>% 
+        filter(external_gene_name %in% overlaps$ABCD)
+
+
+sGSE28422_res.f %>% 
+        filter(external_gene_name %in% overlaps$ABCD)
+
+GSE106865_res.f %>% 
+        filter(alias_symbol %in% overlaps$ABCD)
+
+GSE24235_res.f %>% 
+        filter(external_gene_name == "LDLRAD4")
 
 
 
+venn_df <- list(GSE24235 = GSE24235_res.f %>% filter(abs(logFC) > 0)  %>% pull(external_gene_name),
+                GSE28422 = GSE28422_res.f%>% filter(abs(logFC) > 0)  %>% pull(external_gene_name),
+                GSE47881 = GSE47881_res.f%>% filter(abs(logFC) > 0)  %>% pull(external_gene_name))
 
 
+ggvenn(venn_df)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+overlaps_neg$BCD
+overlaps_pos$BCD
