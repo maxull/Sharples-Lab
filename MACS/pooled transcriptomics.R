@@ -68,7 +68,12 @@ annotLookup <- getBM(
 
 saveRDS(annotLookup, file = "./annotLookup.RDATA")
 
+# Load the package
+library(org.Hs.eg.db)
+data(org.Hs.eg.db)
 
+annotLookup <- annotLookup %>% 
+        mutate(ENTREZID = mapIds(org.Hs.eg.db, keys = annotLookup$ensembl_gene_id, keytype="ENSEMBL", column = "ENTREZID"))
 #################################################################################################
 
 
@@ -1024,10 +1029,10 @@ library(ggvenn)
 # make list with GSE names and Gene symbol names
 
 
-venn_df <- list(GSE106865 = GSE106865_res.f %>% filter(abs(logFC) > 0) %>% pull(alias_symbol) %>%  length(),
-                GSE24235 = GSE24235_res.f %>% filter(abs(logFC) > 0)  %>% pull(external_gene_name)%>% length(),
-                GSE28422 = GSE28422_res.f%>% filter(abs(logFC) > 0)  %>% pull(external_gene_name)%>% length(),
-                GSE47881 = GSE47881_res.f%>% filter(abs(logFC) > 0)  %>% pull(external_gene_name)%>%  length())
+venn_df <- list(GSE106865 = GSE106865_res.f %>% filter(abs(logFC) > 0) %>% pull(alias_symbol),
+                GSE24235 = GSE24235_res.f %>% filter(abs(logFC) > 0)  %>% pull(external_gene_name),
+                GSE28422 = GSE28422_res.f%>% filter(abs(logFC) > 0)  %>% pull(external_gene_name),
+                GSE47881 = GSE47881_res.f%>% filter(abs(logFC) > 0)  %>% pull(external_gene_name))
 
 
 ggvenn(venn_df, text_size = 8)
@@ -1144,7 +1149,59 @@ venn_df <- list(GSE24235 = GSE24235_res.f %>% filter(abs(logFC) > 0)  %>% pull(e
                 GSE47881 = GSE47881_res.f%>% filter(abs(logFC) > 0)  %>% pull(external_gene_name))
 
 
-ggvenn(venn_df)
+ggvenn(venn_df, text_size = 8)
 
 overlaps_neg$BCD
 overlaps_pos$BCD
+
+
+
+
+# extract overlaps that overlap between at least two studies
+
+overlaps_2 <- paste(overlaps$AB, overlaps$AC, overlaps$AD, overlaps$BC, overlaps$BD, overlaps$CD) %>% 
+        strsplit(split = " ") %>% 
+        unlist() %>% 
+        unique() 
+
+library(gage)
+KEGG_new <- kegg.gsets(species = "hsa", id.type = "kegg", check.new=TRUE)
+
+# merge all datasets into expression set: genes as rownames and columns as samples
+
+annotLookup %>% 
+        dplyr::select(ENTREZID,"alias_symbol" = external_gene_name) -> x
+
+GSE106865_res.f %>% 
+        filter(alias_symbol %in% overlaps_2) %>% 
+        merge(., x, by = "alias_symbol") %>% 
+        dplyr::select(ENTREZID, logFC) %>% 
+        distinct(ENTREZID, .keep_all = TRUE) -> z
+        
+GSE24235_res.f %>% 
+        mutate(alias_symbol = external_gene_name) %>% 
+        filter(alias_symbol %in% overlaps_2) %>% 
+        merge(., annotLookup, by = "ensembl_gene_id") %>% 
+        dplyr::select(ENTREZID, logFC) %>% 
+        distinct(ENTREZID, .keep_all = TRUE) %>% 
+        merge(.,z, by = "ENTREZID", all = TRUE) -> z
+
+
+GSE28422_res.f %>% 
+        mutate(alias_symbol = external_gene_name) %>% 
+        filter(alias_symbol %in% overlaps_2) %>% 
+        merge(., annotLookup, by = "ensembl_gene_id") %>% 
+        dplyr::select(ENTREZID, logFC) %>% 
+        distinct(ENTREZID, .keep_all = TRUE) %>% 
+        merge(.,z, by = "ENTREZID", all = TRUE) -> z
+
+
+GSE47881_res.f %>% 
+        mutate(alias_symbol = external_gene_name) %>% 
+        filter(alias_symbol %in% overlaps_2) %>% 
+        merge(., annotLookup, by = "ensembl_gene_id") %>% 
+        dplyr::select(ENTREZID, logFC) %>% 
+        distinct(ENTREZID, .keep_all = TRUE) %>% 
+        merge(.,z, by = "ENTREZID", all = TRUE) -> z
+
+rownames(z) <- z$ENTREZID
