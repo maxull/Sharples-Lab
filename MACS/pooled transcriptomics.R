@@ -1176,7 +1176,8 @@ GSE106865_res.f %>%
         filter(alias_symbol %in% overlaps_2) %>% 
         merge(., x, by = "alias_symbol") %>% 
         dplyr::select(ENTREZID, logFC) %>% 
-        distinct(ENTREZID, .keep_all = TRUE) -> z
+        distinct(ENTREZID, .keep_all = TRUE) %>% 
+        na.omit() -> z
         
 GSE24235_res.f %>% 
         mutate(alias_symbol = external_gene_name) %>% 
@@ -1184,7 +1185,7 @@ GSE24235_res.f %>%
         merge(., annotLookup, by = "ensembl_gene_id") %>% 
         dplyr::select(ENTREZID, logFC) %>% 
         distinct(ENTREZID, .keep_all = TRUE) %>% 
-        merge(.,z, by = "ENTREZID", all = TRUE) -> z
+        na.omit() -> z
 
 
 GSE28422_res.f %>% 
@@ -1193,7 +1194,7 @@ GSE28422_res.f %>%
         merge(., annotLookup, by = "ensembl_gene_id") %>% 
         dplyr::select(ENTREZID, logFC) %>% 
         distinct(ENTREZID, .keep_all = TRUE) %>% 
-        merge(.,z, by = "ENTREZID", all = TRUE) -> z
+        na.omit() -> z
 
 
 GSE47881_res.f %>% 
@@ -1202,6 +1203,52 @@ GSE47881_res.f %>%
         merge(., annotLookup, by = "ensembl_gene_id") %>% 
         dplyr::select(ENTREZID, logFC) %>% 
         distinct(ENTREZID, .keep_all = TRUE) %>% 
-        merge(.,z, by = "ENTREZID", all = TRUE) -> z
+        na.omit() -> z
 
 rownames(z) <- z$ENTREZID
+
+
+z <- z[-1]
+
+
+library(org.Hs.eg.db)
+data(kegg.sets.hs)
+
+
+### homogenate
+
+exprsMat <- as.matrix(z) 
+
+subset <- KEGG_new$kg.sets[KEGG_new[["sigmet.idx"]]]
+
+
+
+kegg_res_3 <- gage(exprs = exprsMat, gsets = subset, same.dir = TRUE, ref = NULL, samp = NULL)
+
+view(kegg_res_4$less)                              ### view less methylated KEGG pathways post vs. Baseline
+view(kegg_res_1$greater)     
+
+
+# did not work, will do two and two
+
+kegg_res_1$greater %>% 
+        head(6) %>% 
+        rbind(.,kegg_res_2$greater %>% 
+                      head(10)) %>% 
+        rbind(.,kegg_res_3$greater %>% 
+                      head(10)) %>% 
+        rbind(.,kegg_res_4$greater %>% 
+                      head(10)) %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "pathway") %>% 
+        distinct(pathway, .keep_all = TRUE) -> top_pathways
+
+
+kegg_res_2$greater %>% 
+        head(10)
+
+kegg_res_3$greater %>% 
+        head(10)
+
+kegg_res_4$greater %>% 
+        head(10)

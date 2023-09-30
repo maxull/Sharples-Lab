@@ -2400,10 +2400,15 @@ _________________________________________________
 
 _________________________________________________
 
-gene_name <- "TMEM5"       # write gene name
+Illumina_anno <- Illumina_anno %>% 
+        mutate("cpg" = IlmnID) 
+
+gene_name <- "NMRK2"       # write gene name
 
 Probes <- anno %>% 
         filter(UCSC_RefGene_Name == gene_name) 
+
+x = c("cg25431166", "cg11866473") # extra probes if misidentified
 
 Chromosome <- merge(Probes, Illumina_anno, by = "cpg") %>% 
         dplyr::select(CHR) %>% 
@@ -2412,14 +2417,14 @@ Chromosome <- merge(Probes, Illumina_anno, by = "cpg") %>%
 m_change_df %>% 
         filter(UCSC_RefGene_Name == gene_name) %>%
         merge(.,Illumina_anno, by = "cpg") %>% 
-        dplyr::select(cpg, PH_vs_BH, PM_vs_BM, MAPINFO, Relation_to_UCSC_CpG_Island) %>% 
+        dplyr::select(cpg, PH_vs_BH, PM_vs_BM, MAPINFO, Relation_to_UCSC_CpG_Island, CHR) %>% 
         pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
         arrange(desc(MAPINFO)) %>% 
         ggplot(aes(x = MAPINFO, y = mean_change, color = contrast, group = contrast))+
         geom_hline(yintercept = 0)+
-        geom_point(aes(shape = Relation_to_UCSC_CpG_Island))+
+        geom_point(aes(shape = Relation_to_UCSC_CpG_Island), size = 3)+
         geom_smooth(method = "loess", alpha = 0.5, se = FALSE)+
-        labs(title = paste(gene_name,";", "N Probes =", nrow(Probes), ";","CHR",Chromosome),
+        labs(title = paste(gene_name,";", "N Probes =", 6, ";","CHR", 19),
              y = "mean M-value change",
              x = "nucleotide")+
         theme_classic()+
@@ -3160,3 +3165,83 @@ t.test(x = PM, y = BM, paired = TRUE)
 
 
 
+
+
+x = c("cg25431166", "cg11866473", "cg08114542", "cg05600174", "cg05386815", "cg04036064",
+      "cg10656332", "cg06262380")
+
+NMRK1 <- anno %>% 
+        filter(UCSC_RefGene_Name == "NMRK1" | cpg %in% x)
+
+DMPs_PH_vs_BH %>% 
+        filter(cpg %in% x)
+
+DMPs_PM_vs_BM %>% 
+        filter(cpg %in% x)
+
+y = c("cg14128911","cg19433767", "cg22782812", "cg01074840", "cg13811969", "cg21690947")
+
+NMRK2 <- anno %>% 
+        filter(UCSC_RefGene_Name == "NMRK2" | cpg %in% y)
+
+DMPs_PH_vs_BH %>% 
+        filter(cpg %in% y)
+
+DMPs_PM_vs_BM %>% 
+        filter(cpg %in% y)
+
+# not changed with training
+
+DMPs_BM_vs_BH %>% 
+        filter(cpg %in% x)
+
+DMPs_PM_vs_PH %>% 
+        filter(cpg %in% x)
+
+DMPs_BM_vs_BH %>% 
+        filter(cpg %in% y)
+
+DMPs_PM_vs_PH %>% 
+        filter(cpg %in% y)
+
+
+# plot NMRK1 probes MYO+int vs. MYO
+
+M_change %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% x) %>% 
+        dplyr::select(cpg, BM_vs_BH, PM_vs_PH) %>% 
+        merge(., Illumina_anno, by = "cpg") %>% 
+        dplyr::select(cpg, BM_vs_BH, PM_vs_PH, MAPINFO,  Relation_to_UCSC_CpG_Island, CHR) %>% 
+        pivot_longer(names_to = "contrast", values_to = "mean_m", cols = 2:3) %>% 
+        arrange(desc(MAPINFO)) %>% 
+        ggplot(aes(x = MAPINFO, y = mean_m, color = contrast, group = contrast))+
+        geom_hline(yintercept = 0)+
+        geom_point(aes(shape = Relation_to_UCSC_CpG_Island), size = 3)+
+        geom_smooth(method = "loess", alpha = 0.5, se = FALSE)+
+        labs(title = paste("NMRK1",";", "N Probes =", 8, ";","CHR", 9),
+             y = "mean M-value difference",
+             x = "nucleotide")+
+        theme_classic()+
+        theme(axis.text.x = element_text(angle = 90))+
+        scale_x_continuous(n.breaks = 20)
+
+
+M_change %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% y) %>% 
+        dplyr::select(cpg, BM_vs_BH, PM_vs_PH) %>% 
+        merge(., Illumina_anno, by = "cpg") %>% 
+        dplyr::select(cpg, BM_vs_BH, PM_vs_PH, MAPINFO,  Relation_to_UCSC_CpG_Island, CHR) %>% 
+        pivot_longer(names_to = "contrast", values_to = "mean_m", cols = 2:3) %>% 
+        arrange(desc(MAPINFO)) %>% 
+        ggplot(aes(x = MAPINFO, y = mean_m, color = contrast, group = contrast))+
+        geom_hline(yintercept = 0)+
+        geom_point(aes(shape = Relation_to_UCSC_CpG_Island), size = 3)+
+        geom_smooth(method = "loess", alpha = 0.5, se = FALSE)+
+        labs(title = paste("NMRK2",";", "N Probes =", 6, ";","CHR", 19),
+             y = "mean M-value difference",
+             x = "nucleotide")+
+        theme_classic()+
+        theme(axis.text.x = element_text(angle = 90))+
+        scale_x_continuous(n.breaks = 20)
