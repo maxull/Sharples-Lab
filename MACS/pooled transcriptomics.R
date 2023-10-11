@@ -1013,6 +1013,201 @@ GSE8479_res <- topTable(fit, coef = "timepointPost",number = Inf, adjust.method 
 saveRDS(GSE8479_res, file = "./GSE8479_res.RDATA")
 
 
+##########################################################################################
+
+# GSE154846: Timmons and Atherton 2020
+
+##########################################################################################
+
+# https://doi.org/10.1371/journal.pgen.1003389
+
+BiocManager::install("oligo")
+
+BiocManager::install("pd.hta.2.0")
+
+library(oligo)
+
+
+GSE154846 <- getGEO(GEO = "GSE154846", GSEMatrix = TRUE)
+
+metadata_GSE154846 <- pData(phenoData(GSE154846[[1]]))
+
+metadata_GSE154846_2 <- pData(phenoData(GSE154846[[2]]))
+
+
+
+
+metadata_GSE154846_2 %>% 
+        dplyr::select(1, characteristics_ch1.1) %>% 
+        filter(nchar(title) > 4 & nchar(title) <9) %>% 
+        mutate(FP = as.numeric(str_extract(title, "\\d+")))  %>% 
+        mutate(timepoint = sapply(strsplit(characteristics_ch1.1, split =  " "), "[", 3))
+
+
+
+        # untar the file and save in directory
+        
+        untar(tarfile = "/Users/maxul/Downloads/GSE154846_RAW.tar",
+              exdir = "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptomics/GSE154846")
+        
+        # unpack .gz files
+        
+        # get list of files
+        
+        gz_files <- list.files("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptomics/GSE154846", full.names = TRUE)
+        
+        
+        for (i in 1:length(gz_files)) {
+                gunzip(filename = gz_files[i], remove = TRUE)
+                print(i)
+        }
+        
+        # list .CEL files
+        
+        cel_files <- list.files("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptomics/GSE154846", 
+                                full.names = TRUE, 
+                                pattern = "*.CEL")
+        
+        
+        # read data GSE28422
+
+        GSE154846_raw <- oligo::read.celfiles(cel_files)
+
+        
+        
+        GSE154846_eset <- rma(GSE154846_raw, target = "core")
+        
+        # create expression dataframe
+        
+        exprs(GSE154846_eset)
+        
+        plotDensities(log2(exprs(GSE154846_eset)), legend = FALSE)
+        
+        
+        # plot pca
+        
+        
+        pca.out <- prcomp(t(log2(exprs(GSE154846_eset))), scale. = FALSE)
+        
+        # check proportion of variability explained by pca 1-50
+        
+        # Extract the proportion of variance explained by each principal component
+        var_explained <- pca.out$sdev^2 / sum(pca.out$sdev^2)
+        
+        # Create a data frame for plotting
+        df <- data.frame(Component = 1:length(var_explained), Variance = var_explained)
+        
+        # Keep only the first 50 principal components
+        df <- df[1:50,]
+        
+        # Plot
+        
+        ggplot(df, aes(x = Component, y = Variance)) +
+                geom_bar(stat = "identity") +
+                scale_x_continuous(breaks = 1:50) +
+                labs(x = "Principal Component", y = "Proportion of Variance Explained",
+                     title = "Variance Explained by Principal Components")
+        
+        
+        plot(pca.out$x[,1:2])
+        
+        
+        # check for outliers
+        
+        # Compute Mahalanobis distances for the first two principal components
+        distances <- mahalanobis(pca.out$x[,1:2], colMeans(pca.out$x[,1:2]), cov(pca.out$x[,1:2]))
+        
+        # Identify outliers as samples with a Mahalanobis distance greater than a certain threshold
+        # Here, I'm using the 97.5 percentile of the Chi-square distribution with 3 degrees of freedom as the threshold
+        outliers <- which(distances > qchisq(0.975, df = 3))
+        
+        # Print the row names of the outliers
+        print(colnames(exprs(GSE154846_eset))[outliers])
+        
+        # Plot the first two principal components, highlighting the outliers
+        
+        ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
+                geom_point() +
+                geom_text_repel(data = data.frame(pca.out$x)[outliers,], aes(label = rownames(data.frame(pca.out$x))[outliers])) +
+                labs(x = "PC1", y = "PC2", title = "First Two Principal Components with Outliers Highlighted")
+        
+        
+        # no outliers in GSE154846
+        
+        GSE154846_exprs <- log2(exprs(GSE154846_eset))
+        
+        
+        # clean up col names/sample IDs så they are just the GSM kode
+        
+        colnames(GSE154846_exprs) <- gsub(".CEL", "", colnames(GSE154846_exprs))
+        
+        
+        sapply(strsplit(colnames(GSE154846_exprs), split = "_"), "[", 1)
+        
+        
+        
+        # identify pre-post samples
+        
+        metadata_GSE24235 %>% 
+                mutate(FP = sapply(strsplit(title, split = "_"),"[", 3),
+                       FP = paste("FP", substr(FP, start = 1, stop = 4))) %>% 
+                mutate(timepoint = ifelse(`condition:ch1` == "24h post acute resistance exercise following 12-week resistance training",
+                                          "Post", ifelse(`condition:ch1` == "resting", "Pre", "4h"))) %>% 
+                filter(timepoint != "4h") %>% 
+                group_by(FP) %>% 
+                filter(any(timepoint == "Pre") & any(timepoint == "Post")) %>% 
+                ungroup() %>% 
+                dplyr::select(geo_accession, FP, timepoint) -> df
+        
+        
+        
+        
+        # create designmatrix for ebayes model
+        
+        FP <- factor(df$FP)
+        timepoint <- factor(df$timepoint, levels = c("Pre", "Post"))
+        
+        
+        design <- model.matrix(~FP+timepoint)
+        
+        
+        
+        GSE24235_exprs %>% 
+                as.data.frame() %>% 
+                dplyr::select(df$geo_accession) %>% 
+                lmFit(., design) -> fit
+        
+        
+        fit <- eBayes(fit)
+        
+        
+        
+        GSE24235_res <- topTable(fit, coef = "timepointPost",number = Inf) %>% 
+                filter(P.Value < 0.05) %>% 
+                rownames_to_column(var = "affy_hg_u133_plus_2") %>% 
+                merge(.,annotLookup, by = "affy_hg_u133_plus_2") %>% 
+                arrange(-abs(logFC)) 
+        
+        GSE24235_res.f <- GSE24235_res[!duplicated(GSE24235_res$logFC),]
+        
+        
+        
+        
+        
+        
+        saveRDS(GSE24235_res.f, file = "./GSE24235_res.f.RDATA")
+        
+        
+        
+
+
+
+
+
+
+
+
+
 
 
 
