@@ -42,6 +42,7 @@ library(ggrepel)
 
 setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Pooled transcriptomics/")
 
+
 # get raw data and pheno data from GEO
 
 
@@ -62,11 +63,17 @@ annotLookup <- getBM(
                 "affy_hg_u133_plus_2",
                 "ensembl_gene_id",
                 "gene_biotype",
-                "external_gene_name"),
+                "external_gene_name",
+                "hgnc_symbol",
+                "entrezgene"),
         filter = "affy_hg_u133_plus_2",
         values = rownames(GSE47881_exprs))
 
+listAttributes(mart)
+
 saveRDS(annotLookup, file = "./annotLookup.RDATA")
+
+annotLookup <- readRDS("./annotLookup.RDATA")
 
 # Load the package
 library(org.Hs.eg.db)
@@ -198,7 +205,9 @@ metadata_GSE28422 %>%
         mutate(timepoint = ifelse(`training state:ch1`== "Untrained", "Pre", "Post")) %>% 
         dplyr::select(timepoint, description.1) %>% 
         mutate(FP = sapply(strsplit(description.1, split = "_"),"[", 6)) %>% 
-        dplyr::select(timepoint, FP)  ->  df
+        dplyr::select(timepoint, FP) %>% 
+        mutate(FP = paste(FP, "GSE28422", sep = ""),
+               Batch = "GSE28422") ->  df_GSE28422
         
 
 FP <- factor(df$FP)
@@ -217,7 +226,6 @@ GSE28422_exprs %>%
 
 
 fit <- eBayes(fit)
-
 
 
 GSE28422_res <- topTable(fit, coef = "timepointPost",number = Inf) %>% 
@@ -365,7 +373,8 @@ metadata_GSE47881 %>%
                FP = `patientid:ch1`,
                timepoint = ifelse(`time:ch1` == "pre-training", "Pre", "Post")) %>% 
         dplyr::select(FP, timepoint, age) %>% 
-        filter(age < 35, FP != "NB021")->  df
+        filter(age < 35, FP != "NB021") %>% 
+        mutate(Batch = "GSE47881")->  df_GSE47881
 
 # create designmatrix for ebayes model
 
@@ -569,16 +578,18 @@ sapply(strsplit(colnames(GSE24235_exprs), split = "."), "[", 1)
 
 metadata_GSE24235 %>% 
         mutate(FP = sapply(strsplit(title, split = "_"),"[", 3),
-               FP = paste("FP", substr(FP, start = 1, stop = 4))) %>% 
+               FP = paste("FP", substr(FP, start = 1, stop = 4), sep = "")) %>% 
         mutate(timepoint = ifelse(`condition:ch1` == "24h post acute resistance exercise following 12-week resistance training",
                                   "Post", ifelse(`condition:ch1` == "resting", "Pre", "4h"))) %>% 
         filter(timepoint != "4h") %>% 
         group_by(FP) %>% 
         filter(any(timepoint == "Pre") & any(timepoint == "Post")) %>% 
         ungroup() %>% 
-        dplyr::select(geo_accession, FP, timepoint) -> df
+        dplyr::select(geo_accession, FP, timepoint) %>% 
+        mutate(Batch = "GSE24235") %>% 
+        as.data.frame()-> df_GSE24235
         
-        
+rownames(df_GSE24235) <- df_GSE24235$geo_accession
 
 
 # create designmatrix for ebayes model
@@ -765,7 +776,8 @@ metadata_GSE106865 %>%
                trainingstatus = sapply(strsplit(title, split = "_"), "[", 6)) %>% 
         filter(timepoint == "Pre") %>% 
         mutate(timepoint = factor(ifelse(trainingstatus == "untrained", "Pre", "Post"), levels = c("Pre", "Post"))) %>%
-        dplyr::select(2,3) -> df
+        dplyr::select(2,3) %>% 
+        mutate(Batch = "GSE106865") -> df_GSE106865
 
 
 
@@ -984,6 +996,14 @@ pca.out <- prcomp(t(GSE8479_exprs.f), scale. = FALSE)
 plot(pca.out$x[,1:2])
 
 
+
+
+metadata_GSE8479 %>% 
+        filter(geo_accession %in% z) %>% 
+        dplyr::select("FP" = ID, timepoint) %>% 
+        mutate(Batch = "GSE8479") -> df_GSE8479
+
+
         
 
 
@@ -1142,39 +1162,36 @@ metadata_GSE154846_2 %>%
         colnames(GSE154846_exprs) <- gsub(".CEL", "", colnames(GSE154846_exprs))
         
         
-        sapply(strsplit(colnames(GSE154846_exprs), split = "_"), "[", 1)
+        colnames(GSE154846_exprs) <- sapply(strsplit(colnames(GSE154846_exprs), split = "_"), "[", 2)
         
         
-        
+
         # identify pre-post samples
         
-        metadata_GSE24235 %>% 
-                mutate(FP = sapply(strsplit(title, split = "_"),"[", 3),
-                       FP = paste("FP", substr(FP, start = 1, stop = 4))) %>% 
-                mutate(timepoint = ifelse(`condition:ch1` == "24h post acute resistance exercise following 12-week resistance training",
-                                          "Post", ifelse(`condition:ch1` == "resting", "Pre", "4h"))) %>% 
-                filter(timepoint != "4h") %>% 
-                group_by(FP) %>% 
-                filter(any(timepoint == "Pre") & any(timepoint == "Post")) %>% 
-                ungroup() %>% 
-                dplyr::select(geo_accession, FP, timepoint) -> df
+        metadata_GSE154846_2 %>% 
+                dplyr::select(1, characteristics_ch1.1) %>% 
+                filter(nchar(title) > 4 & nchar(title) <9) %>% 
+                mutate(FP = as.numeric(str_extract(title, "\\d+")))  %>% 
+                mutate(timepoint = sapply(strsplit(characteristics_ch1.1, split =  " "), "[", 3)) %>% 
+                filter(timepoint != "POST_Unloading") %>% 
+                mutate(Batch = "GSE154846")-> df_GSE154846
         
-        
+
         
         
         # create designmatrix for ebayes model
         
         FP <- factor(df$FP)
-        timepoint <- factor(df$timepoint, levels = c("Pre", "Post"))
+        timepoint <- factor(df$timepoint, levels = c("PRE", "POST"))
         
         
         design <- model.matrix(~FP+timepoint)
         
         
         
-        GSE24235_exprs %>% 
+        GSE154846_exprs %>% 
                 as.data.frame() %>% 
-                dplyr::select(df$geo_accession) %>% 
+                dplyr::select(df$title) %>% 
                 lmFit(., design) -> fit
         
         
@@ -1182,34 +1199,49 @@ metadata_GSE154846_2 %>%
         
         
         
-        GSE24235_res <- topTable(fit, coef = "timepointPost",number = Inf) %>% 
+        GSE154846_res <- topTable(fit, coef = "timepointPOST",number = Inf) %>% 
                 filter(P.Value < 0.05) %>% 
-                rownames_to_column(var = "affy_hg_u133_plus_2") %>% 
-                merge(.,annotLookup, by = "affy_hg_u133_plus_2") %>% 
+                rownames_to_column(var = "PROBEID") %>% 
+                merge(., HTA_anno, by = "PROBEID")%>% 
                 arrange(-abs(logFC)) 
         
-        GSE24235_res.f <- GSE24235_res[!duplicated(GSE24235_res$logFC),]
+
         
         
         
         
         
-        
-        saveRDS(GSE24235_res.f, file = "./GSE24235_res.f.RDATA")
-        
+        saveRDS(GSE154846_res, file = "./GSE154846_res.RDATA")
         
         
+        
+
+BiocManager::install("affycoretools")
+
+library(hta20transcriptcluster.db)
+library(affycoretools)
+
+GSE154846_eset2 <- annotateEset(GSE154846_eset, hta20transcriptcluster.db)
 
 
+fData(GSE154846_eset2) %>% 
+        na.omit() -> HTA_anno
 
 
+## change probe annotation (row name to SYMBOL)
+
+GSE154846_exprs %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "PROBEID") %>% 
+        merge(., HTA_anno, by = "PROBEID") %>% 
+        na.omit() %>% 
+        distinct(SYMBOL, .keep_all = TRUE) %>% 
+        dplyr::select(df_GSE154846$title, "SYMBOL") -> GSE154846_df
 
 
+rownames(GSE154846_df) <- GSE154846_df$SYMBOL
 
-
-
-
-
+GSE154846_df <- GSE154846_df[,(-ncol(GSE154846_df))]
 
 ##########################################################################################
 
@@ -1447,3 +1479,465 @@ kegg_res_3$greater %>%
 
 kegg_res_4$greater %>% 
         head(10)
+
+
+
+
+
+
+
+##########################################################################################
+
+# combine and run batch correct and pre-post diffrential expression
+
+##########################################################################################
+
+
+# start by adding SYMBOL gene name to all expression sets
+
+
+
+GSE106865_exprs.f %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "probe_id") %>%
+        merge(., x, by = "probe_id") %>% 
+        distinct(alias_symbol, .keep_all = TRUE) %>% 
+        dplyr::select(rownames(df_GSE106865), "SYMBOL" = alias_symbol) -> df1
+
+GSE154846_exprs %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "PROBEID") %>% 
+        merge(., HTA_anno, by = "PROBEID") %>% 
+        na.omit() %>% 
+        distinct(SYMBOL, .keep_all = TRUE) %>% 
+        dplyr::select(df_GSE154846$title, "SYMBOL") -> df2
+
+colnames(df2) <- c(rownames(df_GSE154846), "SYMBOL")
+
+GSE24235_exprs %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "affy_hg_u133_plus_2") %>% 
+        merge(.,annotLookup, by = "affy_hg_u133_plus_2") %>% 
+        dplyr::select(rownames(df_GSE24235), "SYMBOL" = external_gene_name) %>% 
+        distinct(SYMBOL, .keep_all = TRUE) %>% 
+        filter(SYMBOL != "") -> df3
+
+GSE28422_exprs %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(df_GSE28422)) %>% 
+        rownames_to_column(var = "affy_hg_u133_plus_2") %>% 
+        merge(.,annotLookup, by = "affy_hg_u133_plus_2") %>% 
+        dplyr::select(rownames(df_GSE28422), "SYMBOL" = external_gene_name) %>% 
+        distinct(SYMBOL, .keep_all = TRUE) %>% 
+        filter(SYMBOL != "") -> df4
+
+GSE47881_exprs %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(df_GSE47881)) %>% 
+        rownames_to_column(var = "affy_hg_u133_plus_2") %>% 
+        merge(.,annotLookup, by = "affy_hg_u133_plus_2") %>% 
+        dplyr::select(rownames(df_GSE47881), "SYMBOL" = external_gene_name) %>% 
+        distinct(SYMBOL, .keep_all = TRUE) %>% 
+        filter(SYMBOL != "") -> df5
+
+GSE8479_exprs %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(df_GSE8479)) %>% 
+        rownames_to_column(var = "SYMBOL") -> df6
+
+
+# merge all df 1-6 and pheno data files
+
+df1 %>% 
+        merge(., df2, by = "SYMBOL") %>% 
+        merge(., df3, by = "SYMBOL") %>% 
+        merge(., df4, by = "SYMBOL") %>% 
+        merge(., df5, by = "SYMBOL") %>% 
+        merge(., df6, by = "SYMBOL") -> pooled_matrix_7610_genes_120_samples 
+
+rownames(pooled_matrix_7610_genes_120_samples) <- pooled_matrix_7610_genes_120_samples$SYMBOL
+pooled_matrix_7610_genes_120_samples <- pooled_matrix_7610_genes_120_samples[,-1]
+
+# pool matrix without df6
+
+df1 %>% 
+        merge(., df2, by = "SYMBOL") %>% 
+        merge(., df3, by = "SYMBOL") %>% 
+        merge(., df4, by = "SYMBOL") %>% 
+        merge(., df5, by = "SYMBOL") -> pooled_matrix_13014_genes_92_samples
+
+
+df2 %>% 
+        merge(., df3, by = "SYMBOL") %>% 
+        merge(., df4, by = "SYMBOL") %>% 
+        merge(., df5, by = "SYMBOL") -> pooled_matrix_19851_genes_72_samples
+
+
+rownames(pooled_matrix_19851_genes_72_samples) <- pooled_matrix_19851_genes_72_samples$SYMBOL
+pooled_matrix_19851_genes_72_samples <- pooled_matrix_19851_genes_72_samples[,-1]
+
+# clean up annotaton files
+
+df_GSE106865 %>% 
+        dplyr::select(FP, timepoint, Batch) -> y
+
+df_GSE154846 %>% 
+        dplyr::select(FP, timepoint, Batch) %>% 
+        mutate(timepoint = ifelse(timepoint == "PRE", "Pre", "Post")) %>% 
+        rbind(y, .) -> y
+
+df_GSE24235 %>% 
+        dplyr::select(FP, timepoint, Batch)%>% 
+        rbind(y, .) -> y
+
+df_GSE28422 %>% 
+        dplyr::select(FP, timepoint, Batch)%>% 
+        rbind(y, .) -> y
+
+df_GSE47881 %>% 
+        dplyr::select(FP, timepoint, Batch)%>% 
+        rbind(y, .) -> y
+
+df_GSE8479 %>% 
+        dplyr::select(FP, timepoint, Batch)%>% 
+        rbind(y, .) -> y
+
+
+# save files
+
+saveRDS(pooled_matrix_7610_genes_120_samples, "./pooled_matrix_7610_genes_120_samples.RDATA")
+saveRDS(y, "./pooled_pheno_data.RDATA")
+
+
+
+pca.out <- prcomp(t(pooled_matrix_7610_genes_120_samples), scale. = FALSE)
+
+plot(pca.out$x[,1:2])
+
+# very pronounced batch effects
+
+# remove batch effects with combat
+library(sva)
+
+batch = y$Batch
+
+FP <- factor(y$FP)
+timepoint <- factor(y$timepoint, levels = c("Pre", "Post"))
+
+
+design <- model.matrix(~timepoint)
+
+combat_eDATA <- ComBat(dat = pooled_matrix_7610_genes_120_samples,
+                       batch = batch,
+                       mod = design)
+
+
+# rerun pca
+
+
+
+pca.out <- prcomp(t(combat_eDATA), scale. = FALSE)
+
+plot(pca.out$x[,1:2])
+
+
+# batch correct worked perfectly
+
+# run ebayes model
+
+
+# create designmatrix for ebayes model
+
+
+
+design <- model.matrix(~FP+timepoint)
+
+
+
+combat_eDATA %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(y)) %>% 
+        lmFit(., design) -> fit
+
+
+fit <- eBayes(fit)
+
+
+
+pooled_res <- topTable(fit, coef = "timepointPost",number = Inf) %>% 
+        filter(P.Value < 0.05) %>% 
+        arrange(-abs(logFC)) 
+
+write.csv(pooled_res, "./pooled_res.csv")
+
+
+# re_run with max genes
+
+
+pooled_matrix_19851_genes_72_samples
+
+y[rownames(y) %in% colnames(pooled_matrix_19851_genes_72_samples),] -> y2
+
+
+
+
+batch = factor(y2$Batch)
+
+FP <- factor(y2$FP)
+timepoint <- factor(y2$timepoint, levels = c("Pre", "Post"))
+
+
+design <- model.matrix(~timepoint)
+
+combat_eDATA2 <- ComBat(dat = pooled_matrix_19851_genes_72_samples,
+                       batch = batch,
+                       mod = design)
+
+
+# rerun pca
+
+
+
+pca.out <- prcomp(t(combat_eDATA2), scale. = FALSE)
+
+plot(pca.out$x[,1:2])
+
+
+# batch correct worked perfectly
+
+# run ebayes model
+
+
+# create designmatrix for ebayes model
+
+
+
+design <- model.matrix(~FP+timepoint)
+
+
+
+combat_eDATA2 %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(y2)) %>% 
+        lmFit(., design) -> fit
+
+
+fit <- eBayes(fit)
+
+
+
+pooled_res2 <- topTable(fit, coef = "timepointPost",number = Inf) %>% 
+        filter(P.Value < 0.05) %>% 
+        arrange(-abs(logFC))
+
+
+write.csv(pooled_res2, "./pooled_res2.csv")
+
+
+# run without batch correct, but as variable in design
+
+
+
+design <- model.matrix(~FP+timepoint+batch)
+
+
+
+pooled_matrix_19851_genes_72_samples %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(y2)) %>% 
+        lmFit(., design) -> fit
+
+
+fit <- eBayes(fit)
+
+
+
+pooled_res3 <- topTable(fit, coef = "timepointPost",number = Inf) %>% 
+        filter(P.Value < 0.05) %>% 
+        arrange(-abs(logFC))
+
+
+## for some reason "design matrix doesnt work anymore
+
+
+FP = y$FP
+timepoint <- factor(y$timepoint, levels = c("Pre", "Post"))
+batch = factor(y$Batch)
+
+
+design <- model.matrix(~FP+timepoint+batch)
+
+z <-  c(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+                      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+
+design <- cbind(design, "batchGSE106865" = z)
+
+
+pooled_matrix_7610_genes_120_samples %>% 
+        as.data.frame() %>% 
+        dplyr::select(rownames(y)) %>% 
+        lmFit(., design) -> fit
+
+
+fit <- eBayes(fit)
+
+
+
+pooled_res3 <- topTable(fit, coef = "timepointPost",number = Inf) %>% 
+        filter(P.Value < 0.05) %>% 
+        arrange(-abs(logFC))
+
+
+
+saveRDS(pooled_res3, "./pooled_transcriptomics.RDATA")
+write.csv(pooled_res3, "./pooled_transcriptomics.csv")
+
+
+
+
+##########################################################################################
+
+# GSEA og pooled genes
+
+##########################################################################################
+
+
+# annotate with entrezID
+
+pooled_res3 %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "gene_name") -> df_res
+        
+
+
+
+entrezIDs <- mapIds(org.Hs.eg.db, keys = df_res$gene_name, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first")
+
+df_res$entrezid <- entrezIDs
+
+library(gage)
+KEGG_new <- kegg.gsets(species = "hsa", id.type = "kegg", check.new=TRUE)
+
+
+
+rownames(df_res) <- entrezIDs
+
+df_res %>% 
+        dplyr::select(logFC) %>% 
+        as.matrix() -> exprsMat
+
+
+kegg_res <- gage(exprs = exprsMat, gsets = KEGG_new$kg.sets, same.dir = TRUE, ref = NULL, samp = NULL)
+
+
+kegg_res$greater
+kegg_res$less
+
+# save kegg sets
+
+write.csv(kegg_res$greater, "./pooled_kegg_greater.csv")
+write.csv(kegg_res$less, "./pooled_kegg_less.csv")
+
+
+
+
+
+
+##########################################################################################
+
+# overlap with MACS
+
+##########################################################################################
+
+        
+pooled_res3 %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "gene_name") -> df_res
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        mutate(gene_name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        merge(., df_res, by = "gene_name") %>% 
+        filter(Relation_to_Island == "Island") %>% 
+        ggplot(aes(x = delta_M, y = logFC))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        geom_text_repel(aes(label = gene_name))
+
+
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        mutate(gene_name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        merge(., df_res, by = "gene_name") %>% 
+        filter(Relation_to_Island == "Island") %>% 
+        ggplot(aes(x = delta_M, y = logFC))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        geom_text_repel(aes(label = gene_name))
+
+# visualize hypomethylated and increased gene expression
+
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        mutate(gene_name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        merge(., df_res, by = "gene_name") %>% 
+        filter(Relation_to_Island == "Island") %>% 
+        filter(delta_M <0 & logFC >0) %>% 
+        ggplot(aes(x = delta_M, y = logFC))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        geom_text_repel(aes(label = gene_name))
+
+
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        mutate(gene_name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        merge(., df_res, by = "gene_name") %>% 
+        filter(Relation_to_Island == "Island") %>% 
+        filter(delta_M <0 & logFC >0) %>% 
+        ggplot(aes(x = delta_M, y = logFC))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        geom_text_repel(aes(label = gene_name))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
