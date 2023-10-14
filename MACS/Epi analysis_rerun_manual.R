@@ -2403,7 +2403,7 @@ _________________________________________________
 Illumina_anno <- Illumina_anno %>% 
         mutate("cpg" = IlmnID) 
 
-gene_name <- "NMRK2"       # write gene name
+gene_name <- "GRK5"       # write gene name
 
 Probes <- anno %>% 
         filter(UCSC_RefGene_Name == gene_name) 
@@ -2424,7 +2424,7 @@ m_change_df %>%
         geom_hline(yintercept = 0)+
         geom_point(aes(shape = Relation_to_UCSC_CpG_Island), size = 3)+
         geom_smooth(method = "loess", alpha = 0.5, se = FALSE)+
-        labs(title = paste(gene_name,";", "N Probes =", 6, ";","CHR", 19),
+        labs(title = paste(gene_name,";", "N Probes =", nrow(Probes), ";","CHR", Chromosome),
              y = "mean M-value change",
              x = "nucleotide")+
         theme_classic()+
@@ -3245,3 +3245,243 @@ M_change %>%
         theme_classic()+
         theme(axis.text.x = element_text(angle = 90))+
         scale_x_continuous(n.breaks = 20)
+
+
+
+
+
+
+
+
+##############################################################################
+
+### PCA and gene corelation
+
+################################################################
+
+
+# PCA 1 correlates with cell population
+
+pca.out <- prcomp(t(M_change[,1:32]), scale. = FALSE)
+
+plot(pca.out$x[,1:2])
+
+plot(pca.out$x[,2:3])
+text(pca.out$x[,2:3], labels = row.names(pca.out$x), pos = 4)
+
+
+# run correlation between pca.out$x[,1] with M_value from M_change dataset
+
+cor_results <- apply(M_change[1:32], 1, function(x) {
+        cor(x, pca.out$x[,1])
+})
+
+# took 2 min, way faster than expected
+
+as.data.frame(cor_results) %>% 
+        mutate(r_squared = cor_results^2) %>% 
+        arrange(-abs(r_squared)) %>% 
+        filter(r_squared > 0.95) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1),
+               entrezID = mapIds(org.Hs.eg.db, keys = UCSC_RefGene_Name, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first")) -> cor_data
+
+        
+# run ORA on most correlated probes
+
+cor_kegg <- gsameth(sig.cpg = cor_data$cpg,
+                                all.cpg = rownames(beta), 
+                                collection = KEGG_new$kg.sets, 
+                                array.type = "EPIC")
+
+cor_kegg %>% 
+        arrange(P.DE)
+
+write.csv(cor_kegg %>% 
+                  arrange(P.DE), "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/kegg_corr_PCA1.csv")
+
+
+# check which PCA1 correlated probes change significantly with time in MYO
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        filter(cpg %in% cor_data$cpg) %>% 
+        merge(., anno, by = "cpg") %>% 
+        arrange(-abs(delta_M)) 
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        filter(cpg %in% cor_data$cpg) %>% 
+        merge(., anno, by = "cpg") %>% 
+        arrange(-abs(delta_M))
+        
+
+
+# plot CPGs that were correlated with PCA1, and significant in MYO following RT
+
+
+pca.out$x[,1] %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = "FP") %>% 
+        dplyr::select(FP, "PCA1" = 2) -> pca_df
+
+# color based on cell population, x = PCA1, y = M_value
+
+DMPs_PM_vs_BM %>% filter(p.value < 0.05) %>% pull(cpg) -> z
+
+# filter cpgs that were NOT significant in myo+int
+
+DMPs_PH_vs_BH %>% filter(p.value > 0.05) %>% pull(cpg) -> z2
+
+
+# plot CPGs that are correlated with cell population, significant in MYO, but not in MYO+INT
+
+M_change %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% cor_data$cpg) %>% 
+        filter(cpg %in% z) %>% 
+        filter(cpg %in% z2) %>% 
+        dplyr::select(1:33) %>% 
+        pivot_longer(names_to = "FP", values_to = "M_val", cols = 2:33) %>% 
+        merge(., pca_df, by = "FP") %>% 
+        mutate(cell_population = substr(FP, nchar(FP), nchar(FP))) %>% 
+        ggplot(aes(x = PCA1, y = M_val, fill = cell_population, color = cell_population))+
+        geom_point()
+
+
+# extract df
+
+M_change %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% cor_data$cpg) %>% 
+        filter(cpg %in% z) %>% 
+        filter(cpg %in% z2)
+
+
+# get gene name of genes hypo and hyper methylation
+
+
+# hypo
+
+M_change %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% cor_data$cpg) %>% 
+        filter(cpg %in% z) %>% 
+        filter(cpg %in% z2) %>% 
+        filter(PM_vs_BM < 0) %>% 
+        merge(., anno, by ="cpg") %>% 
+        distinct(UCSC_RefGene_Name, .keep_all = TRUE) %>% 
+        filter(Relation_to_Island == "Island") %>% pull(UCSC_RefGene_Name)
+
+# get genes with multiple cpgs
+
+M_change %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% cor_data$cpg) %>% 
+        filter(cpg %in% z) %>% 
+        filter(cpg %in% z2) %>% 
+        filter(PM_vs_BM < 0) %>% 
+        merge(., anno, by ="cpg") %>% 
+        group_by(UCSC_RefGene_Name) %>% 
+        filter(n() > 1) %>% pull(UCSC_RefGene_Name) %>% unique()
+    
+        
+
+
+# hyper
+
+M_change %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% cor_data$cpg) %>% 
+        filter(cpg %in% z) %>% 
+        filter(cpg %in% z2) %>% 
+        filter(PM_vs_BM > 0) %>% 
+        merge(., anno, by ="cpg") %>% 
+        distinct(UCSC_RefGene_Name, .keep_all = TRUE)%>% 
+        filter(Relation_to_Island == "Island") %>% pull(UCSC_RefGene_Name)
+
+
+
+# get genes with multiple cpgs
+
+M_change %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% cor_data$cpg) %>% 
+        filter(cpg %in% z) %>% 
+        filter(cpg %in% z2) %>% 
+        filter(PM_vs_BM > 0) %>% 
+        merge(., anno, by ="cpg") %>% 
+        group_by(UCSC_RefGene_Name) %>% 
+        filter(n() > 1) %>% pull(UCSC_RefGene_Name) %>% unique()        # zero
+
+
+
+
+
+##############################################################################
+
+### Cell specific gene lists - differentially methylated
+
+################################################################
+
+# load cell specific gene lists from https://cells.ucsc.edu/?ds=muscle-cell-atlas
+
+files <- list.files("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Cell_specific_genes/", full.names = TRUE)
+
+
+for (i in 1:length(files)) {
+        gunzip(filename = files[i], remove = TRUE)
+        print(i)
+}
+
+
+tsv_files <- list.files("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Cell_specific_genes/", full.names = TRUE)
+
+
+for (i in 1:length(tsv_files)) {
+        z <- sapply(strsplit(tsv_files[i], split =  "/"), "[", 10)
+        
+        z <- str_remove(z, ".tsv")
+         
+        x <- read_tsv(file = tsv_files[i])
+        
+        assign(z, x)
+        print(i)
+}
+
+
+# check if myonuclei genes significant in MYO or MYO+INT
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% Myonuclei$symbol) %>% 
+        distinct(UCSC_RefGene_Name, .keep_all = TRUE)
+
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% Myonuclei$symbol) %>% 
+        distinct(UCSC_RefGene_Name, .keep_all = TRUE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

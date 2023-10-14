@@ -1917,7 +1917,36 @@ DMPs_PM_vs_BM %>%
 
 
 
+# visualize hypermethylated and decreased gene expression
 
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        mutate(gene_name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        merge(., df_res, by = "gene_name") %>% 
+        filter(Relation_to_Island == "Island") %>% 
+        filter(delta_M >0 & logFC <0) %>% 
+        ggplot(aes(x = delta_M, y = logFC))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        geom_text_repel(aes(label = gene_name))
+
+
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        mutate(gene_name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        merge(., df_res, by = "gene_name") %>% 
+        filter(Relation_to_Island == "Island") %>% 
+        filter(delta_M >0 & logFC <0) %>% 
+        ggplot(aes(x = delta_M, y = logFC))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        geom_text_repel(aes(label = gene_name))
 
 
 
