@@ -3373,7 +3373,8 @@ M_change %>%
         filter(PM_vs_BM < 0) %>% 
         merge(., anno, by ="cpg") %>% 
         distinct(UCSC_RefGene_Name, .keep_all = TRUE) %>% 
-        filter(Relation_to_Island == "Island") %>% pull(UCSC_RefGene_Name)
+        #filter(Relation_to_Island == "Island") %>% 
+        filter(UCSC_RefGene_Name %in% rownames(pooled_res3)) %>% pull(UCSC_RefGene_Name)
 
 # get genes with multiple cpgs
 
@@ -3400,7 +3401,7 @@ M_change %>%
         filter(PM_vs_BM > 0) %>% 
         merge(., anno, by ="cpg") %>% 
         distinct(UCSC_RefGene_Name, .keep_all = TRUE)%>% 
-        filter(Relation_to_Island == "Island") %>% pull(UCSC_RefGene_Name)
+        filter(UCSC_RefGene_Name %in% rownames(pooled_res3)) %>% pull(UCSC_RefGene_Name)
 
 
 
@@ -3459,29 +3460,183 @@ DMPs_PM_vs_BM %>%
         merge(., anno, by = "cpg") %>% 
         mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
         filter(UCSC_RefGene_Name %in% Myonuclei$symbol) %>% 
-        distinct(UCSC_RefGene_Name, .keep_all = TRUE)
+        distinct(cpg, .keep_all = TRUE) %>% 
+        mutate(symbol = UCSC_RefGene_Name) %>% 
+        merge(., Myonuclei, by = "symbol") %>% 
+        dplyr::select(1:10, 13) -> MYO_myonuclei
 
+write.csv(MYO_myonuclei, "./MYO_myonuclei.csv")
 
 DMPs_PH_vs_BH %>% 
         filter(p.value < 0.05) %>% 
         merge(., anno, by = "cpg") %>% 
         mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
         filter(UCSC_RefGene_Name %in% Myonuclei$symbol) %>% 
-        distinct(UCSC_RefGene_Name, .keep_all = TRUE)
+        distinct(cpg, .keep_all = TRUE) %>% 
+        mutate(symbol = UCSC_RefGene_Name) %>% 
+        merge(., Myonuclei, by = "symbol") %>% 
+        dplyr::select(1:10, 13) -> MYOINT_myonuclei
+
+write.csv(MYOINT_myonuclei, "./MYOINT_myonuclei.csv")
+
+
+# check satellite cell genes in MYO and MYO+INT
+
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% MuSCsandprogenitors1$symbol) %>% 
+        distinct(cpg, .keep_all = TRUE) %>% 
+        mutate(symbol = UCSC_RefGene_Name) %>% 
+        merge(., MuSCsandprogenitors1, by = "symbol") %>% 
+        dplyr::select(1:10, 13)-> MYO_MuSC_Progenitor1
+
+write.csv(MYO_MuSC_Progenitor1, "./MYO_MuSC_Progenitor1.csv")
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% MuSCsandprogenitors1$symbol) %>% 
+        distinct(cpg, .keep_all = TRUE) %>% 
+        mutate(symbol = UCSC_RefGene_Name) %>% 
+        merge(., MuSCsandprogenitors1, by = "symbol") %>% 
+        dplyr::select(1:10, 13)-> MYOINT_MuSC_Progenitor1
+
+write.csv(MYOINT_MuSC_Progenitor1, "./MYOINT_MuSC_Progenitor1.csv")
+
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% MuSCsandprogenitors2$symbol) %>% 
+        distinct(cpg, .keep_all = TRUE)%>% 
+        mutate(symbol = UCSC_RefGene_Name) %>% 
+        merge(., MuSCsandprogenitors2, by = "symbol") %>% 
+        dplyr::select(1:10, 13) -> MYO_MuSC_Progenitor2
+
+write.csv(MYO_MuSC_Progenitor2, "./MYO_MuSC_Progenitor2.csv")
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% MuSCsandprogenitors2$symbol) %>% 
+        distinct(cpg, .keep_all = TRUE)%>% 
+        mutate(symbol = UCSC_RefGene_Name) %>% 
+        merge(., MuSCsandprogenitors2, by = "symbol") %>% 
+        dplyr::select(1:10, 13) -> MYOINT_MuSC_Progenitor2
+
+write.csv(MYOINT_MuSC_Progenitor2, "./MYOINT_MuSC_Progenitor2.csv")
+
+
+
+# check innflamatory machrofages in MYO and MYO+INT
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% Inflammatorymacrophagesandmonocytes$symbol) %>% 
+        distinct(cpg, .keep_all = TRUE) %>% 
+        mutate(symbol = UCSC_RefGene_Name) %>% 
+        merge(., Inflammatorymacrophagesandmonocytes, by = "symbol") %>% 
+        dplyr::select(1:10, 13)-> MYO_Inf_macrophages
+
+write.csv(MYO_Inf_macrophages, "./MYO_Inf_macrophages.csv")
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% Inflammatorymacrophagesandmonocytes$symbol) %>% 
+        distinct(cpg, .keep_all = TRUE) %>% 
+        mutate(symbol = UCSC_RefGene_Name) %>% 
+        merge(., Inflammatorymacrophagesandmonocytes, by = "symbol") %>% 
+        dplyr::select(1:10, 13)-> MYOINT_Inf_macrophages
+
+write.csv(MYOINT_Inf_macrophages, "./MYOINT_Inf_macrophages.csv")
+
+
+# check fibroblasts in MYO and MYO + INT
+
+# pool Fibroblast genes
+
+Fibroblasts1 <- Fibroblasts1 %>% mutate(cell_population = "Fibroblast1")
+Fibroblasts2 <- Fibroblasts2 %>% mutate(cell_population = "Fibroblast2")
+Fibroblasts3 <- Fibroblasts3 %>% mutate(cell_population = "Fibroblast3")
+
+rbind(Fibroblasts1, Fibroblasts2) %>% 
+        rbind(., Fibroblasts3) %>% 
+        distinct(symbol, .keep_all = TRUE)-> Fibroblasts
+
+
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% Fibroblasts$symbol) %>% 
+        distinct(cpg, .keep_all = TRUE) %>% 
+        mutate(symbol = UCSC_RefGene_Name) %>% 
+        merge(., Fibroblasts, by = "symbol") %>% 
+        dplyr::select(1:10, 13, 16)-> MYO_fibroblasts
+
+write.csv(MYO_fibroblasts, "./MYO_fibroblasts.csv")
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% Fibroblasts$symbol) %>% 
+        distinct(cpg, .keep_all = TRUE) %>% 
+        mutate(symbol = UCSC_RefGene_Name) %>% 
+        merge(., Fibroblasts, by = "symbol") %>% 
+        dplyr::select(1:10, 13, 16)-> MYOINT_fibroblasts
+
+write.csv(MYOINT_fibroblasts, "./MYOINT_fibroblasts.csv")
+
+
+      
+# check overlap with pooled transcriptome
+
+MYO_myonuclei %>% 
+        filter(symbol %in% rownames(pooled_res3))
+
+MYOINT_myonuclei %>% 
+        filter(symbol %in% rownames(pooled_res3))
+
+MYO_MuSC_Progenitor1 %>% 
+        filter(symbol %in% rownames(pooled_res3))
+
+MYOINT_MuSC_Progenitor1 %>% 
+        filter(symbol %in% rownames(pooled_res3))
+
+MYO_MuSC_Progenitor2 %>% 
+        filter(symbol %in% rownames(pooled_res3))
+
+MYOINT_MuSC_Progenitor2 %>% 
+        filter(symbol %in% rownames(pooled_res3))
 
 
 
 
 
 
+################################################################
+
+### check MYH1 methylation and pooled data
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) -> x
 
 
-
-
-
-
-
-
-
-
-
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) -> y
