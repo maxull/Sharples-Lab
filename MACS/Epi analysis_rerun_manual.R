@@ -3418,7 +3418,44 @@ M_change %>%
         filter(n() > 1) %>% pull(UCSC_RefGene_Name) %>% unique()        # zero
 
 
+#### add KEGG pathway to genes
 
+M_change %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% cor_data$cpg) %>% 
+        filter(cpg %in% z) %>% 
+        filter(cpg %in% z2) %>% 
+        filter(PM_vs_BM < 0) %>% 
+        merge(., anno, by ="cpg")
+
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        filter(cpg %in% cor_data$cpg) %>% 
+        filter(cpg %in% z) %>% 
+        filter(cpg %in% z2) %>% 
+        merge(., anno, by ="cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1),
+               entrezID = mapIds(org.Hs.eg.db, keys = UCSC_RefGene_Name, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first")) %>% 
+        mutate(KEGG_pathway = imap(KEGG_new$kg.sets, ~if(entrezID %in% .x) .y else NULL))
+
+DMPs_PM_vs_BM %>%
+        filter(p.value < 0.05) %>%
+        filter(cpg %in% cor_data$cpg) %>%
+        filter(cpg %in% z) %>%
+        filter(cpg %in% z2) %>%
+        merge(., anno, by ="cpg") %>%
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1),
+               entrezID = mapIds(org.Hs.eg.db, keys = UCSC_RefGene_Name, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first")) %>%
+        rowwise() %>%  # Important: This ensures that each row is treated separately
+        mutate(KEGG_pathway = paste(
+                names(KEGG_new$kg.sets)[sapply(KEGG_new$kg.sets, function(x) entrezID %in% x)],
+                collapse = "; "
+        )) %>%
+        ungroup() -> PCA_MYO_GENES
+
+
+write.csv(PCA_MYO_GENES, "/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/MYO_only__genes.csv")
 
 
 ##############################################################################
@@ -3623,20 +3660,138 @@ MYOINT_MuSC_Progenitor2 %>%
 
 
 
+##############################################################################
 
-
+### Muscle fiber type specific genes, supplementary file 4 in Rubenstein et al. 2020
 
 ################################################################
 
-### check MYH1 methylation and pooled data
+# https://doi.org/10.1038/s41598-019-57110-6
 
-DMPs_PH_vs_BH %>% 
-        filter(p.value < 0.05) %>% 
-        merge(., anno, by = "cpg") %>% 
-        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) -> x
+
+Rubenstein_type1 <- c("ANKRD2",
+                      "ATP2A2",
+                      "CA3",
+                      "CASQ2",
+                      "CD36",
+                      "CYB5R1",
+                      "FABP3",
+                      "LDHB",
+                      "MYH7",
+                      "MYL12A",
+                      "MYL2",
+                      "MYL3",
+                      "MYL6B",
+                      "MYOZ2",
+                      "PDLIM1",
+                      "PLN",
+                      "TNNC1",
+                      "TNNI1",
+                      "TNNT1",
+                      "TPM3"
+)
+
+Rubenstein_type2a <- c("ALDOA",
+                       "ATP2A1",
+                       "DDIT4L",
+                       "ENO3",
+                       "G0S2",
+                       "GAPDH",
+                       "LDHA",
+                       "MYBPC2",
+                       "MYH1",
+                       "MYH2",
+                       "MYL1",
+                       "MYLPF",
+                       "PFKM",
+                       "PGM1",
+                       "PKM",
+                       "SLN",
+                       "TNNC2",
+                       "TNNI2",
+                       "TNNT3",
+                       "TPM1"
+)
+
+
+# check if type1 or 2 genes are significant in MYO or MYO+INT
+
+
 
 
 DMPs_PM_vs_BM %>% 
         filter(p.value < 0.05) %>% 
         merge(., anno, by = "cpg") %>% 
-        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) -> y
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% Rubenstein_type1) 
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% Rubenstein_type2a) 
+
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% Rubenstein_type1) 
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        filter(UCSC_RefGene_Name %in% Rubenstein_type2a) 
+
+
+# other myonuclei genes
+
+Myonuclei %>% 
+        mutate(overlap = ifelse(symbol %in% Rubenstein_type1, "Type1", ifelse(symbol %in% Rubenstein_type2a, "Type2a", "NA"))) %>% 
+        filter(overlap == "NA") %>% 
+        dplyr::select("UCSC_RefGene_Name" = symbol, "hprd_class" = 4) -> x
+
+
+DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        merge(., x, by = "UCSC_RefGene_Name")
+
+
+DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
+        merge(., x, by = "UCSC_RefGene_Name")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
