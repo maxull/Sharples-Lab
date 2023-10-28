@@ -3762,7 +3762,7 @@ DMPs_PM_vs_BM %>%
 
 DMPs_PH_vs_BH %>% 
         filter(p.value < 0.05) %>% 
-        merge(., anno, by = "cpg") %>% 
+        merge(., anno, by = "cpg") %>% head()
         mutate(UCSC_RefGene_Name = sapply(strsplit(UCSC_RefGene_Name, split = ";"), `[`, 1)) %>% 
         merge(., x, by = "UCSC_RefGene_Name")
 
@@ -3770,26 +3770,126 @@ DMPs_PH_vs_BH %>%
 
 
 
+##############################################################################
+        
+### get DMPs with lmFit and eBayes
+        
+################################################################
+
+library(limma)
+
+# make the design matrix
+
+
+FP = rep(c("FP1","FP2","FP4","FP5","FP6","FP7","FP8","FP12"), times = 4)
+
+condition = dfh$condition
+
+design <- model.matrix(~FP + condition)
+
+colnames(design) <- c("Intercept","FPFP12","FPFP2","FPFP4","FPFP5","FPFP6","FPFP7","FPFP8","conditionBM","conditionPH","conditionPM")
+
+
+# fit the model
+
+
+M_change %>%
+        dplyr::select(1:32) %>% 
+        lmFit(., design) -> fit
+
+
+colnames(fit$coefficients)
+
+# design contrast matrix
 
 
 
+cont.matrix <- makeContrasts(
+        Baseline_DIFF = conditionBM - Intercept,
+        Post_DIFF = conditionPM - conditionPH,
+        Change_MYO = conditionPM - conditionBM,
+        "Change_MYO+INT" = conditionPH - Intercept,
+        Interaction = (conditionPM - conditionBM) - (conditionPH - Intercept),
+        levels=design
+)
+
+
+# fit the contrasts
+
+fit2 <- contrasts.fit(fit, cont.matrix)
+
+fit2 <- eBayes(fit2)
+
+topTable(fit2, coef="Baseline_DIFF", number = Inf) %>% filter(adj.P.Val < 0.05) %>%  nrow()
+topTable(fit2, coef="Post_DIFF", number = Inf) %>% filter(adj.P.Val < 0.05) %>%  nrow()
+topTable(fit2, coef="Change_MYO", number = Inf) %>% filter(P.Value < 0.05) %>%  nrow()
+topTable(fit2, coef="Change_MYO+INT", number = Inf) %>% filter(adj.P.Val < 0.05) %>%  nrow()
+topTable(fit2, coef="Interaction", number = Inf) %>% filter(adj.P.Val < 0.05) %>%  nrow()
 
 
 
+# run the ebayes on the MYO samples alone
+
+
+FP = rep(c("FP1","FP2","FP4","FP5","FP6","FP7","FP8","FP12"), times = 2)
+
+condition = dfh %>% 
+        filter(condition == "BM" | condition == "PM") %>% 
+        pull(condition) %>% 
+        factor(., levels = c("BM", "PM"))
+
+design <- model.matrix(~FP + condition)
+
+colnames(design) <- c("Intercept","FPFP12","FPFP2","FPFP4","FPFP5","FPFP6","FPFP7","FPFP8","conditionPM")
+
+
+# fit the model
+
+
+M_change %>%
+        dplyr::select(9:16,25:32) %>% 
+        lmFit(., design) -> fit
+
+
+colnames(fit$coefficients)
+
+# design contrast matrix
 
 
 
+cont.matrix <- makeContrasts(
+        Change_MYO = conditionPM - Intercept,
+         levels=design
+)
 
 
+# fit the contrasts
+
+fit2 <- contrasts.fit(fit, cont.matrix)
+
+fit2 <- eBayes(fit2)
+
+topTable(fit2, coef="Change_MYO", number = Inf) %>% filter(adj.P.Val < 0.05) %>%  nrow()
 
 
+plotSA(fit)
 
 
+# check var in all probes
 
+row_variance <- apply(M_change[,1:32], 1, var)
 
+row_variance %>% 
+        as.data.frame() %>% 
+        dplyr::select("var" = 1) %>% 
+        ggplot(aes(x = var))+
+        geom_density()+
+        scale_x_continuous(trans = "sqrt", n.breaks = 20)
 
-
-
+row_variance %>% 
+        as.data.frame() %>% 
+        dplyr::select("var" = 1) %>%
+        filter(var > 0.1) %>% nrow()
 
 
 
