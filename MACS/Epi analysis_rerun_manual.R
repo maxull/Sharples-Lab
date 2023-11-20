@@ -3264,6 +3264,19 @@ M_change %>%
 
 pca.out <- prcomp(t(M_change[,1:32]), scale. = FALSE)
 
+loadings <- pca.out$rotation[,1]
+
+sorted_loadings <- sort(abs(loadings), decreasing = TRUE)
+top_loadings <- names(sorted_loadings)[1:20]
+
+# check genes
+
+anno %>% 
+        filter(cpg %in% top_loadings)
+
+
+
+
 plot(pca.out$x[,1:2])
 
 plot(pca.out$x[,2:3])

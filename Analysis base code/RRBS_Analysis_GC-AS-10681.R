@@ -1,0 +1,812 @@
+# Script for analysis of RRBS data pre-processed using Bismark
+# This script is specific for GC-AS-10681, data originating from GC-AS-10308
+
+# Load packages
+library(methylKit)
+library(dplyr)
+library(ggplot2)
+
+# Set working directory
+setwd('/Users/jamesboot/Documents/9.Genome Centre Files/GC-AS-10681/')
+
+# Locate all files
+inFiles <- as.list(list.files(path = 'bismark_cov_files',
+                      pattern = '*.cov.gz',
+                      full.names = T))
+
+# Create sample names based on filenames 
+samples <-
+  gsub(
+    'bismark_cov_files/GC-AS-10308-',
+    '',
+    list.files(
+      path = 'bismark_cov_files',
+      pattern = '*.cov.gz',
+      full.names = T
+    )
+  )
+samples <- gsub('_merged_R1_processed_val_1_bismark_bt2_pe_MOD.deduplicated.bismark.cov.gz', '', samples)
+
+# Make a treatment vector
+# 0 = control (baseline?) (B)
+# 1 = atrophy (A1)
+# 2 = recovery (R)
+# 3 = repeated atrophy (A2)
+# Base this on sample name
+treatments <- c()
+treatments[grep('B', samples)] <- 0
+treatments[grep('A1', samples)] <- 1
+treatments[grep('R', samples)] <- 2
+treatments[grep('A2', samples)] <- 3
+
+# Read in data using methRead
+dat <- methRead(inFiles,
+                sample.id = as.list(samples),
+                assembly = 'hg38',
+                pipeline = 'bismarkCoverage',
+                header = F,
+                treatment = treatments,
+                mincov = 10)
+
+# Set names of list elements
+names(dat) <- samples
+
+# Plot distribution of methylation per base
+for (x in samples) {
+  tiff(
+    filename = paste0(x, '_hist.tiff'),
+    height = 8,
+    width = 8,
+    units = 'in',
+    res = 300
+  )
+  getMethylationStats(dat[[x]], plot = TRUE, both.strands = FALSE)
+  dev.off()
+}
+
+# Filter low coverage (already filtered) and high coverage
+filt.dat = filterByCoverage(
+  dat,
+  lo.count = 10,
+  lo.perc = NULL,
+  hi.count = NULL,
+  hi.perc = 99.9
+)
+
+# Normalise coverage
+norm.filt.dat <- normalizeCoverage(filt.dat)
+
+# Merge everything together based on common bases
+meth <- unite(norm.filt.dat, destrand = F)
+
+# Cluster samples
+dendrogram <- clusterSamples(meth,
+               dist = "correlation",
+               method = "average",
+               plot = F)
+tiff(filename = 'dendrogram.tiff',
+     height = 8,
+     width = 8,
+     units = 'in',
+     res = 300)
+plot(dendrogram)
+dev.off()
+
+# PCA samples
+pca <- PCASamples(meth, obj.return = T)
+
+# Extract first two PCs
+pcaPlt <- as.data.frame(pca$x[, c(1,2)])
+
+# Add meta
+ID <- gsub('A1', '',
+           gsub('A2', '',
+                gsub('B', '', 
+                     gsub('R', '', samples))))
+
+treatmentVerb <- c()
+treatmentVerb[treatments == 0] <- 'B'
+treatmentVerb[treatments == 1] <- 'A1'
+treatmentVerb[treatments == 2] <- 'R'
+treatmentVerb[treatments == 3] <- 'A2'
+
+pcaPlt$Treatment <- treatmentVerb
+pcaPlt$ID <- ID
+
+# Plot
+ggplot(pcaPlt, aes(x = PC1, y = PC2, colour = ID, shape = Treatment)) +
+  geom_point(size = 5)
+ggsave(plot = last_plot(),
+       filename = 'pca.tiff',
+       height = 8,
+       width = 8,
+       units = 'in',
+       dpi = 300)
+
+# Subset data to perform pairwise comparisons:
+# Make a list of subsets
+comparisons <- list()
+
+# a.  Atrophy compared to Baseline
+comparisons[['A1-B']] <- reorganize(meth,
+                                    sample.ids = meth@sample.ids[meth@treatment %in% c(1, 0)],
+                                    treatment = meth@treatment[meth@treatment %in% c(1, 0)])
+# b.  Recovery compared to Baseline
+comparisons[['R-B']] <- reorganize(meth,
+                                   sample.ids = meth@sample.ids[meth@treatment %in% c(2, 0)],
+                                   treatment = meth@treatment[meth@treatment %in% c(2, 0)])
+# c.  Repeated atrophy compared to Baseline
+comparisons[['A2-B']] <- reorganize(meth,
+                                    sample.ids = meth@sample.ids[meth@treatment %in% c(3, 0)],
+                                    treatment = meth@treatment[meth@treatment %in% c(3, 0)])
+# d.  Recovery compared to atrophy
+comparisons[['R-A1']] <- reorganize(meth,
+                                    sample.ids = meth@sample.ids[meth@treatment %in% c(2, 1)],
+                                    treatment = meth@treatment[meth@treatment %in% c(2, 1)])
+# e.  Repeated atrophy compared to Recovery
+comparisons[['A2-R']] <- reorganize(meth,
+                                    sample.ids = meth@sample.ids[meth@treatment %in% c(3, 2)],
+                                    treatment = meth@treatment[meth@treatment %in% c(3, 2)])
+# f.  Repeated atrophy compared to atrophy
+comparisons[['A2-A1']] <- reorganize(meth,
+                                     sample.ids = meth@sample.ids[meth@treatment %in% c(3, 1)],
+                                     treatment = meth@treatment[meth@treatment %in% c(3, 1)])
+
+# Calculate differential methylation for all comparisons
+diffMethResults <- list()
+for (comp in names(comparisons)) {
+  diffMethResults[[comp]] <- calculateDiffMeth(comparisons[[comp]])
+}
+
+# Annotate bases 
+library(annotatr)
+
+# Select annotations for intersection with regions
+# Note inclusion of custom annotation, and use of shortcuts
+annots = c('hg38_basicgenes')
+
+# Build the annotations (a single GRanges object)
+annotations = build_annotations(genome = 'hg38', annotations = annots)
+
+# Loop to go through all comparisons, annotate, export results
+for (comp in names(diffMethResults)) {
+  print(paste('Starting for compairson:', comp))
+  # Intersect the regions we read in with the annotations
+  test <- as(diffMethResults[[comp]], "GRanges")
+  print('Annotating...')
+  dm_annotated = annotate_regions(
+    regions = test,
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE
+  )
+  
+  print('Converting to dataframe...')
+  test_df = as(dm_annotated, "data.frame")
+  
+  print('Exporting at CSV...')
+  write.csv(test_df, file = paste0(comp, '_DM_Result.csv'))
+}
+
+
+
+
+
+#############################################################################
+
+### Max continuation
+
+#############################################################################
+
+library(methylKit)
+library(tidyverse)
+
+
+
+# create dataframe with one participant and annotate
+
+# filter out probes where number of Ts and Cs does not equal coverage (eks. ~2000 in 12A1)
+
+df <- data.frame(chr = norm.filt.dat[[1]]$chr,
+           start = norm.filt.dat[[1]]$start,
+           end = norm.filt.dat[[1]]$end, 
+           strand = norm.filt.dat[[1]]$strand,
+           coverage = norm.filt.dat[[1]]$coverage, 
+           numCs = norm.filt.dat[[1]]$numCs,
+           numTs = norm.filt.dat[[1]]$numTs) %>% 
+  mutate(check = numTs+numCs==coverage) %>% 
+  filter(check == TRUE) %>% 
+  dplyr::select(1:7) %>% 
+  mutate(percent_meth = numCs/coverage)
+
+# try to annotate
+
+BiocManager::install("annotatr")
+library(annotatr)
+BiocManager::install("TxDb.Hsapiens.UCSC.hg38.knownGene")
+
+# Select annotations for intersection with regions
+# Note inclusion of custom annotation, and use of shortcuts
+annots = c('hg38_basicgenes')
+
+# Build the annotations (a single GRanges object)
+annotations = build_annotations(genome = 'hg38', annotations = annots)
+
+
+# annotate df
+dm_annotated = annotate_regions(
+  regions = as(df, "GRanges"),
+  annotations = annotations,
+  ignore.strand = TRUE,
+  quiet = FALSE
+)
+
+# convert annotated data to data.frame
+dm_annotated %>% as.data.frame() -> x
+
+
+
+saveRDS(annotations, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/annotations.RDATA")
+
+# create list of norm.filt.dat percent meth data
+
+FP12 <- list()
+FP15 <- list()
+FP27 <- list()
+FP3 <- list()
+FP4 <- list()
+FP5 <- list()
+FP7 <- list()
+FP8 <- list()
+FP9 <- list()
+
+for (i in 1:4) {
+  
+  print(paste("calculating % meth",names(norm.filt.dat[i])))
+  
+  df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                   start = norm.filt.dat[[i]]$start,
+                   end = norm.filt.dat[[i]]$end, 
+                   strand = norm.filt.dat[[i]]$strand,
+                   coverage = norm.filt.dat[[i]]$coverage, 
+                   numCs = norm.filt.dat[[i]]$numCs,
+                   numTs = norm.filt.dat[[i]]$numTs) %>% 
+    mutate(check = numTs+numCs==coverage) %>% 
+    filter(check == TRUE) %>% 
+    dplyr::select(1:7) %>% 
+    mutate(percent_meth = numCs/coverage)
+  
+  print(paste("annotating",names(norm.filt.dat[i])))
+  
+  # annotate df
+  dm_annotated = annotate_regions(
+    regions = as(df, "GRanges"),
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE
+  )
+  
+  # convert annotated data to data.frame
+  dm_annotated %>% as.data.frame() -> x
+  
+  FP12[[names(norm.filt.dat[i])]] <- x
+  
+  print(paste("done with",i, "/ 36", "   --- sample:", names(norm.filt.dat[i]))) # tell me how far i have come
+}
+
+saveRDS(FP12, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP12_meth.RDATA")
+
+FP15 <- list()
+
+for (i in 5:8) {
+  
+  print(paste("calculating % meth",names(norm.filt.dat[i])))
+  
+  df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                   start = norm.filt.dat[[i]]$start,
+                   end = norm.filt.dat[[i]]$end, 
+                   strand = norm.filt.dat[[i]]$strand,
+                   coverage = norm.filt.dat[[i]]$coverage, 
+                   numCs = norm.filt.dat[[i]]$numCs,
+                   numTs = norm.filt.dat[[i]]$numTs) %>% 
+    mutate(check = numTs+numCs==coverage) %>% 
+    filter(check == TRUE) %>% 
+    dplyr::select(1:7) %>% 
+    mutate(percent_meth = numCs/coverage)
+  
+  print(paste("annotating",names(norm.filt.dat[i])))
+  
+  # annotate df
+  dm_annotated = annotate_regions(
+    regions = as(df, "GRanges"),
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE
+  )
+  
+  # convert annotated data to data.frame
+  dm_annotated %>% as.data.frame() -> x
+  
+  FP15[[names(norm.filt.dat[i])]] <- x
+  
+  print(paste("done with",i, "/ 36", "   --- sample:", names(norm.filt.dat[i]))) # tell me how far i have come
+}
+
+saveRDS(FP15, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP15_meth.RDATA")
+
+FP27 <- list()
+
+for (i in 9:12) {
+  
+  print(paste("calculating % meth",names(norm.filt.dat[i])))
+  
+  df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                   start = norm.filt.dat[[i]]$start,
+                   end = norm.filt.dat[[i]]$end, 
+                   strand = norm.filt.dat[[i]]$strand,
+                   coverage = norm.filt.dat[[i]]$coverage, 
+                   numCs = norm.filt.dat[[i]]$numCs,
+                   numTs = norm.filt.dat[[i]]$numTs) %>% 
+    mutate(check = numTs+numCs==coverage) %>% 
+    filter(check == TRUE) %>% 
+    dplyr::select(1:7) %>% 
+    mutate(percent_meth = numCs/coverage)
+  
+  print(paste("annotating",names(norm.filt.dat[i])))
+  
+  # annotate df
+  dm_annotated = annotate_regions(
+    regions = as(df, "GRanges"),
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE
+  )
+  
+  # convert annotated data to data.frame
+  dm_annotated %>% as.data.frame() -> x
+  
+  FP27[[names(norm.filt.dat[i])]] <- x
+  
+  print(paste("done with",i, "/ 36", "   --- sample:", names(norm.filt.dat[i]))) # tell me how far i have come
+}
+
+
+saveRDS(FP27, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP27_meth.RDATA")
+
+
+FP3 <- list()
+
+for (i in 13:16) {
+  
+  print(paste("calculating % meth",names(norm.filt.dat[i])))
+  
+  df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                   start = norm.filt.dat[[i]]$start,
+                   end = norm.filt.dat[[i]]$end, 
+                   strand = norm.filt.dat[[i]]$strand,
+                   coverage = norm.filt.dat[[i]]$coverage, 
+                   numCs = norm.filt.dat[[i]]$numCs,
+                   numTs = norm.filt.dat[[i]]$numTs) %>% 
+    mutate(check = numTs+numCs==coverage) %>% 
+    filter(check == TRUE) %>% 
+    dplyr::select(1:7) %>% 
+    mutate(percent_meth = numCs/coverage)
+  
+  print(paste("annotating",names(norm.filt.dat[i])))
+  
+  # annotate df
+  dm_annotated = annotate_regions(
+    regions = as(df, "GRanges"),
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE
+  )
+  
+  # convert annotated data to data.frame
+  dm_annotated %>% as.data.frame() -> x
+  
+  FP3[[names(norm.filt.dat[i])]] <- x
+  
+  print(paste("done with",i, "/ 36", "   --- sample:", names(norm.filt.dat[i]))) # tell me how far i have come
+}
+
+
+saveRDS(FP3, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP3_meth.RDATA")
+
+
+FP4 <- list()
+
+for (i in 17:20) {
+  
+  print(paste("calculating % meth",names(norm.filt.dat[i])))
+  
+  df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                   start = norm.filt.dat[[i]]$start,
+                   end = norm.filt.dat[[i]]$end, 
+                   strand = norm.filt.dat[[i]]$strand,
+                   coverage = norm.filt.dat[[i]]$coverage, 
+                   numCs = norm.filt.dat[[i]]$numCs,
+                   numTs = norm.filt.dat[[i]]$numTs) %>% 
+    mutate(check = numTs+numCs==coverage) %>% 
+    filter(check == TRUE) %>% 
+    dplyr::select(1:7) %>% 
+    mutate(percent_meth = numCs/coverage)
+  
+  print(paste("annotating",names(norm.filt.dat[i])))
+  
+  # annotate df
+  dm_annotated = annotate_regions(
+    regions = as(df, "GRanges"),
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE
+  )
+  
+  # convert annotated data to data.frame
+  dm_annotated %>% as.data.frame() -> x
+  
+  FP4[[names(norm.filt.dat[i])]] <- x
+  
+  print(paste("done with",i, "/ 36", "   --- sample:", names(norm.filt.dat[i]))) # tell me how far i have come
+}
+saveRDS(FP4, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP4_meth.RDATA")
+
+
+FP5 <- list()
+
+for (i in 21:24) {
+  
+  print(paste("calculating % meth",names(norm.filt.dat[i])))
+  
+  df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                   start = norm.filt.dat[[i]]$start,
+                   end = norm.filt.dat[[i]]$end, 
+                   strand = norm.filt.dat[[i]]$strand,
+                   coverage = norm.filt.dat[[i]]$coverage, 
+                   numCs = norm.filt.dat[[i]]$numCs,
+                   numTs = norm.filt.dat[[i]]$numTs) %>% 
+    mutate(check = numTs+numCs==coverage) %>% 
+    filter(check == TRUE) %>% 
+    dplyr::select(1:7) %>% 
+    mutate(percent_meth = numCs/coverage)
+  
+  print(paste("annotating",names(norm.filt.dat[i])))
+  
+  # annotate df
+  dm_annotated = annotate_regions(
+    regions = as(df, "GRanges"),
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE
+  )
+  
+  # convert annotated data to data.frame
+  dm_annotated %>% as.data.frame() -> x
+  
+  FP5[[names(norm.filt.dat[i])]] <- x
+  
+  print(paste("done with",i, "/ 36", "   --- sample:", names(norm.filt.dat[i]))) # tell me how far i have come
+}
+
+saveRDS(FP5, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP5_meth.RDATA")
+
+
+# FP7
+names(norm.filt.dat)
+
+for (i in 25:28) {
+  
+  print(paste("calculating % meth",names(norm.filt.dat[i])))
+  
+  df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                   start = norm.filt.dat[[i]]$start,
+                   end = norm.filt.dat[[i]]$end, 
+                   strand = norm.filt.dat[[i]]$strand,
+                   coverage = norm.filt.dat[[i]]$coverage, 
+                   numCs = norm.filt.dat[[i]]$numCs,
+                   numTs = norm.filt.dat[[i]]$numTs) %>% 
+    mutate(check = numTs+numCs==coverage) %>% 
+    filter(check == TRUE) %>% 
+    dplyr::select(1:7) %>% 
+    mutate(percent_meth = numCs/coverage)
+  
+  print(paste("annotating",names(norm.filt.dat[i])))
+  
+  # annotate df
+  dm_annotated = annotate_regions(
+    regions = as(df, "GRanges"),
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE
+  )
+  
+  # convert annotated data to data.frame
+  dm_annotated %>% as.data.frame() -> x
+  
+  FP7[[names(norm.filt.dat[i])]] <- x
+  
+  print(paste("done with",i, "/ 36", "   --- sample:", names(norm.filt.dat[i]))) # tell me how far i have come
+}
+
+saveRDS(FP7, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP7_meth.RDATA")
+
+
+
+# FP8
+
+for (i in 29:32) {
+  
+  print(paste("calculating % meth",names(norm.filt.dat[i])))
+  
+  df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                   start = norm.filt.dat[[i]]$start,
+                   end = norm.filt.dat[[i]]$end, 
+                   strand = norm.filt.dat[[i]]$strand,
+                   coverage = norm.filt.dat[[i]]$coverage, 
+                   numCs = norm.filt.dat[[i]]$numCs,
+                   numTs = norm.filt.dat[[i]]$numTs) %>% 
+    mutate(check = numTs+numCs==coverage) %>% 
+    filter(check == TRUE) %>% 
+    dplyr::select(1:7) %>% 
+    mutate(percent_meth = numCs/coverage)
+  
+  print(paste("annotating",names(norm.filt.dat[i])))
+  
+  # annotate df
+  dm_annotated = annotate_regions(
+    regions = as(df, "GRanges"),
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE
+  )
+  
+  # convert annotated data to data.frame
+  dm_annotated %>% as.data.frame() -> x
+  
+  FP8[[names(norm.filt.dat[i])]] <- x
+  
+  print(paste("done with",i, "/ 36", "   --- sample:", names(norm.filt.dat[i]))) # tell me how far i have come
+}
+
+saveRDS(FP8, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP8_meth.RDATA")
+
+
+#FP9
+
+for (i in 33:36) {
+  
+  print(paste("calculating % meth",names(norm.filt.dat[i])))
+  
+  df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                   start = norm.filt.dat[[i]]$start,
+                   end = norm.filt.dat[[i]]$end, 
+                   strand = norm.filt.dat[[i]]$strand,
+                   coverage = norm.filt.dat[[i]]$coverage, 
+                   numCs = norm.filt.dat[[i]]$numCs,
+                   numTs = norm.filt.dat[[i]]$numTs) %>% 
+    mutate(check = numTs+numCs==coverage) %>% 
+    filter(check == TRUE) %>% 
+    dplyr::select(1:7) %>% 
+    mutate(percent_meth = numCs/coverage)
+  
+  print(paste("annotating",names(norm.filt.dat[i])))
+  
+  # annotate df
+  dm_annotated = annotate_regions(
+    regions = as(df, "GRanges"),
+    annotations = annotations,
+    ignore.strand = TRUE,
+    quiet = FALSE
+  )
+  
+  # convert annotated data to data.frame
+  dm_annotated %>% as.data.frame() -> x
+  
+  FP9[[names(norm.filt.dat[i])]] <- x
+  
+  print(paste("done with",i, "/ 36", "   --- sample:", names(norm.filt.dat[i]))) # tell me how far i have come
+}
+
+saveRDS(FP9, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP9_meth.RDATA")
+
+
+
+########################################
+
+### read annotated meth data
+
+FP12 <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP12_meth.RDATA")
+FP15 <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP15_meth.RDATA")
+FP27 <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP27_meth.RDATA")
+FP3 <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP3_meth.RDATA")
+FP4 <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP4_meth.RDATA")
+FP5 <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP5_meth.RDATA")
+FP7 <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP7_meth.RDATA")
+FP8 <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP8_meth.RDATA")
+FP9 <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/FP9_meth.RDATA")
+
+
+
+
+
+#######################################################
+
+# check unique probes
+
+
+
+
+
+FP8$`8A1` %>% 
+  dplyr::select(1:2) %>% 
+  mutate(ID = paste(seqnames, start, sep = "_")) %>% 
+  distinct(ID)
+
+
+#############################
+
+# plot raw data
+
+df_raw <- data.frame("ID" = "NA", 
+                     "percent_meth" = "NA",
+                     "Sample" = "NA")
+
+for (i in 1:length(dat)) {
+        df <- data.frame(chr = dat[[i]]$chr,
+                   start = dat[[i]]$start,
+                   coverage = dat[[i]]$coverage, 
+                   numCs = dat[[i]]$numCs) %>% 
+        #head(100) %>% 
+        mutate(percent_meth = numCs/coverage, 
+                ID = paste(chr, start, sep = "_")) %>% 
+        dplyr::select(ID, percent_meth) %>% 
+        mutate(Sample = names(dat[i]))        
+  
+        df_raw <- rbind(df_raw, df)
+  
+        print(i)
+  
+}
+
+df_raw <- df_raw[-1,]
+df_raw$percent_meth <- as.numeric(df_raw$percent_meth)
+
+
+
+ggplot(df_raw, aes(x = percent_meth, color = Sample)) +
+        geom_density() +
+        theme_minimal() +
+        labs(title = "Raw Density Plot", x = "Percent_meth", y = "Density")
+
+
+
+
+# plot filtered data
+
+df_filt <- data.frame("ID" = "NA", 
+                     "percent_meth" = "NA",
+                     "Sample" = "NA")
+
+for (i in 1:length(norm.filt.dat)) {
+        df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                         start = norm.filt.dat[[i]]$start,
+                         coverage = norm.filt.dat[[i]]$coverage, 
+                         numCs = norm.filt.dat[[i]]$numCs) %>% 
+                #head(100) %>% 
+                mutate(percent_meth = numCs/coverage, 
+                       ID = paste(chr, start, sep = "_")) %>% 
+                dplyr::select(ID, percent_meth) %>% 
+                mutate(Sample = names(dat[i]))        
+        
+        df_filt <- rbind(df_filt, df)
+        
+        print(i)
+        
+}
+
+df_filt <- df_filt[-1,]
+df_filt$percent_meth <- as.numeric(df_filt$percent_meth)
+
+
+
+ggplot(df_filt, aes(x = percent_meth, color = Sample)) +
+        geom_density() +
+        theme_minimal() +
+        labs(title = "Filtered Density Plot", x = "Percent_meth", y = "Density")
+
+
+
+#####################
+
+### merge into one dataframe
+
+
+
+meth_df <- data.frame("ID" = "NA")
+
+for (i in 1:length(norm.filt.dat)) {
+        df <- data.frame(chr = norm.filt.dat[[i]]$chr,
+                         start = norm.filt.dat[[i]]$start,
+                         coverage = norm.filt.dat[[i]]$coverage, 
+                         numCs = norm.filt.dat[[i]]$numCs,
+                         numTs = norm.filt.dat[[i]]$numTs) %>% 
+        mutate(check = numTs+numCs==coverage) %>% 
+        filter(check == TRUE) %>%
+        mutate(percent_meth = numCs/coverage, 
+               ID = paste(chr, start, sep = "_")) %>% 
+        dplyr::select(ID, percent_meth) %>% 
+        distinct()
+        
+        names(df) <- c("ID", names(norm.filt.dat[i]))
+        
+        meth_df <- merge(meth_df, df, by = "ID", all = TRUE)
+        
+        print(i)
+        
+}
+
+
+
+saveRDS(meth_df, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/math_df.RDATA")
+
+
+# filter out rows/probes missing more than 4 measurements in at least one timepoint
+
+
+
+
+
+
+filtered_df <- meth_df %>% 
+        dplyr::select("ID", "3B", "4B", "5B", "7B", "8B", "9B", "12B", "15B", "27B",
+                      "3A1", "4A1", "5A1", "7A1", "8A1", "9A1", "12A1", "15A1", "27A1",
+                      "3R", "4R", "5R", "7R", "8R", "9R", "12R", "15R", "27R",
+                      "3A2", "4A2", "5A2", "7A2", "8A2", "9A2", "12A2", "15A2", "27A2") 
+
+
+filtered_df$baseline <- rowSums(is.na(filtered_df[,2:10]))
+filtered_df$atrophy1 <- rowSums(is.na(filtered_df[,11:19]))
+
+# ran out of memory, remove preliminary rows, and continue
+
+filtered_df <- filtered_df %>% 
+        filter(baseline <= 4 | atrophy1 <= 4)
+
+filtered_df$recovery <- rowSums(is.na(filtered_df[,20:28]))
+filtered_df$atrophy2 <- rowSums(is.na(filtered_df[,29:37]))
+
+filtered_df <- filtered_df %>% 
+        filter(recovery <= 4 | atrophy2 <= 4)
+
+
+
+##########################################
+
+### impute remaining NAs
+
+
+
+
+
+#########################################
+
+### plot PCA
+
+
+
+
+
+##########################################
+
+### run linear mixed effects model on dataframe with missing values
+
+
+
+
+
+
+
+
+
+
+
