@@ -3,7 +3,7 @@
 
 # Load packages
 library(methylKit)
-library(dplyr)
+library(tidyverse)
 library(ggplot2)
 
 # Set working directory
@@ -770,13 +770,21 @@ filtered_df$atrophy1 <- rowSums(is.na(filtered_df[,11:19]))
 # ran out of memory, remove preliminary rows, and continue
 
 filtered_df <- filtered_df %>% 
-        filter(baseline <= 4 | atrophy1 <= 4)
+        filter(baseline <= 4)
+
+filtered_df <- filtered_df %>% 
+        filter(atrophy1 <= 4)
+
 
 filtered_df$recovery <- rowSums(is.na(filtered_df[,20:28]))
 filtered_df$atrophy2 <- rowSums(is.na(filtered_df[,29:37]))
 
 filtered_df <- filtered_df %>% 
-        filter(recovery <= 4 | atrophy2 <= 4)
+        filter(recovery <= 4)
+
+filtered_df <- filtered_df %>% 
+        filter(atrophy2 <= 4)
+
 
 
 
@@ -788,12 +796,132 @@ filtered_df <- filtered_df %>%
 
 
 
+# split data into timepoints, impute mean, and recombine data
+
+baseline <- filtered_df[,2:10]
+atrophy1 <- filtered_df[,11:19]
+recovery <- filtered_df[,20:28]
+atrophy2 <- filtered_df[,29:37]
+
+
+
+baseline_imputeNA <- apply(baseline, 1, function(row) {
+        if (any(is.na(row))) {
+                non_na_values <- na.omit(as.numeric(row))
+                mean_val <- sum(non_na_values) / length(non_na_values)
+                row[is.na(row)] <- mean_val
+        }
+        return(row)
+})
+
+baseline_imputeNA <- as.data.frame(t(baseline_imputeNA))
+
+
+atrophy1_imputeNA <- apply(atrophy1, 1, function(row) {
+        if (any(is.na(row))) {
+                non_na_values <- na.omit(as.numeric(row))
+                mean_val <- sum(non_na_values) / length(non_na_values)
+                row[is.na(row)] <- mean_val
+        }
+        return(row)
+})
+
+atrophy1_imputeNA <- as.data.frame(t(atrophy1_imputeNA))
+
+
+recovery_imputeNA <- apply(recovery, 1, function(row) {
+        if (any(is.na(row))) {
+                non_na_values <- na.omit(as.numeric(row))
+                mean_val <- sum(non_na_values) / length(non_na_values)
+                row[is.na(row)] <- mean_val
+        }
+        return(row)
+})
+
+recovery_imputeNA <- as.data.frame(t(recovery_imputeNA))
+
+
+
+
+atrophy2_imputeNA <- apply(atrophy2, 1, function(row) {
+        if (any(is.na(row))) {
+                non_na_values <- na.omit(as.numeric(row))
+                mean_val <- sum(non_na_values) / length(non_na_values)
+                row[is.na(row)] <- mean_val
+        }
+        return(row)
+})
+
+atrophy2_imputeNA <- as.data.frame(t(atrophy2_imputeNA))
+
+
+### 
+
+### merge dataframes
+
+meth_imputeNA = data.frame(ID = filtered_df$ID)
+
+meth_imputeNA <- cbind(meth_imputeNA, baseline_imputeNA)
+
+meth_imputeNA <- cbind(meth_imputeNA, atrophy1_imputeNA)
+
+meth_imputeNA <- cbind(meth_imputeNA, recovery_imputeNA)
+
+meth_imputeNA <- cbind(meth_imputeNA, atrophy2_imputeNA)
+
+saveRDS(meth_imputeNA, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/meth_imputeNA_sum9.RDATA")
+
+saveRDS(meth_imputeNA, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/meth_imputeNA_mean.RDATA")
+
+meth_imputeNA <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/meth_imputeNA_mean.RDATA")
+
 #########################################
 
 ### plot PCA
 
 
+pca.out <- prcomp(t(meth_imputeNA[2:37]), scale. = FALSE)
 
+saveRDS(pca.out, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/pca.out.RDATA")
+
+
+# Extract the proportion of variance explained by each principal component
+var_explained <- pca.out$sdev^2 / sum(pca.out$sdev^2)
+
+# Create a data frame for plotting
+df <- data.frame(Component = 1:length(var_explained), Variance = var_explained)
+
+# Keep only the first 50 principal components
+df <- df[1:50,]
+
+# Plot
+
+ggplot(df, aes(x = Component, y = Variance)) +
+        geom_bar(stat = "identity") +
+        scale_x_continuous(breaks = 1:50) +
+        labs(x = "Principal Component", y = "Proportion of Variance Explained",
+             title = "Variance Explained by Principal Components")+
+        theme_bw()
+
+library(ggrepel)
+
+ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
+        geom_point() +
+        geom_text_repel(data = data.frame(pca.out$x), aes(label = rownames(data.frame(pca.out$x)))) +
+        labs(x = "PC1", y = "PC2", title = "First Two Principal Components")+
+        theme_bw()
+
+
+# density plot
+
+library(reshape2)
+
+melt(meth_imputeNA[2:37],variable.name = "Sample", value.name = "Value") %>% 
+
+        ggplot(aes(x = Value, color = Sample)) +
+        geom_density() +
+        theme_minimal() +
+        labs(title = "ImputedNA Density Plot", x = "Percent_meth", y = "Density")
 
 
 ##########################################
@@ -801,7 +929,7 @@ filtered_df <- filtered_df %>%
 ### run linear mixed effects model on dataframe with missing values
 
 
-
+colnames(filtered_df)
 
 
 
