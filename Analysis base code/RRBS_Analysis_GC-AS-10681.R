@@ -869,8 +869,6 @@ meth_imputeNA <- cbind(meth_imputeNA, recovery_imputeNA)
 
 meth_imputeNA <- cbind(meth_imputeNA, atrophy2_imputeNA)
 
-saveRDS(meth_imputeNA, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/meth_imputeNA_sum9.RDATA")
-
 saveRDS(meth_imputeNA, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/meth_imputeNA_mean.RDATA")
 
 meth_imputeNA <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/meth_imputeNA_mean.RDATA")
@@ -884,6 +882,7 @@ pca.out <- prcomp(t(meth_imputeNA[2:37]), scale. = FALSE)
 
 saveRDS(pca.out, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/pca.out.RDATA")
 
+pca.out <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/pca.out.RDATA")
 
 # Extract the proportion of variance explained by each principal component
 var_explained <- pca.out$sdev^2 / sum(pca.out$sdev^2)
@@ -910,6 +909,30 @@ ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
         geom_text_repel(data = data.frame(pca.out$x), aes(label = rownames(data.frame(pca.out$x)))) +
         labs(x = "PC1", y = "PC2", title = "First Two Principal Components")+
         theme_bw()
+
+
+# check for outliers
+
+# Compute Mahalanobis distances for the first two principal components
+distances <- mahalanobis(pca.out$x[,1:2], colMeans(pca.out$x[,1:2]), cov(pca.out$x[,1:2]))
+
+# Identify outliers as samples with a Mahalanobis distance greater than a certain threshold
+# Here, I'm using the 97.5 percentile of the Chi-square distribution with 3 degrees of freedom as the threshold
+outliers <- which(distances > qchisq(0.975, df = 3))
+
+# Print the row names of the outliers
+print(colnames(filtered_df[2:37])[outliers])
+
+# Plot the first two principal components, highlighting the outliers
+
+ggplot(data.frame(pca.out$x), aes(x = PC1, y = PC2)) +
+        geom_point() +
+        geom_text_repel(data = data.frame(pca.out$x)[outliers,], aes(label = rownames(data.frame(pca.out$x))[outliers])) +
+        labs(x = "PC1", y = "PC2", title = "First Two Principal Components with Outliers Highlighted")
+
+
+
+
 
 
 # density plot
