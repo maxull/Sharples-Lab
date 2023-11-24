@@ -748,7 +748,7 @@ for (i in 1:length(norm.filt.dat)) {
 
 
 saveRDS(meth_df, "/Users/maxul/Documents/Skole/Lab/RMA_RRBS/math_df.RDATA")
-
+meth_df <- readRDS("/Users/maxul/Documents/Skole/Lab/RMA_RRBS/math_df.RDATA")
 
 # filter out rows/probes missing more than 4 measurements in at least one timepoint
 
@@ -951,13 +951,125 @@ melt(meth_imputeNA[2:37],variable.name = "Sample", value.name = "Value") %>%
 
 ### run linear mixed effects model on dataframe with missing values
 
+library(lme4)
+library(emmeans)
+
 
 colnames(filtered_df)
 
+# add pheno data
+
+FP = c(3,4,5,7,8,9,12,15,27)
+sex = c("female","male","male","male","male","female","male","male","male")
+age = c(21,21,30,26,33,27,25,31,28)
+
+lmm_data <- data.frame("FP" = as.factor(FP),
+           "sex" = as.factor(sex),
+           "age" = age)
+
+# transform dataframe to long format
+
+
+lmm_data$baseline <- as.numeric(filtered_df[1,2:10])
+
+lmm_data$atrphy1 <- as.numeric(filtered_df[1,11:19])
+
+lmm_data$recovery <- as.numeric(filtered_df[1,20:28])
+
+lmm_data$atrophy2 <- as.numeric(filtered_df[1,29:37])
+
+
+# change to long format
+
+lmm_data %>% 
+        pivot_longer(cols = 4:7, names_to = "timepoint", values_to = "percent_meth") -> x
+
+#x$timepoint = factor(x$timepoint, levels = c("baseline", "atrophy1", "recovery","atrophy2"))
+
+
+# run mixed model
+
+model <- lmer(percent_meth ~ timepoint + age + sex + (1|FP), data = x)
+
+summary(model)
+
+
+# post-hoc analysis for timepoint
+
+post_hoc_results <- emmeans(model, pairwise ~ timepoint)
+
+print(post_hoc_results)
 
 
 
+plot(resid(model))
+qqnorm(resid(model))
+qqline(resid(model))
 
 
 
+# run on all probes
 
+lmm_models <- list()
+
+
+for (i in 1:100) {
+        
+        
+        lmm_data$baseline <- as.numeric(filtered_df[i,2:10])
+        
+        lmm_data$atrphy1 <- as.numeric(filtered_df[i,11:19])
+        
+        lmm_data$recovery <- as.numeric(filtered_df[i,20:28])
+        
+        lmm_data$atrophy2 <- as.numeric(filtered_df[i,29:37])
+        
+        # change to long format
+        
+        lmm_data %>% 
+                pivot_longer(cols = 4:7, names_to = "timepoint", values_to = "percent_meth") -> x
+        
+        # run mixed model
+        
+        model <- lmer(percent_meth ~ timepoint + age + sex + (1|FP), data = x)
+        
+        
+        lmm_models[filtered_df$ID[i]] <- model
+        
+        print(i)
+        
+        
+        
+}
+
+
+emmeans_models <- list()
+
+for (i in 1:length(lmm_models)) {
+        
+        try({
+        
+        post_hoc_results <- emmeans(lmm_models[[i]], pairwise ~ timepoint)
+        
+        }, silent = TRUE)
+        
+        if (any(as.data.frame(post_hoc_results[[2]])$p.value < 0.05)) {
+                
+                emmeans_models[[names(lmm_models[i])]] <- post_hoc_results
+        }
+        
+        print(i)
+        
+        
+}
+
+
+summary(emmeans_models[[1]])
+
+summary(lmm_models[["chr1_1000135"]])
+
+plot(resid(lmm_models[["chr1_1000135"]]))
+qqnorm(resid(lmm_models[["chr1_1000135"]]))
+qqline(resid(lmm_models[["chr1_1000135"]]))
+
+plot(emmeans_models[[1]])
