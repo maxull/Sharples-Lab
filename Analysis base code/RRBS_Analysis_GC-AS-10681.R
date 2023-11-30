@@ -947,6 +947,44 @@ melt(meth_imputeNA[2:37],variable.name = "Sample", value.name = "Value") %>%
         labs(title = "ImputedNA Density Plot", x = "Percent_meth", y = "Density")
 
 
+
+###########################################
+
+### remove non-variable CpGs to greatly reduce total number of diff-methylation tests
+
+# example code that needs to be adapted from https://nbis-workshop-epigenomics.readthedocs.io/en/latest/content/tutorials/methylationSeq/Seq_Tutorial.html
+
+# get percent methylation matrix
+pm=percMethylation(meth)
+
+# calculate standard deviation of CpGs
+sds=matrixStats::rowSds(pm)
+
+# Visualize the distribution of the per-CpG standard deviation
+# to determine a suitable cutoff
+hist(sds, breaks = 100)
+
+# keep only CpG with standard deviations larger than 2%
+meth <- meth[sds > 2]
+
+# This leaves us with this number of CpG sites
+nrow(meth)
+
+
+
+#########################################
+
+### remove known SNPs
+
+
+
+
+
+
+
+
+
+
 ##########################################
 
 ### run linear mixed effects model on dataframe with missing values
@@ -956,6 +994,8 @@ library(emmeans)
 
 
 colnames(filtered_df)
+
+
 
 # add pheno data
 
