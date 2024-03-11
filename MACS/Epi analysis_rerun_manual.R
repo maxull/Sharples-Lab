@@ -24,6 +24,8 @@ library(lme4)
 library(lmerTest)
 library(ggvenn)
 library(viridis)
+library(ENmix)
+library(gageData)
 
 setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/")
 
@@ -1545,7 +1547,7 @@ beta[rownames(beta) %in% IGF2_dmps$cpg,] %>%
 x <- Illumina_anno %>% 
         mutate(UCSC_RefGene_Name = str_split(UCSC_RefGene_Name, ";", simplify = TRUE)[, 1]) 
 
-unique_gene <- unique(x$UCSC_RefGene_Name) 
+unique_gene <- unique(anno$UCSC_RefGene_Name) 
 unique_gene <- Filter(function(x) x != "", unique_gene)
 
 gene_cpgs <- list()
@@ -1553,9 +1555,9 @@ gene_cpgs <- list()
 # create subset of probes annotated to individual genes
 
 for (i in 1:length(unique_gene)) {
-        y <- x %>% 
+        y <- anno %>% 
                 filter(UCSC_RefGene_Name == unique_gene[i]) %>% 
-                pull(Name)
+                pull(cpg)
         gene_cpgs[[unique_gene[i]]] <- y
         print(i)
 }
@@ -1594,7 +1596,7 @@ for (i in 1:length(unique_gene)) {
 }
 
 # View the results data frame
-results_df
+results_df %>% unique(results_df$gene)
 
 
 # Load the package
@@ -2021,7 +2023,7 @@ for (i in 1:length(go.sets.hs)) {
 
 data("go.subs.hs")
 
-BP_GO <- names(go.sets.hs[go.subs.hs$BP])
+BP_GO <- names(go.sets$go.sets[go.sets$go.subs$BP])
 CC_GO <- names(go.sets.hs[go.subs.hs$CC])
 MF_GO <- names(go.sets.hs[go.subs.hs$MF])
 
@@ -2396,7 +2398,7 @@ results_df %>%
 
 _________________________________________________
 
-# fins probes in genes
+# find probes in genes
 
 _________________________________________________
 
@@ -3255,7 +3257,7 @@ M_change %>%
 
 ##############################################################################
 
-### PCA and gene corelation
+### PCA and gene correlation
 
 ################################################################
 
@@ -3266,8 +3268,420 @@ pca.out <- prcomp(t(M_change[,1:32]), scale. = FALSE)
 
 loadings <- pca.out$rotation[,1]
 
-sorted_loadings <- sort(abs(loadings), decreasing = TRUE)
-top_loadings <- names(sorted_loadings)[1:20]
+sorted_loadings <- sort((loadings), decreasing = TRUE) 
+top_loadings <- names(sorted_loadings)[1:100]
+
+# load annotation df
+
+anno <- readRDS("anno.RDATA")
+
+as.data.frame(top_loadings) %>% 
+        dplyr::select("cpg" = top_loadings) %>% 
+        merge(., anno, by = "cpg")
+        
+
+# identify drivers towards left, i.e. homogenate by fintering the negative values and arranging
+
+
+loadings %>% 
+        as.data.frame() %>% 
+        dplyr::select("PC1" = 1) %>% 
+        arrange(PC1) %>% 
+        filter(PC1 < 0) %>%     # nrow = 374432
+        head(10000) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") -> neg_PC1
+
+loadings %>% 
+        as.data.frame() %>% 
+        dplyr::select("PC1" = 1) %>% 
+        arrange(-PC1) %>% 
+        filter(PC1 > 0) %>%     # nrow = 374432
+        head(10000) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") -> pos_PC1
+
+
+# plot correlation between top 100 drivers of PC1 between MYO and MYO+INT
+
+### run ORA on top negative PCA1 probes
+
+# get updated go pathways
+
+go.sets <- go.gsets(species = "human", pkg.name=NULL, id.type = "eg", keep.evidence=FALSE)
+
+# Run ORA
+
+
+GO_neg_PCA1 <- gsameth(sig.cpg = neg_PC1$cpg,
+                    all.cpg = rownames(beta), 
+                    collection = go.sets$go.sets,
+                    array.type = "EPIC")
+
+GO_neg_PCA1 <- GO_neg_PCA1 %>% filter(FDR<0.05)
+
+GO_pos_PCA1 <- gsameth(sig.cpg = pos_PC1$cpg,
+                       all.cpg = rownames(beta), 
+                       collection = go.sets$go.sets,
+                       array.type = "EPIC")
+
+GO_pos_PCA1 <- GO_pos_PCA1 %>% filter(FDR<0.05)
+
+### calculate mean methylations and plot
+
+# add direction of methylation for GO pathways
+
+# calculate mean delta M for each gene
+
+mean_change_df <- M_change %>% dplyr::select(37)
+
+
+# Assuming you have a data frame named 'mean_change_df' with columns 'PH_vs_BH' and 'PM_vs_BM', and rownames as probe names
+
+# Initialize an empty data frame to store the results
+results_df <- data.frame(
+        gene = character(length(unique_gene)),
+        mean_change_BM_vs_BH = numeric(length(unique_gene)),
+        stringsAsFactors = FALSE
+)
+
+# Loop through unique genes and calculate mean change
+for (i in 1:length(unique_gene)) {
+        gene <- unique_gene[i]
+        gene_probes <- gene_cpgs[[gene]]
+        
+        # Filter the mean_change_df to keep only the rows corresponding to the gene's probes
+        gene_mean_change <- mean_change_df[rownames(mean_change_df) %in% gene_probes, ]
+        
+        # Calculate the mean change for each contrast and store it in the results data frame
+        results_df[i, "gene"] <- gene
+        results_df[i, "mean_change_BM_vs_BH"] <- sum(gene_mean_change) / length(gene_probes)
+        
+        
+        print(i)
+}
+
+# Convert gene symbols to Entrez Gene IDs
+entrezIDs <- mapIds(org.Hs.eg.db, keys = results_df$gene, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first")
+
+as.data.frame(entrezIDs) %>% 
+        rownames_to_column(var = "gene") %>% 
+        merge(results_df,., by = "gene") %>% 
+        filter(entrezIDs != "<NA>") -> change_df
+
+
+pathway_dir_go = data.frame()
+
+
+
+for (i in 1:length(go.sets$go.sets)) {
+        pathway = names(go.sets$go.sets[i])
+        pathway_genes = go.sets$go.sets[[pathway]]
+        
+        gene_mean_change <- change_df[change_df$entrezIDs %in% pathway_genes,]
+        
+        pathway_dir_go[i, "pathway"] <- pathway
+        pathway_dir_go[i, "mean_change_BM_vs_BH"] <- sum(gene_mean_change$mean_change_BM_vs_BH) / length(pathway_genes)
+        
+        print(i)
+}
+
+
+# Positive PC1: Hypermethylated in MYO compared to MYO+INT at baseline
+GO_pos_PCA1 %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir_go, by = "pathway") %>% 
+        mutate(mean_change_BM_vs_BH = round(mean_change_BM_vs_BH, digits = 4)) %>% 
+        filter(FDR < 0.05) %>% 
+        arrange(-mean_change_BM_vs_BH) %>% 
+        head(20)
+
+
+# Positive PC1: Hypomethylated in MYO compared to MYO+INT at baseline
+GO_pos_PCA1 %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir_go, by = "pathway") %>% 
+        mutate(mean_change_BM_vs_BH = round(mean_change_BM_vs_BH, digits = 4)) %>% 
+        filter(FDR < 0.05) %>% 
+        arrange(mean_change_BM_vs_BH) %>% 
+        head(20)
+
+
+# Negative PC1: Hypermethylated in MYO compared to MYO+INT at baseline
+GO_neg_PCA1 %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir_go, by = "pathway") %>% 
+        mutate(mean_change_BM_vs_BH = round(mean_change_BM_vs_BH, digits = 4)) %>% 
+        filter(FDR < 0.05) %>% 
+        arrange(-mean_change_BM_vs_BH) %>% 
+        head(20)
+
+
+# Negative PC1: Hypomethylated in MYO compared to MYO+INT at baseline
+GO_neg_PCA1 %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir_go, by = "pathway") %>% 
+        mutate(mean_change_BM_vs_BH = round(mean_change_BM_vs_BH, digits = 4)) %>% 
+        filter(FDR < 0.05) %>% 
+        arrange(mean_change_BM_vs_BH) %>% 
+        head(20)
+
+
+
+#############################################################################################################
+###############################   check main drivers of PC1, that are the most exercise responsive   ########
+#############################################################################################################
+
+# isolate the abs arranged list og PC1 drivers
+
+
+
+
+as.data.frame(loadings) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        # merge with significant DMPs post vs pre MYO
+        merge(.,DMPs_PM_vs_BM, by = "cpg") %>% 
+        mutate( loadings = round(loadings, digits = 5)) %>% 
+        
+        
+        # merge with annotation dataset
+        
+        merge(., anno, by = "cpg") %>% 
+        arrange(-abs(loadings), -abs(delta_M)) %>% 
+        
+        # extract top 10 list
+        
+        head(10) %>% 
+        pull(cpg) -> top10_PC1_MYO_exercise_DMPs
+
+
+# plot M_values for these genes
+
+M_change %>% 
+        rownames_to_column(var = "cpg") %>% 
+        filter(cpg %in% top10_PC1_MYO_exercise_DMPs[1]) %>% 
+        dplyr::select(1:33) %>% 
+        pivot_longer(cols = 2:33) %>% 
+        mutate(sample = as.factor(substr(name, nchar(name) -0, nchar(name))),
+               timepoint = as.factor(substr(name, nchar(name) -1, nchar(name)))) %>% 
+        mutate(timepoint = as.factor(substr(timepoint, 1,1))) %>%
+        mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post"),
+               sample = ifelse(sample == "H", "MYO+INT", "MYO")) %>% 
+        ggplot(aes(x = timepoint, y = value, fill = sample)) +
+        geom_boxplot(position = position_dodge(width = 0.8)) +
+        geom_point(position = position_dodge(width = 0.8), size = 3) +
+        labs(fill = "Sample",
+             y = "M_Value",
+             x = "Timepoint", 
+             title = (anno %>% filter(cpg == top10_PC1_MYO_exercise_DMPs[1]) %>% pull(UCSC_RefGene_Name))) + 
+        theme_classic(base_size = 20)
+
+
+# for loop top 10 PC1 drivers
+
+for (i in 1:length(top10_PC1_MYO_exercise_DMPs)) {
+        
+        p1 <- M_change %>% 
+                rownames_to_column(var = "cpg") %>% 
+                filter(cpg %in% top10_PC1_MYO_exercise_DMPs[i]) %>% 
+                dplyr::select(1:33) %>% 
+                pivot_longer(cols = 2:33) %>% 
+                mutate(sample = as.factor(substr(name, nchar(name) -0, nchar(name))),
+                       timepoint = as.factor(substr(name, nchar(name) -1, nchar(name)))) %>% 
+                mutate(timepoint = as.factor(substr(timepoint, 1,1))) %>%
+                mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post"),
+                       sample = ifelse(sample == "H", "MYO+INT", "MYO")) %>% 
+                ggplot(aes(x = timepoint, y = value, fill = sample)) +
+                geom_boxplot(position = position_dodge(width = 0.8)) +
+                geom_point(position = position_dodge(width = 0.8), size = 3) +
+                labs(fill = "Sample",
+                     y = "M_Value",
+                     x = "Timepoint", 
+                     title = (anno %>% filter(cpg == top10_PC1_MYO_exercise_DMPs[i]) %>% pull(UCSC_RefGene_Name))) + 
+                theme_classic(base_size = 20)+
+                theme(legend.key.size = unit(1.5, "cm"))
+        
+
+        ggsave(p1, file = paste0("./", "PC1_figures/",anno %>% filter(cpg == top10_PC1_MYO_exercise_DMPs[i]) %>% pull(UCSC_RefGene_Name),".PNG"))
+        
+        print(i)
+        
+}
+        
+        
+  for (i in 1:length(top10_PC1_MYO_exercise_DMPs  )) {
+          x <- anno %>% filter(cpg == top10_PC1_MYO_exercise_DMPs[i]) %>% pull(UCSC_RefGene_Name)
+          print(x)
+  }    
+        
+        
+  
+        
+    
+        
+# check if top10 exist in MYO+INT DMPs
+
+DMPs_PH_vs_BH %>% 
+        filter(cpg %in% top10_PC1_MYO_exercise_DMPs)
+        
+        
+        
+# repeat for MYO+INT significant genes
+
+as.data.frame(loadings) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        # merge with significant DMPs post vs pre MYO
+        merge(.,DMPs_PH_vs_BH, by = "cpg") %>% 
+        mutate( loadings = round(loadings, digits = 5)) %>% 
+        
+        
+        # merge with annotation dataset
+        
+        merge(., anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        arrange(-abs(loadings), -abs(delta_M)) %>% 
+        
+        # extract top 10 list
+        
+        head(10) %>% 
+        pull(cpg) -> top10_PC1_MYOINT_exercise_DMPs
+
+
+# for loop top 10 PC1 drivers
+
+for (i in 1:length(top10_PC1_MYOINT_exercise_DMPs)) {
+        
+        p1 <- M_change %>% 
+                rownames_to_column(var = "cpg") %>% 
+                filter(cpg %in% top10_PC1_MYOINT_exercise_DMPs[i]) %>% 
+                dplyr::select(1:33) %>% 
+                pivot_longer(cols = 2:33) %>% 
+                mutate(sample = as.factor(substr(name, nchar(name) -0, nchar(name))),
+                       timepoint = as.factor(substr(name, nchar(name) -1, nchar(name)))) %>% 
+                mutate(timepoint = as.factor(substr(timepoint, 1,1))) %>%
+                mutate(timepoint = ifelse(timepoint == "B", "Baseline", "Post"),
+                       sample = ifelse(sample == "H", "MYO+INT", "MYO")) %>% 
+                ggplot(aes(x = timepoint, y = value, fill = sample)) +
+                geom_boxplot(position = position_dodge(width = 0.8)) +
+                geom_point(position = position_dodge(width = 0.8), size = 3) +
+                labs(fill = "Sample",
+                     y = "M_Value",
+                     x = "Timepoint", 
+                     title = (anno %>% filter(cpg == top10_PC1_MYOINT_exercise_DMPs[i]) %>% pull(UCSC_RefGene_Name))) + 
+                theme_classic(base_size = 20)+
+                theme(legend.key.size = unit(1.5, "cm"))
+        
+        
+        ggsave(p1, file = paste0("./", "PC1_figures/MYOINT/",anno %>% filter(cpg == top10_PC1_MYOINT_exercise_DMPs[i]) %>% pull(UCSC_RefGene_Name),".PNG"))
+        
+        print(i)
+        
+}
+
+
+for (i in 1:length(top10_PC1_MYO_exercise_DMPs  )) {
+        x <- anno %>% filter(cpg == top10_PC1_MYOINT_exercise_DMPs[i]) %>% pull(UCSC_RefGene_Name)
+        print(x)
+}    
+
+DMPs_PM_vs_BM %>% 
+        filter(cpg %in% top10_PC1_MYOINT_exercise_DMPs) %>% 
+        merge(.,anno, by = "cpg")
+        
+        
+        
+        
+        
+        
+        
+        
+        
+
+
+
+data("go.subs.hs")
+
+BP_GO <- names(go.sets$go.sets[go.sets$go.subs$BP])
+CC_GO <- names(go.sets.hs[go.subs.hs$CC])
+MF_GO <- names(go.sets.hs[go.subs.hs$MF])
+
+GO_res_homo <- GO_res_homo %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir_go, by = "pathway") %>% 
+        mutate(dir = ifelse(mean_change_PH_vs_BH < 0, "hypo", "hyper")) %>% 
+        dplyr::select(1,2,3,4,5,6,8) %>% 
+        arrange(desc(-P.DE)) %>% 
+        mutate(subset = ifelse(pathway %in% BP_GO, "Biological processes", 
+                               ifelse(pathway %in% CC_GO, "Cellular components", "Molecular function"))) 
+
+write.csv(GO_res_homo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/GO_all_pathways_homogenate.csv")
+
+GO_res_myo <- GO_res_myo %>% 
+        rownames_to_column(var = "pathway") %>% 
+        merge(.,pathway_dir_go, by = "pathway") %>% 
+        mutate(dir = ifelse(mean_change_PM_vs_BM < 0, "hypo", "hyper")) %>% 
+        dplyr::select(1,2,3,4,5,7,8) %>% 
+        arrange(desc(-P.DE)) %>% 
+        mutate(subset = ifelse(pathway %in% BP_GO, "Biological processes", 
+                               ifelse(pathway %in% CC_GO, "Cellular components", "Molecular function"))) 
+
+
+write.csv(GO_res_myo, file = "C:/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Supplementary files/GO_all_pathways_myonuclei.csv")
+
+
+
+##############################################################################
+
+### GO plot
+
+############################################################################
+
+GO_res_homo %>% 
+        arrange(desc(-P.DE)) %>% 
+        head(20) -> top_go
+
+
+pathway_levels = top_go %>% pull(pathway)
+
+GO_res_myo %>% 
+        filter(pathway %in% top_go$pathway) %>% 
+        merge(top_go, ., by = "pathway") %>% 
+        dplyr::select(pathway, PH_vs_BH = mean_change_PH_vs_BH, PM_vs_BM = mean_change_PM_vs_BM, subset = subset.x) %>% 
+        pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
+        mutate(pathway = factor(pathway, levels = pathway_levels)) %>% 
+        ggplot(aes(y = pathway, x = mean_change, group = contrast, color = contrast))+
+        geom_point(aes(shape = subset))+
+        geom_vline(xintercept = 0)+
+        theme_classic()+
+        theme(axis.title.y = element_blank())+
+        labs(title = "Topp 20 GO pathways in Homogenate")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # check genes
 
@@ -3280,7 +3694,7 @@ anno %>%
 plot(pca.out$x[,1:2])
 
 plot(pca.out$x[,2:3])
-text(pca.out$x[,2:3], labels = row.names(pca.out$x), pos = 4)
+text(pca.out$x[,1:2], labels = row.names(pca.out$x), pos = 4)
 
 
 # run correlation between pca.out$x[,1] with M_value from M_change dataset
@@ -3905,6 +4319,134 @@ row_variance %>%
         filter(var > 0.1) %>% nrow()
 
 
+
+##################################################################################
+
+### Intra-individual within timepoint correlation between methylation M value
+
+###################################################################################
+
+
+# extract each particiant into their own dataframe
+
+# FP 1
+
+M_change %>% 
+        dplyr::select("1BH", "1BM") %>% 
+        head(10000) %>% 
+        ggplot(aes(x = `1BH`, y = `1BM`))+
+        geom_point(size = 0.1)+
+        geom_smooth(method = "lm", se = FALSE, color = "blue") +
+        labs(title = "Correlation between 1BH and 1BM",
+             x = "FP 1 MYO+INT",
+             y = "FP 1 MYO")  
+
+M_change %>% 
+        dplyr::select("1PH", "1PM") %>% 
+        head(10000) %>% 
+        ggplot(aes(x = `1PH`, y = `1PM`))+
+        geom_point(size = 0.1)+
+        geom_smooth(method = "lm", se = FALSE, color = "blue") +
+        labs(title = "Correlation between 1PH and 1PM",
+             x = "FP 1 MYO+INT",
+             y = "FP 1 MYO") 
+
+
+# FP 2
+
+M_change %>% 
+        dplyr::select("2BH", "2BM") %>% 
+        head(10000) %>% 
+        ggplot(aes(x = `2BH`, y = `2BM`))+
+        geom_point(size = 0.1)+
+        geom_smooth(method = "lm", se = FALSE, color = "blue") +
+        labs(title = "Correlation between 2BH and 2BM",
+             x = "FP 2 MYO+INT",
+             y = "FP 2 MYO")  
+
+M_change %>% 
+        dplyr::select("2PH", "2PM") %>% 
+        head(10000) %>% 
+        ggplot(aes(x = `2PH`, y = `2PM`))+
+        geom_point(size = 0.1)+
+        geom_smooth(method = "lm", se = FALSE, color = "blue") +
+        labs(title = "Correlation between 2PH and 2PM",
+             x = "FP 2 MYO+INT",
+             y = "FP 2 MYO") 
+
+
+# plot DMPs changed with exercise
+
+# list of DMPs in MYO and MYO+INT
+
+MYO <- DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        pull(cpg)
+
+MYOINT <- DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        pull(cpg)
+
+# combine lists, and keep only unique rownames
+ 
+all_sig <- unique(c(MYO, MYOINT))
+
+shared <- c(MYO, MYOINT)
+
+shared <- shared[duplicated(shared) ]
+
+DMPs_PH_vs_BH %>% 
+        filter(cpg %in% all_sig) %>% 
+        mutate(Group = ifelse(cpg %in% MYO, "MYO", ifelse(cpg %in% MYOINT, "MYO+INT", ifelse(cpg %in% shared, "Shared", "error")))) %>% 
+        dplyr::select(cpg, delta_M_MYOINT = delta_M, Group) %>% 
+        merge(.,DMPs_PM_vs_BM %>% 
+        filter(cpg %in% all_sig) %>% 
+        mutate(Group = ifelse(cpg %in% MYO, "MYO", ifelse(cpg %in% MYOINT, "MYO+INT", ifelse(cpg %in% shared, "Shared", "error")))) %>% 
+        dplyr::select(cpg, delta_M_MYO = delta_M, Group)) %>% 
+        mutate(Group = ifelse(cpg %in% shared, "Shared", Group),
+               Size = abs(delta_M_MYO)+abs(delta_M_MYOINT)) %>% 
+        ggplot(aes(x = delta_M_MYOINT, y = delta_M_MYO, color = Group, size = Size))+
+        geom_point()+
+        scale_color_manual(values = c("MYO" = "green", "MYO+INT" = "purple", "Shared" = "black"))+
+        scale_size(range = c(0.01, 3))
+
+# combined figure is not easy t interpret.
+# split into MYO significant, MYO+INT significant and shared on both plots
+
+DMPs_PH_vs_BH %>% 
+        filter(cpg %in% MYOINT) %>% 
+        mutate(Group = ifelse(cpg %in% MYO, "MYO", ifelse(cpg %in% MYOINT, "MYO+INT", ifelse(cpg %in% shared, "Shared", "error")))) %>% 
+        dplyr::select(cpg, delta_M_MYOINT = delta_M, Group) %>% 
+        merge(.,DMPs_PM_vs_BM %>% 
+                      filter(cpg %in% MYOINT) %>% 
+                      mutate(Group = ifelse(cpg %in% MYO, "MYO", ifelse(cpg %in% MYOINT, "MYO+INT", ifelse(cpg %in% shared, "Shared", "error")))) %>% 
+                      dplyr::select(cpg, delta_M_MYO = delta_M, Group)) %>% 
+        mutate(Group = ifelse(cpg %in% shared, "Shared", Group),
+               Size = abs(delta_M_MYO)+abs(delta_M_MYOINT)) %>% 
+        ggplot(aes(x = abs(delta_M_MYOINT), y = abs(delta_M_MYO), color = Group, size = Size))+
+        geom_point()+
+        scale_color_manual(values = c("MYO" = "green", "MYO+INT" = "purple", "Shared" = "black"))+
+        scale_size(range = c(0.01, 3)) +
+        geom_smooth(method = "lm")
+
+
+DMPs_PM_vs_BM %>% 
+        filter(cpg %in% MYO) %>% 
+        mutate(Group = ifelse(cpg %in% MYO, "MYO", ifelse(cpg %in% MYOINT, "MYO+INT", ifelse(cpg %in% shared, "Shared", "error")))) %>% 
+        dplyr::select(cpg, delta_M_MYOINT = delta_M, Group) %>% 
+        merge(.,DMPs_PH_vs_BH %>% 
+                      filter(cpg %in% MYO) %>% 
+                      mutate(Group = ifelse(cpg %in% MYO, "MYO", ifelse(cpg %in% MYOINT, "MYO+INT", ifelse(cpg %in% shared, "Shared", "error")))) %>% 
+                      dplyr::select(cpg, delta_M_MYO = delta_M, Group)) %>% 
+        mutate(Group = ifelse(cpg %in% shared, "Shared", Group),
+               Size = abs(delta_M_MYO)+abs(delta_M_MYOINT)) %>% 
+        ggplot(aes(x = abs(delta_M_MYOINT), y = abs(delta_M_MYO), color = Group, size = Size))+
+        geom_point()+
+        scale_color_manual(values = c("MYO" = "green", "MYO+INT" = "purple", "Shared" = "black"))+
+        scale_size(range = c(0.01, 3)) +
+        geom_smooth(method = "lm")+
+        theme_classic()+
+        scale_y_continuous()
 
 
 
