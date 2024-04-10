@@ -14,6 +14,7 @@ library(ggrepel)
 library(scales)
 library(tidyverse)
 library(ggplot2)
+library(ggpubr)
 library(stringr)
 library(missMethyl)
 library(ChAMP)
@@ -22,6 +23,7 @@ library(viridis)
 library(ENmix)
 library(AnnotationDbi)
 library(org.Hs.eg.db)
+library(gage)
 
 setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/")
 
@@ -67,8 +69,8 @@ DMPs_PM_vs_BM <- readRDS("DMPs_PM_vs_BM.RDATA")
 #DMPs_PM_vs_PH$adj.p.val <- p.adjust(p = DMPs_PM_vs_PH$p.value, method = "fdr", n = length(rownames(DMPs_PM_vs_PH)))        
 
 #p.adjust(p = DMPs_PM_vs_PH$p.value, method = "bonferroni", n = length(rownames(DMPs_PM_vs_PH))) %>% 
-        as.data.frame() %>% 
-        filter(.<0.05) 
+#        as.data.frame() %>% 
+#        filter(.<0.05) 
 
 # filter all dmp lists for p.value <=0.05
 
@@ -97,6 +99,8 @@ DMPs_PM_vs_BM <- readRDS("DMPs_PM_vs_BM.RDATA")
 
 pca.out <- prcomp(t(M_change[,1:32]), scale. = FALSE)
 
+plot(pca.out$x[,1:2])
+        
 loadings <- pca.out$rotation[,1]
 
 # look through top PC1 drivers
@@ -170,6 +174,26 @@ mean_change_df <- M_change %>% dplyr::select(37)
 
 
 # Assuming you have a data frame named 'mean_change_df' with columns 'PH_vs_BH' and 'PM_vs_BM', and rownames as probe names
+
+# get all unique genes
+unique_gene <- unique(anno %>% 
+                              filter(UCSC_RefGene_Name != "NA") %>% 
+                              mutate(UCSC_RefGene_Name = sub(";.*", "", UCSC_RefGene_Name)) %>% 
+                              pull(UCSC_RefGene_Name))
+
+gene_cpgs <- list()
+
+# create subset of probes annotated to individual genes
+
+for (i in 1:length(unique_gene)) {
+        y <- anno %>% 
+                filter(UCSC_RefGene_Name == unique_gene[i]) %>% 
+                pull(cpg)
+        gene_cpgs[[unique_gene[i]]] <- y
+        print(i)
+}
+
+
 
 # Initialize an empty data frame to store the results
 results_df <- data.frame(
@@ -600,12 +624,44 @@ exercise_responsive_dmps %>%
 
         
 
+# plot the DMPs with the highest delta m -> labs df
+
+labs_flt <- labs %>% 
+        mutate(absolute_delta = abs(delta_M.x)+abs(delta_M.y)) %>% 
+        arrange(-absolute_delta) %>% 
+        filter(UCSC_RefGene_Name != "") 
+
+CPG =   labs_flt[5,1]    
 
 
+p1 <- M_change[CPG,1:32] %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 1:32) %>% 
+        mutate(Timepoint = ifelse(grepl("B", FP), "Baseline", "Post"),
+               Sample = ifelse(grepl("H", FP), "MYO+INT", "MYO"),
+               FP = paste0("FP",as.numeric(gsub("[^0-9]", "", FP)))) %>% 
+        ggplot(aes(y = M_value, x = Timepoint, fill  = Timepoint))+
+        geom_boxplot(width = 0.6)+
+        geom_point(size = 3, alpha = 0.6)+
+        geom_line(aes(group = FP), alpha = 0.6)+
+        facet_grid(~Sample)+
+        theme_classic(base_size = 20)+
+        labs(title = paste(labs_flt %>% filter(cpg == CPG) %>% pull(UCSC_RefGene_Name), 
+                           "  Signif in:", labs_flt %>% filter(cpg == CPG) %>% pull(signif)))
 
 
+p2 <- M_change[CPG,1:32] %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 1:32) %>% 
+        mutate(Timepoint = ifelse(grepl("B", FP), "Baseline", "Post"),
+               Sample = ifelse(grepl("H", FP), "MYO+INT", "MYO"),
+               FP = paste0("FP",as.numeric(gsub("[^0-9]", "", FP)))) %>% 
+        pivot_wider(names_from = Sample, values_from = M_value) %>% 
+        ggplot(aes(y = `MYO+INT`, x = MYO, color = Timepoint))+
+        geom_point(size = 3)+
+        theme_classic(base_size = 20)+
+        labs(title = paste(labs_flt %>% filter(cpg == CPG) %>% pull(UCSC_RefGene_Name), 
+                           "  Signif in:", labs_flt %>% filter(cpg == CPG) %>% pull(signif)))
 
-
+ggarrange(p1,p2, ncol = 1, common.legend = TRUE, legend = "bottom")
 
 
 

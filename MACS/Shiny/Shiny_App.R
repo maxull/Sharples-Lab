@@ -6,7 +6,7 @@
 
 library(shiny)
 
-
+setwd("/Users/maxul/Documents/Coding/Sharples-Lab/MACS/Shiny/Epigenetics_MACS/")
 
 
 
@@ -194,7 +194,6 @@ server <- function(input, output) {
 
 # Run Shiny App
 shinyApp(ui = ui, server = server)
-
 
 
 
