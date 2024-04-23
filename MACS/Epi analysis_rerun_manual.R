@@ -173,7 +173,7 @@ DMPs_PH_vs_BH <- DMPs_PH_vs_BH %>%
 
 #############################################################################################
 
-### # create horizontal barchart of DMPs in different positions
+### # create horizontal barchart of DMPs in different positions #########
 
 ########################################################################
 

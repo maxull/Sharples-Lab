@@ -101,11 +101,11 @@ df_change <- lean_dexa_change %>%
                   mean_percent = mean(percent_change),
                   sd_percent = sd(percent_change)) %>% 
         ggplot(aes(x = measure, y = mean_change_gram))+
-        geom_point(size = 2)+
+        geom_point(size = 3)+
         geom_errorbar(aes(ymin = (mean_change_gram - sd_change_gram),
                           ymax = (mean_change_gram + sd_change_gram)), width = 0.2)+
-        geom_point(data = lean_dexa_change, aes(x = measure, y = change_gram, color = FP))+
-        theme_classic()
+        geom_point(data = lean_dexa_change, aes(x = measure, y = change_gram, color = FP), size = 3, alpha = 0.5)+
+        theme_classic(base_size = 20)
 
 
 #percent_change <- 

@@ -606,7 +606,7 @@ exercise_responsive_dmps %>%
 rbind(x,y) -> labs
 labs <- labs[!duplicated(labs$cpg),]
 
-exercise_responsive_dmps %>% 
+exercise_dmps_plot <- exercise_responsive_dmps %>% 
      #   head(10000) %>% 
         ggplot(aes(x = as.numeric(delta_M.y), y = as.numeric(delta_M.x), fill = signif))+
         geom_hline(yintercept = 0, alpha = 0.5)+
@@ -621,8 +621,13 @@ exercise_responsive_dmps %>%
         scale_x_continuous(n.breaks = 6)+
         scale_y_continuous(n.breaks = 6)
 
+# exports interactive plot
 
-        
+library(htmlwidgets)
+library(plotly)        
+
+saveWidget(ggplotly(exercise_dmps_plot), file = "./Figures/exercise_responsive_DMPs.html")
+
 
 # plot the DMPs with the highest delta m -> labs df
 
@@ -667,27 +672,277 @@ ggarrange(p1,p2, ncol = 1, common.legend = TRUE, legend = "bottom")
 
 
 
+###############################################################################################
+
+###            correlations
+
+###############################################################################################
+
+
+###
+# plot correlation between top exercise responsive genes
+###
+
+
+
+M_change[rownames(M_change) %in% labs_flt$cpg,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Timepoint = ifelse(grepl("B", FP), "Baseline", "Post"),
+               Sample = ifelse(grepl("H", FP), "MYO+INT", "MYO"),
+               FP = paste0("FP",as.numeric(gsub("[^0-9]", "", FP)))) %>% 
+        pivot_wider(names_from = Sample, values_from = M_value) %>% 
+        ggplot(aes(y = `MYO+INT`, x = MYO, color = Timepoint))+
+        geom_point(size = 3)+
+        theme_classic(base_size = 20)
+
+
+M_change[rownames(M_change) %in% labs_flt$cpg,1:32] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        pivot_longer(names_to = "FP", values_to = "M_value", cols = 2:33) %>% 
+        mutate(Timepoint = ifelse(grepl("B", FP), "Baseline", "Post"),
+               Sample = ifelse(grepl("H", FP), "MYO+INT", "MYO"),
+               FP = paste0("FP",as.numeric(gsub("[^0-9]", "", FP)))) %>% 
+        pivot_wider(names_from = Sample, values_from = M_value) -> cor_df
+
+# correlation matrix
+
+
+cor(M_change[rownames(M_change) %in% labs_flt$cpg,c(1:8,17:24)], 
+    M_change[rownames(M_change) %in% labs_flt$cpg,c(9:16,25:32)])
+
+pheatmap::pheatmap(cor(M_change[rownames(M_change) %in% labs_flt$cpg,c(1:8,17:24)], 
+                       M_change[rownames(M_change) %in% labs_flt$cpg,c(9:16,25:32)]), 
+                   cluster_rows = FALSE, cluster_cols = FALSE,
+                   display_numbers = TRUE, fontsize_number = 10, number_color = "black", viridis(10))
+
+# correlation baseline
+
+mean(0.67,0.78,0.78,0.61,0.68,0.64,0.5,0.49)
+
+# correlation post
+
+mean(0.61,0.56,0.75,0.76,0.74,0.71,0.68,0.67)
+
+# variation matrix
+
+
+var(M_change[rownames(M_change) %in% labs_flt$cpg,c(1:8,17:24)], 
+    M_change[rownames(M_change) %in% labs_flt$cpg,c(9:16,25:32)])
+
+pheatmap::pheatmap(var(M_change[rownames(M_change) %in% labs_flt$cpg,c(1:8,17:24)], 
+                       M_change[rownames(M_change) %in% labs_flt$cpg,c(9:16,25:32)]), 
+                   cluster_rows = FALSE, cluster_cols = FALSE,
+                   display_numbers = TRUE, fontsize_number = 10, number_color = "black", viridis(10))
 
 
 
 
 
+###
+# plot correlation between top MYO+INT exercise responsive genes
+###
+
+# get list
+
+ex.resp_myoint <- DMPs_PH_vs_BH %>% 
+        filter(p.value < 0.05) %>% 
+        arrange(-abs(delta_M)) %>% 
+        head(100) %>% 
+        pull(cpg)
+
+# plot heatmap
+
+pheatmap::pheatmap(cor(M_change[rownames(M_change) %in% ex.resp_myoint,c(1:8,17:24)], 
+                       M_change[rownames(M_change) %in% ex.resp_myoint,c(9:16,25:32)]), 
+                   cluster_rows = FALSE, cluster_cols = FALSE,
+                   display_numbers = TRUE, fontsize_number = 10, number_color = "black", viridis(10))
+
+# plot var
+
+pheatmap::pheatmap(var(M_change[rownames(M_change) %in% ex.resp_myoint,c(1:8,17:24)], 
+                       M_change[rownames(M_change) %in% ex.resp_myoint,c(9:16,25:32)]), 
+                   cluster_rows = FALSE, cluster_cols = FALSE,
+                   display_numbers = TRUE, fontsize_number = 10, number_color = "black", viridis(10))
+
+
+###
+# plot correlation between top MYO exercise responsive genes
+###
+
+# get list
+
+ex.resp_myo <- DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        arrange(-abs(delta_M)) %>% 
+        head(100) %>% 
+        pull(cpg)
+
+# plot heatmap
+
+pheatmap::pheatmap(cor(M_change[rownames(M_change) %in% ex.resp_myo,c(1:8,17:24)], 
+                       M_change[rownames(M_change) %in% ex.resp_myo,c(9:16,25:32)]), 
+                   cluster_rows = FALSE, cluster_cols = FALSE,
+                   display_numbers = TRUE, fontsize_number = 10, number_color = "black", viridis(10))
+
+pheatmap::pheatmap(var(M_change[rownames(M_change) %in% ex.resp_myo,c(1:8,17:24)], 
+                       M_change[rownames(M_change) %in% ex.resp_myo,c(9:16,25:32)]), 
+                   cluster_rows = FALSE, cluster_cols = FALSE,
+                   display_numbers = TRUE, fontsize_number = 10, number_color = "black", viridis(10))
 
 
 
 
 
+###################################################################################################################
+###################################################################################################################
+
+###            plot hypo and hyper methylation of all genes relative to transcriptional start site
+
+###################################################################################################################
+###################################################################################################################
+
+
+# workflow
+
+# 1. get genomic position of all annotated probes
+# 2. get transcriptional start site for the gene
+# 3. calculate distance from tss
+# 4. plot y axis = M_value, x axis = distance to TSS, color = annotated region 
+
+
+###
+# get TSS
+### 
+
+
+# add TSS to figure
+
+BiocManager::install("biomaRt")
+
+library(biomaRt)
+
+listMarts()
+
+ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+mart_attributes <- listAttributes(mart = ensembl)
+
+region_data <- getBM(attributes = c("ensembl_gene_id", 
+                                 "external_gene_name", 
+                                 "start_position",
+                                 "end_position",
+                                 "5_utr_start",
+                                 "5_utr_end",
+                                 "3_utr_start",
+                                 "3_utr_end",
+                                 "transcription_start_site", 
+                                 "chromosome_name", 
+                                 "strand"),
+                  mart = ensembl, verbose = TRUE)
+
+
+# filter out duplicated Enseml IDs
+
+
+region_data <- region_data %>%
+        distinct(ensembl_gene_id, .keep_all = TRUE)
+
+
+# merge annotation files and get the probeID, and position
+
+anno_data <- region_data %>% 
+        as.data.frame() %>% 
+        unique() %>% 
+        filter(external_gene_name != "") %>% 
+        mutate(UCSC_RefGene_Name = external_gene_name) 
+
+        
+        merge(.,anno,by = "UCSC_RefGene_Name")
+        pull(transcription_start_site) %>% mean()
+
+
+illumina_anno <-readRDS("./EPIC.manifest.hg19.RDATA")
+
+
+merged_anno <- illumina_anno %>% 
+        dplyr::select(CpG_chrm, CpG_beg, CpG_end) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(anno, ., by = "cpg") %>% 
+        left_join(., anno_data, by = "UCSC_RefGene_Name") %>% 
+        distinct(cpg, .keep_all = TRUE)
+
+
+anno_flt <- merged_anno %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        mutate(dist_cpg_to_TSS = transcription_start_site-CpG_beg,
+               gene_body = ifelse(CpG_beg > start_position & CpG_beg < end_position, "Gene_Body", "")) 
 
 
 
+M_change[,1:32] %>% 
+        head(100000) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(., anno_flt, by = "cpg" ) %>% 
+        dplyr::select(1:33, dist_cpg_to_TSS, gene_body, Regulatory_Feature_Group) %>% 
+        filter(dist_cpg_to_TSS != "") %>% 
+        mutate(TSS = ifelse(dist_cpg_to_TSS > -200 & dist_cpg_to_TSS < 0, "TSS",""), 
+        
+               TSS = ifelse(gene_body == "Gene_Body", "gene_body", TSS)) %>% 
+        pull(TSS) %>% unique()
+        pivot_longer(cols = 2:33, names_to = "FP") %>%
+        mutate(Timepoint = ifelse(grepl("B", FP), "Baseline", "Post"),
+               Sample = ifelse(grepl("H", FP), "MYO+INT", "MYO"),
+               FP = paste0("FP",as.numeric(gsub("[^0-9]", "", FP)))) %>% 
+        
+        
+        ggplot(aes(x = dist_cpg_to_TSS, y = value, color = Sample))+
+        geom_point()+
+        geom_vline(xintercept = 0)+
+        scale_x_continuous(n.breaks = 20)
 
 
 
+###################################################################################################################
+##################       density plot of differences                 ##############################################
+###################################################################################################################        
 
 
 
+# density plot of differences in M_value at the same timepoint
+        
+
+M_change[,37:38] %>% 
+        pivot_longer(cols = 1:2, names_to = "Comparison", values_to = "M_difference") %>% 
+        ggplot(aes(x = M_difference, group = Comparison, color = Comparison, fill = Comparison))+
+        geom_density(linewidth = 1)+
+        scale_y_sqrt()+
+        facet_wrap(~Comparison, ncol = 1, nrow = 2)+
+        theme_classic(base_size = 20)+
+        theme(strip.text = element_blank())+
+        scale_color_manual(values = c("#440154FF","#5DC863FF"))+
+        scale_fill_manual(values = c("#B396B9","#B3D7B1"))+
+        labs(title = "Difference between MYO+INT vs. MYO at Baseline and Post RT",
+             x = "MYO vs. MYO+INT")+
+        geom_vline(xintercept = 0)
 
 
 
+# blant altman plot
+        
+library(blandr)
+
+        # BH vs. BM
+blandr.output.report(M_change[,33], M_change[,34])
+
+blandr_stats <- blandr.statistics(M_change[,33], M_change[,34])
+
+# plot
+
+baseline_ba_plot <- blandr.plot.ggplot(blandr_stats)
+
+baseline_ba_plot+
+        theme_classic(base_size = 20)+
+        geom_hline(linewidth = 1.5)
 
 
