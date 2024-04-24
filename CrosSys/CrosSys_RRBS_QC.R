@@ -8,6 +8,7 @@
 # This script is specific for CrosSys, data originating from Finnish group
 
 
+
 library(tidyverse)
 
 
@@ -100,7 +101,7 @@ reports_df %>%
         labs(y = "Sequences")
 
 
-# plot ASAT
+# plot GF
 
 
 mapping_efficiency <-  reports_df %>%
@@ -143,6 +144,8 @@ qf_plot <- reports_df %>%
               legend.title = element_blank())+
         labs(y = "Sequences")
 
+
+
 # save
 ggsave("/Users/maxul/Documents/Skole/Lab/CrosSys/QF_QC.emf", plot = qf_plot, width = 12, height = 8)
 
@@ -167,3 +170,6 @@ for (i in 1:length(reports_list)) {
 
 # total time in hours spent on bismark allign (not including trimming or methylation extraction)
 (sum(as.numeric(time$Seconds))/60 + sum(as.numeric(time$Minutes)))/60
+
+
+
