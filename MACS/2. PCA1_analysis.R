@@ -7,7 +7,7 @@
 
 #This script contains the majority of the analysis code for the master thesis of Max Ullrich
 
-
+BiocManager::install("missMethyl")
 
 library(cowplot)
 library(ggrepel)
@@ -17,15 +17,15 @@ library(ggplot2)
 library(ggpubr)
 library(stringr)
 library(missMethyl)
-library(ChAMP)
-library(pathview)
+# library(ChAMP)
+# library(pathview)
 library(viridis)
 library(ENmix)
 library(AnnotationDbi)
 library(org.Hs.eg.db)
 library(gage)
 
-setwd("/Users/maxul/Documents/Skole/Master 21-22/Master/DATA/Epigenetics/")
+setwd("/Users/maxullrich/Library/CloudStorage/OneDrive-UGent/Skole/M.Sc/Master 21-22/Master/DATA/Epigenetics")
 
 beta <- readRDS(file = "beta.RDATA")
 anno <- readRDS(file = "anno.RDATA")
@@ -145,7 +145,7 @@ loadings %>%
 
 # get updated go pathways
 
-go.sets <- go.gsets(species = "human", pkg.name=NULL, id.type = "eg", keep.evidence=FALSE)
+go.sets <- go.gsets(species = "human", pkg.name=NULL, id.type = "EG", keep.evidence=FALSE)
 
 # Run ORA
 
@@ -506,6 +506,33 @@ GO_neg_PCA1 %>%
 
 # combine df of top 5 go pathways
 
+# create ordering vector
+
+order <- rbind(GO_pos_PCA1 %>% 
+          rownames_to_column(var = "pathway") %>% 
+          merge(.,pathway_dir_go, by = "pathway") %>% 
+          mutate(BM_vs_BH = round(mean_change_BM_vs_BH, digits = 4)) %>% 
+          filter(pathway %in% Positive_hyper_PC1 | pathway %in% Positive_hypo_PC1) %>% 
+          mutate(PC1 = "positive",
+                 methylation = ifelse(pathway %in% Positive_hyper_PC1, "Hyper", "Hypo")) %>% 
+          arrange(BM_vs_BH),
+      
+      
+      GO_neg_PCA1 %>% 
+          rownames_to_column(var = "pathway") %>% 
+          merge(.,pathway_dir_go, by = "pathway") %>% 
+          mutate(BM_vs_BH = round(mean_change_BM_vs_BH, digits = 4)) %>% 
+          filter(pathway %in% Negative_hyper_PC1 | pathway %in% Negative_hypo_PC1) %>% 
+          mutate(PC1 = "negative",
+                 methylation = ifelse(pathway %in% Negative_hyper_PC1, "Hyper", "Hypo")) %>% 
+          arrange(BM_vs_BH)) %>% 
+    
+    # remove GO code
+    mutate(pathway = substr(pathway, 12,100)) %>% 
+    pull(pathway) 
+
+
+
 rbind(GO_pos_PCA1 %>% 
         rownames_to_column(var = "pathway") %>% 
         merge(.,pathway_dir_go, by = "pathway") %>% 
@@ -670,7 +697,207 @@ ggarrange(p1,p2, ncol = 1, common.legend = TRUE, legend = "bottom")
 
 
 
+###############################################################################################
+##########      Exercise related DMPs in MYO                            #######################
+##########      Promoter and island related DMPs                        #######################
+###############################################################################################
 
+# filter MYO dmps for CpG islands within promoters
+
+# get hypermethylated probes
+MYO_hyper <- merge(DMPs_PM_vs_BM, anno %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island"), 
+        by = "cpg") %>% 
+        filter(p.value < 0.05) %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        filter(delta_M > 0) %>% 
+        pull(cpg)
+
+MYO_hypo <- merge(DMPs_PM_vs_BM, anno %>% 
+        filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island"), 
+        by = "cpg") %>% 
+        filter(p.value < 0.05) %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        filter(delta_M < 0) %>% 
+        pull(cpg)
+        
+        
+# get updated go pathways
+
+go.sets <- go.gsets(species = "human", pkg.name=NULL, id.type = "EG", keep.evidence=FALSE)
+
+
+# Run ORA
+
+MYO_hyper_GO.all <- gsameth(sig.cpg = MYO_hyper,
+                       all.cpg = rownames(beta), 
+                       collection = go.sets$go.sets,
+                       array.type = "EPIC")
+
+MYO_hyper_GO.BP <- gsameth(sig.cpg = MYO_hyper,
+                            all.cpg = rownames(beta), 
+                            collection = go.sets$go.sets[go.sets$go.subs$BP],
+                            array.type = "EPIC") %>% 
+        filter(FDR < 0.05) %>% 
+        mutate(percent_DE = DE/N) %>% 
+        arrange(-percent_DE)
+
+MYO_hyper_GO.CC <- gsameth(sig.cpg = MYO_hyper,
+                            all.cpg = rownames(beta), 
+                            collection = go.sets$go.sets[go.sets$go.subs$CC],
+                            array.type = "EPIC") %>% 
+        filter(FDR < 0.05) %>% 
+        mutate(percent_DE = DE/N) %>% 
+        arrange(-percent_DE)
+
+MYO_hyper_GO.MF <- gsameth(sig.cpg = MYO_hyper,
+                            all.cpg = rownames(beta), 
+                            collection = go.sets$go.sets[go.sets$go.subs$MF],
+                            array.type = "EPIC") %>% 
+        filter(FDR < 0.05) %>% 
+        mutate(percent_DE = DE/N) %>% 
+        arrange(-percent_DE)
+
+
+MYO_hypo_GO.all <- gsameth(sig.cpg = MYO_hypo,
+                            all.cpg = rownames(beta), 
+                            collection = go.sets$go.sets,
+                            array.type = "EPIC")
+
+MYO_hypo_GO.BP <- gsameth(sig.cpg = MYO_hypo,
+                           all.cpg = rownames(beta), 
+                           collection = go.sets$go.sets[go.sets$go.subs$BP],
+                           array.type = "EPIC") %>% 
+        filter(FDR < 0.1) %>% 
+        mutate(percent_DE = DE/N) %>% 
+        arrange(-percent_DE)
+
+MYO_hypo_GO.CC <- gsameth(sig.cpg = MYO_hypo,
+                           all.cpg = rownames(beta), 
+                           collection = go.sets$go.sets[go.sets$go.subs$CC],
+                           array.type = "EPIC") %>% 
+        filter(FDR < 0.1) %>% 
+        mutate(percent_DE = DE/N) %>% 
+        arrange(-percent_DE)
+
+MYO_hypo_GO.MF <- gsameth(sig.cpg = MYO_hypo,
+                           all.cpg = rownames(beta), 
+                           collection = go.sets$go.sets[go.sets$go.subs$MF],
+                           array.type = "EPIC") %>% 
+        filter(FDR < 0.1) %>% 
+        mutate(percent_DE = DE/N) %>% 
+        arrange(-percent_DE)
+
+
+# find tropomyosin GO term
+
+go.sets$go.sets["GO:0005862 muscle thin filament tropomyosin"] %>% as.data.frame
+
+anno[go.sets$go.sets[["GO:0005862 muscle thin filament tropomyosin"]],]
+
+
+# Convert gene symbols to Entrez Gene IDs
+entrezIDs <- mapIds(org.Hs.eg.db, keys = go.sets$go.sets[["GO:0005862 muscle thin filament tropomyosin"]], column ="SYMBOL", keytype = "ENTREZID", multiVals = "first")
+
+TPM <- DMPs_PM_vs_BM %>% 
+        filter(p.value < 0.05) %>% 
+        merge(., anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name %in% c("TPM1","TPM2", "TPM3", "TPM4"))
+
+M_change[TPM$cpg,]
+
+
+####
+#       Plot horizontal histogram of N probes + DMP within the pathway
+####
+
+
+
+MYO_hypo_plot <- rbind(MYO_hyper_GO.BP %>% 
+              rownames_to_column(var = "GO_term") %>% 
+              mutate(GO_term = substr(GO_term, 12, nchar(GO_term)),
+                     N_DE = N-DE) %>% 
+              pivot_longer(cols = c("DE", "N_DE")) %>% 
+              mutate(GO_cat = "BP"),
+      MYO_hyper_GO.CC %>% 
+              rownames_to_column(var = "GO_term") %>% 
+              mutate(GO_term = substr(GO_term, 12, nchar(GO_term)),
+                     N_DE = N-DE) %>% 
+              pivot_longer(cols = c("DE", "N_DE")) %>% 
+              mutate(GO_cat = "CC")) %>% 
+        rbind(., 
+              MYO_hyper_GO.MF %>% 
+                rownames_to_column(var = "GO_term") %>% 
+                mutate(GO_term = substr(GO_term, 12, nchar(GO_term)),
+                        N_DE = N-DE) %>% 
+                pivot_longer(cols = c("DE", "N_DE")) %>%
+                mutate(GO_cat = "MF")) %>% 
+        ggplot(aes(x = value, y = GO_term, fill = factor(name, levels = rev(unique(name)))))+
+        geom_bar(stat = "identity", width = 0.5)+
+        facet_wrap(~GO_cat, nrow = 3, strip.position = "right")+
+        labs(x = "N genes", 
+             fill = "Genes in pathway")+
+        theme_classic(base_size = 16)+
+        theme(axis.title.y = element_blank(), 
+              legend.position = "top", 
+              axis.title.x = element_blank())+
+        scale_x_continuous(expand = c(0,0))+
+        scale_fill_manual(values = c("#440154FF","#5DC863FF"),
+                          labels = c("All genes in GO term", "DMGs in GO term"))
+
+
+
+p1_BP <- MYO_hyper_GO.BP %>% 
+        rownames_to_column(var = "GO_term") %>% 
+        mutate(GO_term = substr(GO_term, 12, nchar(GO_term)),
+               N_DE = N-DE) %>% 
+        pivot_longer(cols = c("DE", "N_DE")) %>% 
+        ggplot(aes(x = value, y = GO_term, fill = factor(name, levels = rev(unique(name)))))+
+                geom_bar(stat = "identity", width = 0.5)+
+        labs(x = "N genes", 
+             fill = "Genes in pathway")+
+        theme_classic(base_size = 16)+
+        theme(axis.title.y = element_blank(), 
+              legend.position = "top", 
+              axis.title.x = element_blank())+
+        scale_x_continuous(expand = c(0,0))+
+        scale_fill_manual(values = c("#440154FF","#5DC863FF"),
+                          labels = c("All genes in GO term", "DMGs in GO term"))
+
+p2_CC <- MYO_hyper_GO.CC %>% 
+        rownames_to_column(var = "GO_term") %>% 
+        mutate(GO_term = substr(GO_term, 12, nchar(GO_term)),
+               N_DE = N-DE) %>% 
+        pivot_longer(cols = c("DE", "N_DE")) %>% 
+        ggplot(aes(x = value, y = GO_term, fill = factor(name, levels = rev(unique(name)))))+
+        geom_bar(stat = "identity", width = 0.5)+
+        labs(x = "N genes", 
+             fill = "Genes in pathway")+
+        theme_classic(base_size = 16)+
+        theme(axis.title.y = element_blank(), 
+              legend.position = "none",
+              axis.title.x = element_blank())+
+        scale_x_continuous(expand = c(0,0))+
+        scale_fill_manual(values = c("#440154FF","#5DC863FF"),
+                          labels = c("All genes in GO term", "DMGs in GO term"))
+
+p3_MF <- MYO_hyper_GO.MF %>% 
+        rownames_to_column(var = "GO_term") %>% 
+        mutate(GO_term = substr(GO_term, 12, nchar(GO_term)),
+               N_DE = N-DE) %>% 
+        pivot_longer(cols = c("DE", "N_DE")) %>% 
+        ggplot(aes(x = value, y = GO_term, fill = factor(name, levels = rev(unique(name)))))+
+        geom_bar(stat = "identity", width = 0.5)+
+        labs(x = "N genes", 
+             fill = "Genes in pathway")+
+        theme_classic(base_size = 16)+
+        theme(axis.title.y = element_blank(), 
+              legend.position = "none")+
+        scale_x_continuous(expand = c(0,0))+
+        scale_fill_manual(values = c("#440154FF","#5DC863FF"),
+                          labels = c("All genes in GO term", "DMGs in GO term"))
+
+plot_grid(p1_BP, p2_CC, p3_MF, ncol = 1)
 
 ###############################################################################################
 
@@ -678,6 +905,31 @@ ggarrange(p1,p2, ncol = 1, common.legend = TRUE, legend = "bottom")
 
 ###############################################################################################
 
+# plot absoulte correlation between MYO vs. MYO+INT
+
+M_change %>% 
+        ggplot(aes(x = BH, y = BM)) +
+        geom_point() +
+        theme_classic(base_size = 20)+
+        labs(x = "Baseline MYO+INT",
+             y = "Baseline MYO")
+
+M_change %>% 
+        ggplot(aes(x = PH, y = PM)) +
+        geom_point() +
+        theme_classic(base_size = 20)+
+        labs(x = "Post MYO+INT",
+             y = "Post MYO")
+        
+baseline_cor <- cor(x = M_change [1:8], y = M_change[9:16])
+
+# mean cor baseline
+
+((baseline_cor[1,1]+baseline_cor[2,2]+baseline_cor[3,3]+baseline_cor[4,4]+baseline_cor[5,5]+baseline_cor[6,6]+baseline_cor[7,7]+baseline_cor[8,8])/8)^2
+
+post_cor <- cor(x = M_change [17:24], y = M_change[25:32])
+
+((post_cor[1,1]+post_cor[2,2]+post_cor[3,3]+post_cor[4,4]+post_cor[5,5]+post_cor[6,6]+post_cor[7,7]+post_cor[8,8])/8)^2
 
 ###
 # plot correlation between top exercise responsive genes
@@ -929,20 +1181,27 @@ M_change[,37:38] %>%
 
 
 # blant altman plot
+
+library(BlandAltmanLeh)
+library(ggExtra)
+
         
-library(blandr)
+# BH vs. BM
+bland.altman.plot(M_change[,33], M_change[,34], graph.sys = "ggplot2", conf.int = 0.95)
 
-        # BH vs. BM
-blandr.output.report(M_change[,33], M_change[,34])
+# stats
 
-blandr_stats <- blandr.statistics(M_change[,33], M_change[,34])
+bland.altman.stats(M_change[,33], M_change[,34])
 
-# plot
+# same plot, just with distribution histograms
 
-baseline_ba_plot <- blandr.plot.ggplot(blandr_stats)
-
-baseline_ba_plot+
-        theme_classic(base_size = 20)+
-        geom_hline(linewidth = 1.5)
+ggMarginal(bland.altman.plot(M_change[,33], M_change[,34], graph.sys = "ggplot2", type = "histogram", size=4))
 
 
+# PH vs. PM
+
+ggMarginal(bland.altman.plot(M_change[,35], M_change[,36], graph.sys = "ggplot2", type = "histogram", size=4))
+
+# stats
+
+bland.altman.stats(M_change[,35], M_change[,36])
