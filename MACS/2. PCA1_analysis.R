@@ -734,6 +734,11 @@ MYO_hyper_GO.all <- gsameth(sig.cpg = MYO_hyper,
                        collection = go.sets$go.sets,
                        array.type = "EPIC")
 
+MYO_hyper_GO.all %>% 
+        filter(FDR < 0.05) %>% 
+        mutate(percent_DE = DE/N) %>% 
+        arrange(-percent_DE)
+
 MYO_hyper_GO.BP <- gsameth(sig.cpg = MYO_hyper,
                             all.cpg = rownames(beta), 
                             collection = go.sets$go.sets[go.sets$go.subs$BP],
@@ -898,6 +903,61 @@ p3_MF <- MYO_hyper_GO.MF %>%
                           labels = c("All genes in GO term", "DMGs in GO term"))
 
 plot_grid(p1_BP, p2_CC, p3_MF, ncol = 1)
+
+
+####
+#               Check ORA of MYO+INT island and promoter hypermethylation
+####
+
+# filter MYO+INT dmps for CpG islands within promoters
+
+# get hypermethylated probes
+MYOINT_hyper <- merge(DMPs_PH_vs_BH, anno %>% 
+                           filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island"), 
+                   by = "cpg") %>% 
+        filter(p.value < 0.05) %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        filter(delta_M > 0) %>% 
+        pull(cpg)
+
+
+MYOINT_hyper_GO.all <- gsameth(sig.cpg = MYOINT_hyper,
+                           all.cpg = rownames(beta), 
+                           collection = go.sets$go.sets,
+                           array.type = "EPIC")
+
+MYOINT_hyper_GO.all %>% 
+        filter(FDR < 0.05) %>% 
+        mutate(percent_DE = DE/N) %>% 
+        arrange(-percent_DE)
+
+# get hyp0methylated probes
+MYOINT_hypo <- merge(DMPs_PH_vs_BH, anno %>% 
+                              filter(Regulatory_Feature_Group == "Promoter_Associated" & Relation_to_Island == "Island"), 
+                      by = "cpg") %>% 
+        filter(p.value < 0.05) %>% 
+        filter(UCSC_RefGene_Name != "NA") %>% 
+        filter(delta_M < 0) %>% 
+        pull(cpg)
+
+
+MYOINT_hypo_GO.all <- gsameth(sig.cpg = MYOINT_hypo,
+                               all.cpg = rownames(beta), 
+                               collection = go.sets$go.sets,
+                               array.type = "EPIC")
+
+MYOINT_hypo_GO.all %>% 
+        filter(FDR < 0.1) %>% 
+        mutate(percent_DE = DE/N) %>% 
+        arrange(-percent_DE)
+
+
+# check genes
+
+anno %>% 
+        filter(cpg %in% MYO_hyper) %>% 
+        distinct(UCSC_RefGene_Name, .keep_all = TRUE)
+
 
 ###############################################################################################
 
