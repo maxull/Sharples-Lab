@@ -1802,7 +1802,306 @@ data.frame(Time = summary(emm_8477)$Time,
         # geom_text(aes(x = 1.67, y = 0.855*d, label = paste("p =", round(contrast_results_df %>% filter(gene == "8477") %>% pull(p_value_time_myoint),8))), size = 5)
 
 
+# plot SATB2 SATB homeobox 2
+emm_23314 <- emmeans(model_results[["23314"]], ~ Time * Sample)
+a = 0.8
+b = 0.92
+c = 0.88
+d = 1.1
 
+# SATB2 <-
+data.frame(Time = summary(emm_23314)$Time,
+           Sample = summary(emm_23314)$Sample,
+           emmean = summary(emm_23314)$emmean,
+           lower.CL = summary(emm_23314)$lower.CL,
+           upper.CL = summary(emm_23314)$upper.CL) %>% 
+        ggplot(aes(x = Time, y = emmean, fill = Sample))+
+        geom_bar(stat = "identity", color = "black", position = position_dodge(), width = 0.5, linewidth = 1.2)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2, position = position_dodge(0.5), linewidth = 0.8)+
+        scale_fill_manual(values = c("#B396B9","#B3D7B1"), labels = c("MYO", "MYO+INT"))+
+        scale_y_continuous(expand = c(0,0), limits = c(0, 0.85))+
+        theme_classic(base_size = 20)+
+        labs(y = "Aggregate promoter methylation (\u03b2-value)", 
+             title = "SATB2")+
+        geom_point(data = t(average_promoter.m["23314",1:32]) %>% as.data.frame() %>% rownames_to_column(var = "ID") %>%  dplyr::select(ID, "SATB2" = "23314") %>% merge(., promoter_model, by = "ID"), 
+                   aes(x= Time, y = SATB2, fill = Sample), position = position_dodge(width = 0.5), size = 2)+
+        theme(axis.title.x = element_blank(),
+              axis.text.x = element_text(size = 20, face = "bold", colour = "black"))+
+        # # Baseline comparison
+        # geom_segment(aes(x = 0.875, xend = 1.125, y = 0.78*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the left side of the bracket
+        # geom_segment(aes(x = 0.875, xend = 0.875, y = 0.76*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the right side of the bracket
+        # geom_segment(aes(x = 1.125, xend = 1.125, y = 0.76*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # # Adding label for the bracket
+        # geom_text(aes(x = 1, y = 0.805*a, label = paste("p =", round(contrast_results_df %>% filter(gene == "23314") %>% pull(p_value_sample_baseline),3))), size = 5)+
+        # Post comparison
+        geom_segment(aes(x = 1.875, xend = 2.125, y = 0.78*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the left side of the bracket
+        geom_segment(aes(x = 1.875, xend = 1.875, y = 0.76*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the right side of the bracket
+        geom_segment(aes(x = 2.125, xend = 2.125, y = 0.76*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Adding label for the bracket
+        geom_text(aes(x = 2, y = 0.805*b, label = paste("p =", round(contrast_results_df %>% filter(gene == "23314") %>% pull(p_value_sample_post),4))), size = 5)+
+        # MYO comparison
+        geom_segment(aes(x = 0.875, xend = 1.875, y = 0.88*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the left side of the bracket
+        geom_segment(aes(x = 0.875, xend = 0.875, y = 0.86*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the right side of the bracket
+        geom_segment(aes(x = 1.875, xend = 1.875, y = 0.86*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Adding label for the bracket
+        geom_text(aes(x = 1.37, y = 0.905*c, label = paste("p =", round(contrast_results_df %>% filter(gene == "23314") %>% pull(p_value_time_myo),3))), size = 5)
+        # # MYO+INT comparison
+        # geom_segment(aes(x = 1.125, xend = 2.125, y = 0.83*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the left side of the bracket
+        # geom_segment(aes(x = 1.125, xend = 1.125, y = 0.81*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the right side of the bracket
+        # geom_segment(aes(x = 2.125, xend = 2.125, y = 0.81*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # # Adding label for the bracket
+        # geom_text(aes(x = 1.67, y = 0.855*d, label = paste("p =", round(contrast_results_df %>% filter(gene == "23314") %>% pull(p_value_time_myoint),8))), size = 5)
+
+
+# Identify genes with high baseline difference, which increases with RT. 
+
+contrast_results_df %>%
+        arrange(-abs(sample_result_baseline)) %>% 
+        filter(abs(sample_result_baseline) > 0.1) %>% 
+        filter(abs(sample_result_post) > abs(sample_result_baseline)) %>% 
+        filter(p_value_time_myo < 0.05 | p_value_time_myoint < 0.05)
+        mutate(diff = abs(sample_result_baseline)+abs(sample_result_post)) %>% 
+        arrange(-abs(diff)) 
+
+# plot MYPN
+# Not interesting
+        
+gene <- "84665"
+gene_name = "MYPN"
+emm <- emmeans(model_results[[gene]], ~ Time * Sample)
+a = 0.8
+b = 0.92
+c = 0.88
+d = 1.1
+
+# SATB2 <-
+data.frame(Time = summary(emm)$Time,
+           Sample = summary(emm)$Sample,
+           emmean = summary(emm)$emmean,
+           lower.CL = summary(emm)$lower.CL,
+           upper.CL = summary(emm)$upper.CL) %>% 
+        ggplot(aes(x = Time, y = emmean, fill = Sample))+
+        geom_bar(stat = "identity", color = "black", position = position_dodge(), width = 0.5, linewidth = 1.2)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2, position = position_dodge(0.5), linewidth = 0.8)+
+        scale_fill_manual(values = c("#B396B9","#B3D7B1"), labels = c("MYO", "MYO+INT"))+
+        scale_y_continuous(expand = c(0,0), limits = c(0, 0.6))+
+        theme_classic(base_size = 20)+
+        labs(y = "Aggregate promoter methylation (\u03b2-value)", 
+             title = gene_name)+
+        geom_point(data = t(average_promoter.m[gene,1:32]) %>% as.data.frame() %>% rownames_to_column(var = "ID") %>%  dplyr::select(ID, gene_name = gene) %>% merge(., promoter_model, by = "ID"), 
+                   aes(x= Time, y = gene_name, fill = Sample), position = position_dodge(width = 0.5), size = 2)+
+        theme(axis.title.x = element_blank(),
+              axis.text.x = element_text(size = 20, face = "bold", colour = "black"))+
+        # # Baseline comparison
+        # geom_segment(aes(x = 0.875, xend = 1.125, y = 0.78*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the left side of the bracket
+        # geom_segment(aes(x = 0.875, xend = 0.875, y = 0.76*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the right side of the bracket
+        # geom_segment(aes(x = 1.125, xend = 1.125, y = 0.76*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # # Adding label for the bracket
+        # geom_text(aes(x = 1, y = 0.805*a, label = paste("p =", round(contrast_results_df %>% filter(gene == "gene_name") %>% pull(p_value_sample_baseline),3))), size = 5)+
+        # Post comparison
+        geom_segment(aes(x = 1.875, xend = 2.125, y = 0.78*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the left side of the bracket
+        geom_segment(aes(x = 1.875, xend = 1.875, y = 0.76*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the right side of the bracket
+        geom_segment(aes(x = 2.125, xend = 2.125, y = 0.76*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Adding label for the bracket
+        geom_text(aes(x = 2, y = 0.805*b, label = paste("p =", round(contrast_results_df %>% filter(gene == "gene_name") %>% pull(p_value_sample_post),4))), size = 5)+
+        # MYO comparison
+        geom_segment(aes(x = 0.875, xend = 1.875, y = 0.88*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the left side of the bracket
+        geom_segment(aes(x = 0.875, xend = 0.875, y = 0.86*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the right side of the bracket
+        geom_segment(aes(x = 1.875, xend = 1.875, y = 0.86*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Adding label for the bracket
+        geom_text(aes(x = 1.37, y = 0.905*c, label = paste("p =", round(contrast_results_df %>% filter(gene == gene_name) %>% pull(p_value_time_myo),3))), size = 5)
+        # # MYO+INT comparison
+        # geom_segment(aes(x = 1.125, xend = 2.125, y = 0.83*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the left side of the bracket
+        # geom_segment(aes(x = 1.125, xend = 1.125, y = 0.81*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the right side of the bracket
+        # geom_segment(aes(x = 2.125, xend = 2.125, y = 0.81*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # # Adding label for the bracket
+        # geom_text(aes
+
+# plot MYPN
+# Not interesting
+
+gene <- "9119"
+gene_name = "KRT75"
+emm <- emmeans(model_results[[gene]], ~ Time * Sample)
+a = 0.8
+b = 0.92
+c = 0.88
+d = 1.1
+
+# SATB2 <-
+data.frame(Time = summary(emm)$Time,
+           Sample = summary(emm)$Sample,
+           emmean = summary(emm)$emmean,
+           lower.CL = summary(emm)$lower.CL,
+           upper.CL = summary(emm)$upper.CL) %>% 
+        ggplot(aes(x = Time, y = emmean, fill = Sample))+
+        geom_bar(stat = "identity", color = "black", position = position_dodge(), width = 0.5, linewidth = 1.2)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2, position = position_dodge(0.5), linewidth = 0.8)+
+        scale_fill_manual(values = c("#B396B9","#B3D7B1"), labels = c("MYO", "MYO+INT"))+
+        scale_y_continuous(expand = c(0,0), limits = c(0, 0.6))+
+        theme_classic(base_size = 20)+
+        labs(y = "Aggregate promoter methylation (\u03b2-value)", 
+             title = gene_name)+
+        geom_point(data = t(average_promoter.m[gene,1:32]) %>% as.data.frame() %>% rownames_to_column(var = "ID") %>%  dplyr::select(ID, gene_name = gene) %>% merge(., promoter_model, by = "ID"), 
+                   aes(x= Time, y = gene_name, fill = Sample), position = position_dodge(width = 0.5), size = 2)+
+        theme(axis.title.x = element_blank(),
+              axis.text.x = element_text(size = 20, face = "bold", colour = "black"))+
+        # # Baseline comparison
+        # geom_segment(aes(x = 0.875, xend = 1.125, y = 0.78*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the left side of the bracket
+        # geom_segment(aes(x = 0.875, xend = 0.875, y = 0.76*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the right side of the bracket
+        # geom_segment(aes(x = 1.125, xend = 1.125, y = 0.76*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # # Adding label for the bracket
+        # geom_text(aes(x = 1, y = 0.805*a, label = paste("p =", round(contrast_results_df %>% filter(gene == "gene_name") %>% pull(p_value_sample_baseline),3))), size = 5)+
+        # Post comparison
+        geom_segment(aes(x = 1.875, xend = 2.125, y = 0.78*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the left side of the bracket
+        geom_segment(aes(x = 1.875, xend = 1.875, y = 0.76*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the right side of the bracket
+        geom_segment(aes(x = 2.125, xend = 2.125, y = 0.76*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Adding label for the bracket
+        geom_text(aes(x = 2, y = 0.805*b, label = paste("p =", round(contrast_results_df %>% filter(gene == "gene_name") %>% pull(p_value_sample_post),4))), size = 5)+
+        # MYO comparison
+        geom_segment(aes(x = 0.875, xend = 1.875, y = 0.88*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the left side of the bracket
+        geom_segment(aes(x = 0.875, xend = 0.875, y = 0.86*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the right side of the bracket
+        geom_segment(aes(x = 1.875, xend = 1.875, y = 0.86*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Adding label for the bracket
+        geom_text(aes(x = 1.37, y = 0.905*c, label = paste("p =", round(contrast_results_df %>% filter(gene == gene_name) %>% pull(p_value_time_myo),3))), size = 5)
+        # # MYO+INT comparison
+        # geom_segment(aes(x = 1.125, xend = 2.125, y = 0.83*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the left side of the bracket
+        # geom_segment(aes(x = 1.125, xend = 1.125, y = 0.81*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # # Vertical segment on the right side of the bracket
+        # geom_segment(aes(x = 2.125, xend = 2.125, y = 0.81*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # # Adding label for the bracket
+        # geom_text(aes(x = 1.67, y = 0.855*d, label = paste("p =", round(contrast_results_df %>% filter(gene == gene_name %>% pull(p_value_time_myoint),8))), size = 5)
+
+
+
+
+
+###################################################################################################################
+##################       dot plot of exercise responsive genes on aggregate methylation.         ##################
+###################################################################################################################   
+
+signif_promoter_exercise <- contrast_results_df %>% 
+        filter(p_value_time_myo < 0.05 | p_value_time_myoint < 0.05) %>% 
+        mutate(signif = ifelse(p_value_time_myo < 0.05, "MYO", 
+                               ifelse(p_value_time_myoint < 0.05, "MYOINT", "none"))) %>% 
+        mutate(signif = as.factor(ifelse(p_value_time_myo < 0.05 & p_value_time_myoint < 0.05, "BOTH", signif))) %>% 
+        merge(., average_promoter.m[,39:40] %>% rownames_to_column(var = "gene"), by = "gene") 
+        
+        
+# Convert gene symbols to Entrez Gene IDs
+signif_promoter_exercise$entrezIDs <- mapIds(org.Hs.eg.db, keys = signif_promoter_exercise$gene, column = "SYMBOL", keytype = "ENTREZID", multiVals = "first")
+
+shared_labs <- 
+        %>% 
+        dplyr::select(28:30) %>% 
+        filter(entrezIDs != "MYBPH") %>% 
+        filter(entrezIDs != "NACA4P") %>% 
+        filter(entrezIDs != "VARS1") 
+
+signif_promoter_exercise %>% 
+        ggplot(aes(x = PM_vs_BM, y = PH_vs_BH, fill = signif))+
+        geom_hline(yintercept = 0, alpha = 0.5)+
+        geom_vline(xintercept = 0, alpha = 0.5)+
+        geom_point(aes(color = signif)) +
+        geom_label_repel(aes(label = entrezIDs ) ,box.padding = 0.3, size = 3.5, point.padding = 0.5, force = 1.6, min.segment.length = 0.1, max.time = 2, max.overlaps = 12, show.legend = FALSE)+
+        theme_classic(base_size = 20)+
+        labs(x = "MYO",
+             y = "MYO+INT", fill = "Significant", color = "Significant")+
+        scale_color_manual(values = c("RED",  "#440154FF","#5DC863FF"), labels = c("Both", "MYO", "MYO+INT"))+
+        scale_fill_manual(values = c("Red","#B396B9" ,"#B3D7B1"), labels = c("Both", "MYO", "MYO+INT"))+
+        scale_x_continuous(n.breaks = 10, limits = c(-0.1,0.08), expand = c(0,0.0011))+
+        scale_y_continuous(n.breaks = 10, limits = c(-0.1,0.08), expand = c(0,0.0005))+
+        geom_label_repel(data = shared_labs, aes(x = PM_vs_BM, y = PH_vs_BH,label = entrezIDs ),inherit.aes = FALSE,
+                         box.padding = 0.3, size = 3.5, point.padding = 0.5, force = 1.6, min.segment.length = 0.1, max.time = 2, max.overlaps = 12, fill = "red", show.legend = FALSE)+
+        theme(legend.position = "top", legend.key.spacing.x = unit(4, "mm"))+
+        guides(color = guide_legend(override.aes = list(size = 6)))
+
+# individual gene exporation
+
+# plot NEUROD6
+# Not interesting
+
+gene <- "63974"
+gene_name = "NEUROD6"
+emm <- emmeans(model_results[[gene]], ~ Time * Sample)
+a = 0.8
+b = 0.92
+c = 0.88
+d = 1.1
+
+# SATB2 <-
+data.frame(Time = summary(emm)$Time,
+           Sample = summary(emm)$Sample,
+           emmean = summary(emm)$emmean,
+           lower.CL = summary(emm)$lower.CL,
+           upper.CL = summary(emm)$upper.CL) %>% 
+        ggplot(aes(x = Time, y = emmean, fill = Sample))+
+        geom_bar(stat = "identity", color = "black", position = position_dodge(), width = 0.5, linewidth = 1.2)+
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2, position = position_dodge(0.5), linewidth = 0.8)+
+        scale_fill_manual(values = c("#B396B9","#B3D7B1"), labels = c("MYO", "MYO+INT"))+
+        scale_y_continuous(expand = c(0,0), limits = c(0, 1))+
+        theme_classic(base_size = 20)+
+        labs(y = "Aggregate promoter methylation (\u03b2-value)", 
+             title = gene_name)+
+        geom_point(data = t(average_promoter.m[gene,1:32]) %>% as.data.frame() %>% rownames_to_column(var = "ID") %>%  dplyr::select(ID, gene_name = gene) %>% merge(., promoter_model, by = "ID"), 
+                   aes(x= Time, y = gene_name, fill = Sample), position = position_dodge(width = 0.5), size = 2)+
+        theme(axis.title.x = element_blank(),
+              axis.text.x = element_text(size = 20, face = "bold", colour = "black"))+
+        # Baseline comparison
+        geom_segment(aes(x = 0.875, xend = 1.125, y = 0.78*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the left side of the bracket
+        geom_segment(aes(x = 0.875, xend = 0.875, y = 0.76*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the right side of the bracket
+        geom_segment(aes(x = 1.125, xend = 1.125, y = 0.76*a, yend = 0.78*a), linetype = "solid", linewidth = 0.6) +
+        # Adding label for the bracket
+        geom_text(aes(x = 1, y = 0.805*a, label = paste("p =", round(contrast_results_df %>% filter(gene == "gene_name") %>% pull(p_value_sample_baseline),3))), size = 5)+
+        # Post comparison
+        geom_segment(aes(x = 1.875, xend = 2.125, y = 0.78*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the left side of the bracket
+        geom_segment(aes(x = 1.875, xend = 1.875, y = 0.76*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the right side of the bracket
+        geom_segment(aes(x = 2.125, xend = 2.125, y = 0.76*b, yend = 0.78*b), linetype = "solid", linewidth = 0.6) +
+        # Adding label for the bracket
+        geom_text(aes(x = 2, y = 0.805*b, label = paste("p =", round(contrast_results_df %>% filter(gene == "gene_name") %>% pull(p_value_sample_post),4))), size = 5)+
+        # MYO comparison
+        geom_segment(aes(x = 0.875, xend = 1.875, y = 0.88*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the left side of the bracket
+        geom_segment(aes(x = 0.875, xend = 0.875, y = 0.86*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the right side of the bracket
+        geom_segment(aes(x = 1.875, xend = 1.875, y = 0.86*c, yend = 0.88*c), linetype = "solid", linewidth = 0.6) +
+        # Adding label for the bracket
+        geom_text(aes(x = 1.37, y = 0.905*c, label = paste("p =", round(contrast_results_df %>% filter(gene == gene_name) %>% pull(p_value_time_myo),3))), size = 5)+
+        # MYO+INT comparison
+        geom_segment(aes(x = 1.125, xend = 2.125, y = 0.83*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the left side of the bracket
+        geom_segment(aes(x = 1.125, xend = 1.125, y = 0.81*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # Vertical segment on the right side of the bracket
+        geom_segment(aes(x = 2.125, xend = 2.125, y = 0.81*d, yend = 0.83*d), linetype = "solid", linewidth = 0.6) +
+        # Adding label for the bracket
+        geom_text(aes(x = 1.67, y = 0.855*d, label = paste("p =", round(contrast_results_df %>% filter(gene == gene_name) %>% pull(p_value_time_myoint),8))), size = 5)
 
 
 ###################################################################################################################
