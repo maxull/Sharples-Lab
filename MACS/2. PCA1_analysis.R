@@ -102,8 +102,32 @@ DMPs_PM_vs_BM <- readRDS("DMPs_PM_vs_BM.RDATA")
 pca.out <- prcomp(t(M_change[,1:32]), scale. = FALSE)
 
 plot(pca.out$x[,1:2])
+
+# plot nice PCA plot
+
+pca.out$x[,1:2] %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = 'ID') %>% 
+        mutate(Time = ifelse(grepl('B', ID), 'Baseline', 'Post'), 
+               Sample = ifelse(grepl('H', ID), 'MYOINT', 'MYO')) %>% 
+        ggplot(aes(x = PC1, y = PC2))+
+        geom_point(aes(size = 2+pca.out$sdev),shape = 3)+
+        geom_point(aes(color = Sample), size = 2)+
+        theme_classic(base_size = 20)
         
-loadings <- pca.out$rotation[,1]
+
+
+
+promoter_model$Time[grep('B', promoter_model$ID)] <- "Baseline"
+promoter_model$Time[grep('P', promoter_model$ID)] <- 'Post'
+promoter_model$Sample[grep('M', promoter_model$ID)] <- 'MYO'
+promoter_model$Sample[grep('H', promoter_model$ID)] <- 'MYOINT'
+promoter_model$FP <- paste0("FP_",(unlist(str_extract_all(promoter_model$ID, "\\d+"))))
+
+
+
+
+loadings <- pca.out$rotation[,1:2]
 
 # look through top PC1 drivers
 
@@ -1353,67 +1377,6 @@ contrast_results <- data.frame(
 )
 
 
-# Iterate over each model and extract contrasts
-for (i in 1:1:length(model_results)) {
-        gene_name <- names(model_results)[i] 
-        model <- model_results[[i]]
-        
-        emm <- emmeans(model, ~ Time * Sample)
-        # Contrast between Baseline and Post for each Sample
-        contrast_time <- contrast(emm, method = "pairwise", by = "Sample")
-        # Contrast between MYO and MYOINT for each Time
-        contrast_sample <- contrast(emm, method = "pairwise", by = "Time")
-        # Interaction contrasts (simple main effects)
-        interaction_contrasts <- contrast(emm, interaction = "pairwise")
-        # Extract results for time contrast (Baseline - Post) within each sample
-        time_result_myo <- as.data.frame(contrast_time)[1, ]
-        time_result_myoint <- as.data.frame(contrast_time)[2, ]
-        # Extract results for sample contrast (MYO - MYOINT) within each time
-        sample_result_baseline <- as.data.frame(contrast_sample)[1, ]
-        sample_result_post <- as.data.frame(contrast_sample)[2, ]
-        # Extract results for interaction contrast
-        interaction_result <- as.data.frame(interaction_contrasts)[1, ]
-        
-        # Consolidate results into a single row for this gene
-        result_row <- data.frame(
-                gene = gene_name,
-                time_contrast_myo = time_result_myo$estimate,
-                se_time_myo = time_result_myo$SE,
-                df_time_myo = time_result_myo$df,
-                t_ratio_time_myo = time_result_myo$t.ratio,
-                p_value_time_myo = time_result_myo$p.value,
-                time_contrast_myoint = time_result_myoint$estimate,
-                se_time_myoint = time_result_myoint$SE,
-                df_time_myoint = time_result_myoint$df,
-                t_ratio_time_myoint = time_result_myoint$t.ratio,
-                p_value_time_myoint = time_result_myoint$p.value,
-                sample_result_baseline = sample_result_baseline$estimate,
-                se_sample_baseline = sample_result_baseline$SE,
-                df_sample_baseline = sample_result_baseline$df,
-                t_ratio_sample_baseline = sample_result_baseline$t.ratio,
-                p_value_sample_baseline = sample_result_baseline$p.value,
-                sample_result_post = sample_result_post$estimate,
-                se_sample_post = sample_result_post$SE,
-                df_sample_post = sample_result_post$df,
-                t_ratio_sample_post = sample_result_post$t.ratio,
-                p_value_sample_post = sample_result_post$p.value,
-                estimate_interaction = interaction_result$estimate,
-                se_interaction = interaction_result$SE,
-                df_interaction = interaction_result$df,
-                t_ratio_interaction = interaction_result$t.ratio,
-                p_value_interaction = interaction_result$p.value,
-                stringsAsFactors = FALSE
-        )
-       
-        contrast_results <- rbind(contrast_results, result_row)
-        
-        print(i)
-}
-
-
-
-
-
 # Function to extract contrasts for a given model
 extract_contrasts <- function(model, gene_name) {
         emm <- emmeans(model, ~ Time * Sample)
@@ -2021,6 +1984,12 @@ shared_labs <- signif_promoter_exercise %>%
         filter(entrezIDs != "VARS1",
                entrezIDs != "MYEOV") 
 
+Labelled_genes <- c("LINC00327", "GPR174", "SLC2A9", "OR1J2", "LINC01603", 
+                    "ACSM1", "BLK", "LINC00613", "TAAR5", "CCDC168", "OR5A1", "LINC02877", 
+                    "LARP1", "OR51S1", "GNG2", 
+                    "NPPB", "OTOA", "LINC00332", "GPR65", "TFEC", "ROS1", "SATB2","ZNF430", 
+                    "MYBPH", "NEUROD6", "MS4A13", "H1-8", "MYH16", "MYEOV", "RTN4", "THPO", "GSTM2", "CLCC1", "GRAMD1C")
+
 labs <- signif_promoter_exercise %>% 
         dplyr::select(28:30) %>% 
         filter(entrezIDs %in% Labelled_genes) %>% 
@@ -2052,6 +2021,13 @@ agg_plot <- signif_promoter_exercise %>%
 # save plot 
 
 ggsave(plot = agg_plot, path = "Figures/Aggregate_promoter_methylation/", filename = "exercise_responsive_aggregate_promoter_methylation.png")
+
+
+# count and calculate % of shared promoter genes and unique
+
+signif_promoter_exercise %>%  filter(signif == 'MYO') %>% nrow() /signif_promoter_exercise %>% nrow()
+signif_promoter_exercise %>%  filter(signif == 'MYOINT') %>% nrow() /signif_promoter_exercise %>% nrow()
+signif_promoter_exercise %>%  filter(signif == 'BOTH') %>% nrow() /signif_promoter_exercise %>% nrow()
 
 # individual gene exporation
 
@@ -2202,7 +2178,290 @@ for (i in 1:length(Labelled_genes)) {
 
 
 
-###################################################################################################################
+#############################################################################################################################
+##################       plot all probes from the most ingeresting gene of aggregate promoter genes        ##################
+#############################################################################################################################   
+
+
+
+
+_________________________________________________
+
+# find probes in genes
+
+_________________________________________________
+
+Illumina_anno <- Illumina_anno %>% 
+        mutate("cpg" = IlmnID) 
+
+x <- Illumina_anno %>% 
+        mutate(UCSC_RefGene_Name = str_split(UCSC_RefGene_Name, ";", simplify = TRUE)[, 1]) 
+
+x$cpg = x$Name
+
+m_change_df <- M_change[39:40] %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(., x, by = "cpg") %>% 
+        dplyr::select(1:3, UCSC_RefGene_Name)
+
+
+gene_name <- "LINC00327"       # write gene name
+
+Probes <- anno %>% 
+        filter(UCSC_RefGene_Name == gene_name) 
+
+x = c("cg25431166", "cg11866473") # extra probes if misidentified
+
+Chromosome <- merge(Probes, Illumina_anno %>% mutate(cpg = IlmnID), by = "cpg") %>% 
+        dplyr::select(CHR) %>% 
+        unique()
+
+m_change_df %>% 
+        filter(UCSC_RefGene_Name == gene_name) %>%
+        merge(.,Illumina_anno, by = "cpg") %>% 
+        dplyr::select(cpg, PH_vs_BH, PM_vs_BM, MAPINFO, Relation_to_UCSC_CpG_Island, CHR) %>% 
+        pivot_longer(names_to = "contrast", values_to = "mean_change", cols = 2:3) %>% 
+        arrange(desc(MAPINFO)) %>% 
+        ggplot(aes(x = MAPINFO, y = mean_change, color = contrast, group = contrast))+
+        geom_hline(yintercept = 0)+
+        geom_point(aes(shape = Relation_to_UCSC_CpG_Island), size = 3)+
+        geom_smooth(method = "loess", alpha = 0.5, se = FALSE)+
+        labs(title = paste(gene_name,";", "N Probes =", nrow(Probes), ";","CHR", Chromosome),
+             y = "mean M-value change",
+             x = "nucleotide")+
+        theme_classic()+
+        theme(axis.text.x = element_text(angle = 90))+
+        scale_x_continuous(n.breaks = 20)
+
+
+
+####
+#       Find TSS LNC00327
+####
+
+
+
+BiocManager::install("biomaRt")
+
+library(biomaRt)
+
+ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+tss_data <- getBM(attributes = c("ensembl_gene_id", "external_gene_name", "transcription_start_site", "chromosome_name", "strand"),
+                  mart = ensembl)
+
+tss_data %>% 
+        as.data.frame() %>% 
+        filter(external_gene_name == gene_name) %>% 
+        pull(transcription_start_site) %>% mean()
+
+# calculate LINC00327 distance to tss
+
+Illumina_anno %>% 
+        filter(UCSC_RefGene_Name == "LINC00327") %>% 
+        mutate(TSS_distance = Start_hg38-tss_data %>% 
+                       as.data.frame() %>% 
+                       filter(external_gene_name == gene_name) %>% 
+                       pull(transcription_start_site) %>% mean()) %>% 
+        arrange(TSS_distance)
+
+
+# plot boxplot of LINC00327
+
+LINC00327 <- Illumina_anno %>% 
+        filter(UCSC_RefGene_Name == "LINC00327") %>% 
+        mutate(TSS_distance = Start_hg38-tss_data %>% 
+                       as.data.frame() %>% 
+                       filter(external_gene_name == gene_name) %>% 
+                       pull(transcription_start_site) %>% mean()) %>% 
+        arrange(TSS_distance) %>% 
+        merge(., M_change %>% rownames_to_column(var = "cpg"), by = "cpg") %>% 
+        pivot_longer(cols = 55:86, names_to = "Sample", values_to = "M_val") %>% 
+        dplyr::select(1, TSS_distance, Sample, M_val) %>% 
+        mutate(Time = "na", 
+               FP = "na")
+
+
+LINC00327$Time[grep('BM', LINC00327$Sample)] <- "Baseline_MYO"
+LINC00327$Time[grep('PM', LINC00327$Sample)] <- 'Post_MYO'
+LINC00327$Time[grep('BH', LINC00327$Sample)] <- "Baseline_MYOINT"
+LINC00327$Time[grep('PH', LINC00327$Sample)] <- 'Post_MYOINT'
+# LINC00327$FP <- paste0("FP_",(unlist(str_extract_all(LINC00327$Sample, "\\d+"))))
+# LINC00327$Sample[grep('M', LINC00327$Sample)] <- 'MYO'
+# LINC00327$Sample[grep('H', LINC00327$Sample)] <- 'MYOINT'
+
+
+# plot
+
+c1 <- LINC00327 %>% 
+        mutate(Time = factor(Time, levels = c("Baseline_MYO", "Post_MYO", "Baseline_MYOINT", "Post_MYOINT"))) %>% 
+        filter(cpg == "cg19409956") %>% 
+        ggplot(aes(x = Time, y = M_val, fill = Time))+
+        geom_boxplot(outliers = FALSE, linewidth = 1.5) +
+        geom_point(show.legend = FALSE, size =3) + 
+        scale_y_continuous(limits = c(0,4), expand = c(0,0))+
+        scale_fill_manual(values = c( "#440154FF","#B396B9","#5DC863FF","#B3D7B1"), labels = c("MYO (Baseline)", "MYO (Post)", "MYO+INT (Baseline)", "MYO+INT (Post)"))+
+        theme_classic(base_size = 20) +
+        theme(axis.title.x = element_blank(), 
+              axis.text.x = element_blank(), 
+              axis.title.y = element_blank(), 
+              panel.grid.major.y = element_line(), 
+              legend.position = "none")
+
+c2 <- LINC00327 %>% 
+        mutate(Time = factor(Time, levels = c("Baseline_MYO", "Post_MYO", "Baseline_MYOINT", "Post_MYOINT"))) %>% 
+        filter(cpg == "cg22576398") %>% 
+        ggplot(aes(x = Time, y = M_val, fill = Time))+
+        geom_boxplot(outliers = FALSE, linewidth = 1.5) +
+        geom_point(show.legend = FALSE, size =3) + 
+        scale_y_continuous(limits = c(0,4), expand = c(0,0))+
+        scale_fill_manual(values = c( "#440154FF","#B396B9","#5DC863FF","#B3D7B1"), labels = c("MYO (Baseline)", "MYO (Post)", "MYO+INT (Baseline)", "MYO+INT (Post)"))+
+        theme_classic(base_size = 20) +
+        theme(axis.title.x = element_blank(), 
+              axis.text.x = element_blank(), 
+              axis.title.y = element_blank(), 
+              panel.grid.major.y = element_line(), 
+              legend.position = "none", 
+              axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
+
+c3 <- LINC00327 %>% 
+        mutate(Time = factor(Time, levels = c("Baseline_MYO", "Post_MYO", "Baseline_MYOINT", "Post_MYOINT"))) %>% 
+        filter(cpg == "cg15896012") %>% 
+        ggplot(aes(x = Time, y = M_val, fill = Time))+
+        geom_boxplot(outliers = FALSE, linewidth = 1.5) +
+        geom_point(show.legend = FALSE, size =3) + 
+        scale_y_continuous(limits = c(0,4), expand = c(0,0))+
+        scale_fill_manual(values = c( "#440154FF","#B396B9","#5DC863FF","#B3D7B1"), labels = c("MYO (Baseline)", "MYO (Post)", "MYO+INT (Baseline)", "MYO+INT (Post)"))+
+        theme_classic(base_size = 20) +
+        theme(axis.title.x = element_blank(), 
+              axis.text.x = element_blank(), 
+              axis.title.y = element_blank(), 
+              panel.grid.major.y = element_line(), 
+              legend.position = "none", 
+              axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
+
+c4 <- LINC00327 %>% 
+        mutate(Time = factor(Time, levels = c("Baseline_MYO", "Post_MYO", "Baseline_MYOINT", "Post_MYOINT"))) %>% 
+        filter(cpg == "cg21995219") %>% 
+        ggplot(aes(x = Time, y = M_val, fill = Time))+
+        geom_boxplot(outliers = FALSE, linewidth = 1.5) +
+        geom_point(show.legend = FALSE, size =3) + 
+        scale_y_continuous(limits = c(0,4), expand = c(0,0))+
+        scale_fill_manual(values = c( "#440154FF","#B396B9","#5DC863FF","#B3D7B1"), labels = c("MYO (Baseline)", "MYO (Post)", "MYO+INT (Baseline)", "MYO+INT (Post)"))+
+        theme_classic(base_size = 20) +
+        theme(axis.title.x = element_blank(), 
+              axis.text.x = element_blank(), 
+              axis.title.y = element_blank(), 
+              panel.grid.major.y = element_line(), 
+              legend.position = "none", 
+              axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
+
+
+plot_grid(c1, c2, c3, c4, nrow = 1)
+
+
+
+¢###################################################################################################################
+##################       Gene silencer methylation                   ##############################################
+###################################################################################################################  
+
+# load full proba info and location
+Illumina_anno <- read.csv("Annotation file Illumina/infinium-methylationepic-v-1-0-b5-manifest-file.csv", skip = 7, header = TRUE)
+
+Illumina_anno <- Illumina_anno %>% 
+        mutate(CHR = paste0("chr", CHR))
+
+Illumina_anno <- Illumina_anno %>% 
+        mutate(MAPINFO = as.numeric(MAPINFO))
+
+# load silencer database
+Silencer_DB <- read_tsv("Silencer_DB_Homo_sapiens_Muscle_UCSC.bed", skip = 1)
+
+#fix colnames of silencer_db
+
+Silencer_DB <- rbind(Silencer_DB,colnames(Silencer_DB))
+
+Silencer_DB <- Silencer_DB[,c(1:7,10)]
+
+colnames(Silencer_DB) <- c("Chr", "Start", "End", "Silencer_ID", "Length", "Strand", "Muscle_origin", "Detection_method")
+
+str(Silencer_DB)
+
+Silencer_DB <- Silencer_DB %>% 
+        mutate(Start = as.numeric(Start),
+               End = as.numeric(End))
+
+
+####
+#       Identify which illumina probes are located in silencer regions
+####
+
+# Initialize the 'Within_Silencer' column
+Illumina_anno$Within_Silencer <- NA
+
+# Loop through each row in the Illumina_anno data frame
+for (i in 1:nrow(Illumina_anno)) {
+        # Filter silencers on the same chromosome
+        relevant_silencers <- Silencer_DB %>%
+                filter(Chr == as.character(Illumina_anno$CHR[i]))
+        
+        # Check each silencer for overlap
+        for (j in 1:nrow(relevant_silencers)) {
+                if (Illumina_anno$MAPINFO[i] >= relevant_silencers$Start[j] &&
+                    Illumina_anno$MAPINFO[i] <= relevant_silencers$End[j]) {
+                        Illumina_anno$Within_Silencer[i] <- relevant_silencers$Silencer_ID[j]
+                        
+                }
+        }
+        print(i)
+}
+
+# second iteration
+
+# Setup a parallel cluster
+cl <- makeCluster(detectCores() - 1)  # Leave one core free for system processes
+clusterExport(cl, list("Illumina_anno", "Silencer_DB"))  # Export necessary objects to each worker
+
+# Run pblapply in parallel
+results <- pblapply(seq_len(nrow(Illumina_anno)), function(i) {
+        relevant_silencers <- Silencer_DB[Silencer_DB$Chr == as.character(Illumina_anno$CHR[i]), ]
+        for (j in seq_len(nrow(relevant_silencers))) {
+                if (Illumina_anno$MAPINFO[i] >= relevant_silencers$Start[j] &&
+                    Illumina_anno$MAPINFO[i] <= relevant_silencers$End[j]) {
+                        return(relevant_silencers$Silencer_ID[j])
+                }
+        }
+        return(NA)
+}, cl = cl)
+
+# Stop the cluster
+stopCluster(cl)
+
+# unslit results
+
+results <- unlist(results)
+
+results <- as.data.frame(results)
+
+
+Illumina_anno <- cbind(Illumina_anno, results) %>% 
+        dplyr::select(1:51, "Silencer" = results)
+
+# save annotation file
+
+write_csv(Illumina_anno, "Annotation file Illumina/infinium-methylationepic-v-1-0-b5-manifest-file_with_silencers.csv")
+
+# check file
+
+silencer_anno <- Illumina_anno %>% 
+        filter(Silencer != "NA") %>% 
+        dplyr::select("IlmnID","CHR", "MAPINFO", "Strand", "UCSC_RefGene_Name", "UCSC_RefGene_Group", "Relation_to_UCSC_CpG_Island", "Regulatory_Feature_Group", "Silencer_ID" = Silencer) %>% 
+        merge(., Silencer_DB, by = "Silencer_ID") %>% 
+        dplyr::select("IlmnID","CHR", "MAPINFO", "Strand.x", "UCSC_RefGene_Name", "UCSC_RefGene_Group", "Relation_to_UCSC_CpG_Island", "Regulatory_Feature_Group", "Silencer_ID", 10:16)
+
+write_csv(silencer_anno, "Annotation file Illumina/infinium-methylationepic-v-1-0-b5_silencer_anno.csv")
+
+r###################################################################################################################
 ##################       density plot of differences                 ##############################################
 ###################################################################################################################        
 
