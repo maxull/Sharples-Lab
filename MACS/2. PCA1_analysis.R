@@ -105,26 +105,34 @@ plot(pca.out$x[,1:2])
 
 # plot nice PCA plot
 
-pca.out$x[,1:2] %>% 
+pca_plt <- pca.out$x[,1:2] %>% 
         as.data.frame() %>% 
         rownames_to_column(var = 'ID') %>% 
-        mutate(Time = ifelse(grepl('B', ID), 'Baseline', 'Post'), 
-               Sample = ifelse(grepl('H', ID), 'MYOINT', 'MYO')) %>% 
+        mutate(Sample = factor(ifelse(grepl('BH', ID), 'Baseline_MYOINT', 
+                               ifelse(grepl('BM', ID), 'Baseline_MYO', 
+                                      ifelse(grepl('PH', ID), 'Post_MYOINT', 'Post_MYO'))),
+                               levels = c('Baseline_MYO','Post_MYO','Baseline_MYOINT','Post_MYOINT'))) %>% 
         ggplot(aes(x = PC1, y = PC2))+
-        geom_point(aes(size = 2+pca.out$sdev),shape = 3)+
-        geom_point(aes(color = Sample), size = 2)+
-        theme_classic(base_size = 20)
-        
+        #geom_point(aes(size = 2+pca.out$sdev),shape = 3)+
+        geom_point(aes(fill = Sample), size = 6, stroke = 3, color = 'Black', shape = 21)+
+        scale_fill_manual(values = c("#440154FF","#B396B9","#5DC863FF","#B3D7B1"), labels = c('MYO (Baseline)', 'MYO (Post)', 'MYO+INT (Baseline)','MYO+INT (Post)'))+
+        theme_classic(base_size = 20)+
+        labs(x = 'Principal Component 1',
+             y = 'Principal Component 2')+
+        theme(legend.position = 'top')+
+        guides(fill = guide_legend(override.aes = list(size = 6)))+
+        theme(
+                panel.background = element_rect(fill='transparent'), #transparent panel bg
+                plot.background = element_rect(fill='transparent', color=NA), #transparent plot bg
+                panel.grid.major = element_blank(), #remove major gridlines
+                panel.grid.minor = element_blank(), #remove minor gridlines
+                legend.background = element_rect(fill='transparent'), #transparent legend bg
+                legend.box.background = element_rect(fill='transparent')) #transparent legend panel
 
 
+ggsave(plot = pca_plt, bg = "transparent", path = "Figures/", filename = "MACS_PCA_plot_transparent.png") 
 
-promoter_model$Time[grep('B', promoter_model$ID)] <- "Baseline"
-promoter_model$Time[grep('P', promoter_model$ID)] <- 'Post'
-promoter_model$Sample[grep('M', promoter_model$ID)] <- 'MYO'
-promoter_model$Sample[grep('H', promoter_model$ID)] <- 'MYOINT'
-promoter_model$FP <- paste0("FP_",(unlist(str_extract_all(promoter_model$ID, "\\d+"))))
-
-
+ggsave(filename = "Figures/MACS_PCA_plot_transparent.png", plot = pca_plt, bg = "transparent", device = "png")
 
 
 loadings <- pca.out$rotation[,1:2]
@@ -1990,22 +1998,27 @@ Labelled_genes <- c("LINC00327", "GPR174", "SLC2A9", "OR1J2", "LINC01603",
                     "NPPB", "OTOA", "LINC00332", "GPR65", "TFEC", "ROS1", "SATB2","ZNF430", 
                     "MYBPH", "NEUROD6", "MS4A13", "H1-8", "MYH16", "MYEOV", "RTN4", "THPO", "GSTM2", "CLCC1", "GRAMD1C")
 
+Labelled_genes2 <- c("LINC00327", "GPR174", "SLC2A9", "OR1J2", 
+                    "ACSM1", "LINC00613", "TAAR5", "CCDC168", "LINC02877", 
+                    "LARP1", "OR51S1", "GNG2", 
+                    "NPPB", "LINC00332", "GPR65", "TFEC", "ROS1", "SATB2", 
+                    "MYBPH", "NEUROD6", "MS4A13", "H1-8", "MYH16", "MYEOV", "THPO")
+
 labs <- signif_promoter_exercise %>% 
         dplyr::select(28:30) %>% 
-        filter(entrezIDs %in% Labelled_genes) %>% 
-        mutate(entrezIDs = factor(entrezIDs, levels = Labelled_genes)) %>% 
+        filter(entrezIDs %in% Labelled_genes2) %>% 
+        mutate(entrezIDs = factor(entrezIDs, levels = Labelled_genes2)) %>% 
         arrange(entrezIDs)
 
-# reorder labs
-labs[]
+
 
 agg_plot <- signif_promoter_exercise %>% 
         ggplot(aes(x = PM_vs_BM, y = PH_vs_BH, fill = signif))+
         geom_hline(yintercept = 0, alpha = 0.5)+
         geom_vline(xintercept = 0, alpha = 0.5)+
-        geom_point(aes(color = signif)) +
+        geom_point(aes(color = signif), size = 2, shape = 21) +
         #geom_label_repel(aes(label = entrezIDs ) ,box.padding = 0.3, size = 3.5, point.padding = 0.5, force = 1.6, min.segment.length = 0.1, max.time = 2, max.overlaps = 12, show.legend = FALSE)+
-        theme_classic(base_size = 20)+
+        theme_classic(base_size = 25)+
         labs(x = "MYO",
              y = "MYO+INT", fill = "Significant", color = "Significant")+
         scale_color_manual(values = c("RED",  "#440154FF","#5DC863FF"), labels = c("Both", "MYO", "MYO+INT"))+
@@ -2013,10 +2026,20 @@ agg_plot <- signif_promoter_exercise %>%
         scale_x_continuous(n.breaks = 10, limits = c(-0.1,0.08), expand = c(0,0.0011))+
         scale_y_continuous(n.breaks = 10, limits = c(-0.1,0.08), expand = c(0,0.0005))+
         geom_label_repel(data = labs, aes(x = PM_vs_BM, y = PH_vs_BH,label = entrezIDs ),inherit.aes = FALSE,
-                         box.padding = 0.3, size = 3.5, point.padding = 0.5, force = 1.6, min.segment.length = 0.1, max.time = 2, max.overlaps = 12, 
-                         fill = c(rep("#B396B9",5), rep("#B3D7B1",10)  ,rep("#B396B9",8)  ,rep("red", 11)), show.legend = FALSE)+
+                         box.padding = 0.3, size = 5, point.padding = 0.5, force = 1.6, min.segment.length = 0.1, max.time = 2, max.overlaps = 12, 
+                         fill = c(rep("#B396B9",4), rep("#B3D7B1",8)  ,rep("#B396B9",6)  ,rep("red",7)), show.legend = FALSE)+
         theme(legend.position = "top", legend.key.spacing.x = unit(4, "mm"))+
-        guides(color = guide_legend(override.aes = list(size = 6)))
+        guides(color = guide_legend(override.aes = list(size = 6)))+
+        theme(axis.text.r = element_text(color = 'black'),
+                panel.background = element_rect(fill='transparent'), #transparent panel bg
+                plot.background = element_rect(fill='transparent', color=NA), #transparent plot bg
+                panel.grid.major = element_blank(), #remove major gridlines
+                panel.grid.minor = element_blank(), #remove minor gridlines
+                legend.background = element_rect(fill='transparent'), #transparent legend bg
+                legend.box.background = element_rect(fill='transparent')) #transparent legend panel
+
+
+ggsave(plot = pca_plt, bg = "transparent", path = "Figures/", filename = "MACS_PCA_plot_transparent.png") 
 
 # save plot 
 
