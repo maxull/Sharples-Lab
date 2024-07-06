@@ -1451,6 +1451,22 @@ contrast_results <- pblapply(1:length(model_results), function(i) {
 contrast_results_df <- do.call(rbind, contrast_results)
 
 
+######################################################################################################################
+#######          save                                                                   ##############################
+######################################################################################################################
+
+write_csv(contrast_results_df, file = './aggregate_promoter_contrasts.csv')
+write_csv(average_promoter.m, file = './average_promoter.meth.csv')
+
+######################################################################################################################
+#######          load data directly                                                     ##############################
+######################################################################################################################
+
+contrast_results_df <- read.csv('./aggregate_promoter_contrasts.csv')
+average_promoter.m  <- read.csv('./average_promoter.meth.csv')
+
+
+
 
 ####
 #       check for significant differential methylation of aggregate promoter methylation
@@ -2002,7 +2018,7 @@ Labelled_genes2 <- c("LINC00327", "GPR174", "SLC2A9", "OR1J2",
                     "ACSM1", "LINC00613", "TAAR5", "CCDC168", "LINC02877", 
                     "LARP1", "OR51S1", "GNG2", 
                     "NPPB", "LINC00332", "GPR65", "TFEC", "ROS1", "SATB2", 
-                    "MYBPH", "NEUROD6", "MS4A13", "H1-8", "MYH16", "MYEOV", "THPO")
+                    "MYBPH", "NEUROD6", "MYH16", "MYEOV", "THPO")
 
 labs <- signif_promoter_exercise %>% 
         dplyr::select(28:30) %>% 
@@ -2023,11 +2039,11 @@ agg_plot <- signif_promoter_exercise %>%
              y = "MYO+INT", fill = "Significant", color = "Significant")+
         scale_color_manual(values = c("RED",  "#440154FF","#5DC863FF"), labels = c("Both", "MYO", "MYO+INT"))+
         scale_fill_manual(values = c("Red","#B396B9" ,"#B3D7B1"), labels = c("Both", "MYO", "MYO+INT"))+
-        scale_x_continuous(n.breaks = 10, limits = c(-0.1,0.08), expand = c(0,0.0011))+
-        scale_y_continuous(n.breaks = 10, limits = c(-0.1,0.08), expand = c(0,0.0005))+
+        scale_x_continuous(n.breaks = 5, limits = c(-0.1,0.08), expand = c(0,0.0011))+
+        scale_y_continuous(n.breaks = 5, limits = c(-0.1,0.08), expand = c(0,0.0005))+
         geom_label_repel(data = labs, aes(x = PM_vs_BM, y = PH_vs_BH,label = entrezIDs ),inherit.aes = FALSE,
                          box.padding = 0.3, size = 5, point.padding = 0.5, force = 1.6, min.segment.length = 0.1, max.time = 2, max.overlaps = 12, 
-                         fill = c(rep("#B396B9",4), rep("#B3D7B1",8)  ,rep("#B396B9",6)  ,rep("red",7)), show.legend = FALSE)+
+                         fill = c(rep("#B396B9",4), rep("#B3D7B1",8)  ,rep("#B396B9",6)  ,rep("red",5)), show.legend = FALSE)+
         theme(legend.position = "top", legend.key.spacing.x = unit(4, "mm"))+
         guides(color = guide_legend(override.aes = list(size = 6)))+
         theme(axis.text.r = element_text(color = 'black'),
@@ -2039,7 +2055,7 @@ agg_plot <- signif_promoter_exercise %>%
                 legend.box.background = element_rect(fill='transparent')) #transparent legend panel
 
 
-ggsave(plot = pca_plt, bg = "transparent", path = "Figures/", filename = "MACS_PCA_plot_transparent.png") 
+ggsave(plot = agg_plot, bg = "transparent", path = "Figures/", filename = "MACS_agg_plot_transparent.png") 
 
 # save plot 
 
@@ -2329,7 +2345,14 @@ c1 <- LINC00327 %>%
               axis.text.x = element_blank(), 
               axis.title.y = element_blank(), 
               panel.grid.major.y = element_line(), 
-              legend.position = "none")
+              legend.position = "none")+
+        theme(axis.text.r = element_text(color = 'black'),
+              panel.background = element_rect(fill='transparent'), #transparent panel bg
+              plot.background = element_rect(fill='transparent', color=NA), #transparent plot bg
+              panel.grid.major = element_blank(), #remove major gridlines
+              panel.grid.minor = element_blank(), #remove minor gridlines
+              legend.background = element_rect(fill='transparent'), #transparent legend bg
+              legend.box.background = element_rect(fill='transparent'))
 
 c2 <- LINC00327 %>% 
         mutate(Time = factor(Time, levels = c("Baseline_MYO", "Post_MYO", "Baseline_MYOINT", "Post_MYOINT"))) %>% 
@@ -2345,7 +2368,14 @@ c2 <- LINC00327 %>%
               axis.title.y = element_blank(), 
               panel.grid.major.y = element_line(), 
               legend.position = "none", 
-              axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
+              axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())+
+        theme(axis.text.r = element_text(color = 'black'),
+              panel.background = element_rect(fill='transparent'), #transparent panel bg
+              plot.background = element_rect(fill='transparent', color=NA), #transparent plot bg
+              panel.grid.major = element_blank(), #remove major gridlines
+              panel.grid.minor = element_blank(), #remove minor gridlines
+              legend.background = element_rect(fill='transparent'), #transparent legend bg
+              legend.box.background = element_rect(fill='transparent'))
 
 c3 <- LINC00327 %>% 
         mutate(Time = factor(Time, levels = c("Baseline_MYO", "Post_MYO", "Baseline_MYOINT", "Post_MYOINT"))) %>% 
@@ -2361,7 +2391,14 @@ c3 <- LINC00327 %>%
               axis.title.y = element_blank(), 
               panel.grid.major.y = element_line(), 
               legend.position = "none", 
-              axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
+              axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())+
+        theme(axis.text.r = element_text(color = 'black'),
+              panel.background = element_rect(fill='transparent'), #transparent panel bg
+              plot.background = element_rect(fill='transparent', color=NA), #transparent plot bg
+              panel.grid.major = element_blank(), #remove major gridlines
+              panel.grid.minor = element_blank(), #remove minor gridlines
+              legend.background = element_rect(fill='transparent'), #transparent legend bg
+              legend.box.background = element_rect(fill='transparent'))
 
 c4 <- LINC00327 %>% 
         mutate(Time = factor(Time, levels = c("Baseline_MYO", "Post_MYO", "Baseline_MYOINT", "Post_MYOINT"))) %>% 
@@ -2377,10 +2414,28 @@ c4 <- LINC00327 %>%
               axis.title.y = element_blank(), 
               panel.grid.major.y = element_line(), 
               legend.position = "none", 
-              axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())
+              axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank())+
+        theme(axis.text.r = element_text(color = 'black'),
+              panel.background = element_rect(fill='transparent'), #transparent panel bg
+              plot.background = element_rect(fill='transparent', color=NA), #transparent plot bg
+              panel.grid.major = element_blank(), #remove major gridlines
+              panel.grid.minor = element_blank(), #remove minor gridlines
+              legend.background = element_rect(fill='transparent'), #transparent legend bg
+              legend.box.background = element_rect(fill='transparent'))
 
 
-plot_grid(c1, c2, c3, c4, nrow = 1)
+linc00327 <- plot_grid(c1, c2, c3, c4, nrow = 1)+
+        theme(axis.text.r = element_text(color = 'black'),
+              panel.background = element_rect(fill='transparent'), #transparent panel bg
+              plot.background = element_rect(fill='transparent', color=NA), #transparent plot bg
+              panel.grid.major = element_blank(), #remove major gridlines
+              panel.grid.minor = element_blank(), #remove minor gridlines
+              legend.background = element_rect(fill='transparent'), #transparent legend bg
+              legend.box.background = element_rect(fill='transparent')) #transparent legend panel
+
+
+ggsave(plot = linc00327, bg = "transparent", path = "Figures/", filename = "MACS_linc00327_transparent.png") 
+
 
 
 
