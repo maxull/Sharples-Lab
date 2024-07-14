@@ -335,6 +335,157 @@ norm_PCA$x[,1:2] %>%
 
 
 
+##########################################################################################################
+#########               separate samples into QF and ASAT and perform dmr analysis separate                                                    ####################
+##########################################################################################################
+
+# treatment groups
+# 
+# treatment <- c()
+# 
+# treatment[grep('PRE-ASAT', sample_names)] <- 0
+# treatment[grep('POST-ASAT', sample_names)] <- 1
+# treatment[grep('PRE-QF', sample_names)] <- 2
+# treatment[grep('POST-QF', sample_names)] <- 3
+
+# split normalized and filtered data by condition (pre-post | QF-ASAT)
+split_list <- split(norm.filt.dat, norm.filt.dat@treatment)
+
+# Access the subsets
+ASAT_df <- unlist(split_list[1:2])  # Treatment group 0 and 1 (ASAT)
+QF_df <- split_list[3:4] # Treatment group 2 and 3 (QF)
+
+# Merge everything together based on common bases
+# Only merge CpGs that are in at least 6 samples per group after discussion with Adam (11/03/24)
+minPerGroup <- 15L
+meth_ASAT <- methylKit::unite(ASAT_df, destrand = F, min.per.group = minPerGroup)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# annotate probe info
+
+# Annotate bases 
+BiocManager::install("annotatr")
+library(annotatr)
+BiocManager::install("TxDb.Hsapiens.UCSC.hg38.knownGene")
+BiocManager::install("Homo.sapiens")
+BiocManager::install("ChIPpeakAnno", force = TRUE)
+
+
+# Select annotations for intersection with regions
+# Note inclusion of custom annotation, and use of shortcuts
+annots = c('hg38_basicgenes')
+
+# Build the annotations (a single GRanges object)
+annotations = build_annotations(genome = 'hg38', annotations = annots)
+
+loadings <- loadings %>% 
+        as.data.frame() %>% 
+        rowwise() %>% 
+        mutate(chr = str_split(ID, pattern = "\\.")[[1]][1],
+               start = str_split(ID, pattern = "\\.")[[1]][2],
+               end = str_split(ID, pattern = "\\.")[[1]][3]) %>% 
+        ungroup()
+str(loadings)
+loadings$chr <- as.numeric(loadings$chr)
+loadings$start <- as.numeric(loadings$start)
+loadings$end <- as.numeric(loadings$end)
+
+
+############################################
+#### create annotation set
+
+BiocManager::install("rtracklayer", force = TRUE)
+library(rtracklayer)
+
+
+GRC38 <- readGFF("methylation_results/Homo_sapiens.GRCh38.112.chr.gtf")
+
+
+
+##########################################################################################################
+#########               Annotate with genomation                                                     ####################
+##########################################################################################################
+
+# # Install dependencies
+# install.packages( c("data.table","plyr","reshape2","ggplot2","gridBase","devtools"))
+# source("http://bioconductor.org/biocLite.R")
+# biocLite(c("GenomicRanges","rtracklayer","impute","Rsamtools"))
+# BiocManager::install("impute", force = TRUE)
+# 
+# Sys.setenv(PATH = paste(Sys.getenv("PATH"), "C:/rtools40/usr/bin", sep = ";"))
+# Sys.setenv(BINPREF = "C:/rtools40/mingw_$(WIN)/bin/")
+# 
+# # install the packages
+# library(devtools)
+# devtools::install_github("BIMSBbioinfo/genomation",build_vignettes=FALSE)
+build_annotations(GRC38)
+
+library(genomation)
+
+# Annotate with gene annotations
+gene_anno <- annotateWithGeneParts(target = meth, feature = GRC38_granges)
+
+
+
+# Extract and analyze annotation results
+gene_anno_results <- gene_anno$annotation
+summary(gene_anno_results)
+
+
+
+
+
+# look through top PC1 drivers
+
+sorted_loadings <- sort((loadings), decreasing = TRUE) 
+top_loadings <- names(sorted_loadings)[1:100]
+
+
+
+as.data.frame(top_loadings) %>% 
+        dplyr::select("cpg" = top_loadings) %>% 
+        merge(., anno, by = "cpg")
+
+
+# identify drivers towards left, i.e. homogenate by fintering the negative values and arranging
+
+
+loadings %>% 
+        as.data.frame() %>% 
+        dplyr::select("PC1" = 1) %>% 
+        arrange(PC1) %>% 
+        filter(PC1 < 0) %>%     # nrow = 374432
+        head(10000) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") -> neg_PC1
+
+loadings %>% 
+        as.data.frame() %>% 
+        dplyr::select("PC1" = 1) %>% 
+        arrange(-PC1) %>% 
+        filter(PC1 > 0) %>%     # nrow = 374432
+        head(10000) %>% 
+        rownames_to_column(var = "cpg") %>% 
+        merge(.,anno, by = "cpg") %>% 
+        filter(UCSC_RefGene_Name != "NA") -> pos_PC1
+
+
 
 ##########################################################################################################
 #########               save files                                              ####################
