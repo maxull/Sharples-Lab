@@ -127,6 +127,7 @@ density_df %>%
 
 
 
+
 ##########################################################################################################
 #########               normalize                                                     ####################
 ##########################################################################################################
@@ -239,14 +240,115 @@ pca.out$x[,1:2] %>%
 
 
 ##########################################################################################################
+#########               PCA before normalization                                                     ####################
+##########################################################################################################
+
+# merge percent meth into one df
+
+# filter probes for already IDd probes
+
+united_ID <- rownames(percent_meth)
+
+percent_meth_non.norm <- data.frame(ID = united_ID)
+        
+for (i in 1:length(samples)) {
+        x <- samples[[i]] %>% 
+                mutate(ID = paste0(chr,".",start,".",end)) %>% 
+                dplyr::select(ID, percent_meth) %>% 
+                filter(ID %in% united_ID)
+        
+        percent_meth_non.norm <- merge(percent_meth_non.norm, x, by = "ID")
+        
+        print(i)
+        
+}
+
+# rename colnames of samples
+
+colnames(percent_meth_non.norm) <- c('ID', names(samples))
+
+non.norm_PCA <- prcomp(t(percent_meth_non.norm[,2:69]))
+
+non.norm_PCA$x[,1:2] %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = 'ID') %>% 
+        mutate(Sample = factor(ifelse(grepl('PRE-ASAT', ID), 'PRE-ASAT', 
+                                      ifelse(grepl('POST-ASAT', ID), 'POST-ASAT', 
+                                             ifelse(grepl('PRE-QF', ID), 'PRE-QF', 'POST-QF'))),
+                               levels = c('PRE-ASAT','POST-ASAT','PRE-QF','POST-QF'))) %>% 
+        mutate(Tissue = ifelse(grepl('ASAT', ID), 'ASAT', 'QF')) %>% 
+        #filter(Tissue == "ASAT") %>% 
+        ggplot(aes(x = PC1, y = PC2))+
+        #geom_point(aes(size = 2+pca.out$sdev),shape = 3)+
+        geom_point(aes(fill = Sample), size = 3, stroke = 2, color = 'Black', shape = 21)+
+        scale_fill_manual(values = c("#440154FF","#B396B9","#5DC863FF","#B3D7B1"))+
+        theme_classic(base_size = 20)+
+        labs(x = 'Principal Component 1',
+             y = 'Principal Component 2')+
+        theme(legend.position = 'top')+
+        # geom_label_repel(aes(label = ID), max.overlaps = 68)+
+        guides(fill = guide_legend(override.aes = list(size = 6)))
+
+# PC1 perfectly separates QF and ASAT samples, as expected
+
+percent_meth_norm <- data.frame(ID = united_ID)
+
+for (i in 1:length(norm.filt.dat)) {
+        
+        x <- data.frame(ID = paste0(norm.filt.dat[[i]]$chr, ".",
+                               norm.filt.dat[[i]]$start, ".",
+                               norm.filt.dat[[i]]$end),
+                   percent_meth = norm.filt.dat[[i]]$percent_meth) %>% 
+                filter(ID %in% united_ID)
+      
+        
+        percent_meth_norm <- merge(percent_meth_norm, x, by = "ID")
+        
+        print(i)
+        
+}
+
+colnames(percent_meth_norm) <- c('ID', names(samples))
+
+norm_PCA <- prcomp(t(percent_meth_norm[,2:69]))
+
+norm_PCA$x[,1:2] %>% 
+        as.data.frame() %>% 
+        rownames_to_column(var = 'ID') %>% 
+        mutate(Sample = factor(ifelse(grepl('PRE-ASAT', ID), 'PRE-ASAT', 
+                                      ifelse(grepl('POST-ASAT', ID), 'POST-ASAT', 
+                                             ifelse(grepl('PRE-QF', ID), 'PRE-QF', 'POST-QF'))),
+                               levels = c('PRE-ASAT','POST-ASAT','PRE-QF','POST-QF'))) %>% 
+        mutate(Tissue = ifelse(grepl('ASAT', ID), 'ASAT', 'QF')) %>% 
+        #filter(Tissue == "ASAT") %>% 
+        ggplot(aes(x = PC1, y = PC2))+
+        #geom_point(aes(size = 2+pca.out$sdev),shape = 3)+
+        geom_point(aes(fill = Sample), size = 3, stroke = 2, color = 'Black', shape = 21)+
+        scale_fill_manual(values = c("#440154FF","#B396B9","#5DC863FF","#B3D7B1"))+
+        theme_classic(base_size = 20)+
+        labs(x = 'Principal Component 1',
+             y = 'Principal Component 2')+
+        theme(legend.position = 'top')+
+        # geom_label_repel(aes(label = ID), max.overlaps = 68)+
+        guides(fill = guide_legend(override.aes = list(size = 6)))
+
+
+
+
+
+##########################################################################################################
 #########               save files                                              ####################
 ##########################################################################################################
 
 
-saveRDS(percent_meth, "./methylation_results/percent_meth.RDATA")
+save_RDS(percent_meth, "./methylation_results/percent_meth.RDATA")
 
-saveRDS(norm.filt.dat, "./methylation_results/norm.filt.dat.RDATA")
+saveRDS(norm.filt.dat, "./methylation_results/norm.filt.dat.rds")
 
 saveRDS(samples, "./methylation_results/samples.RDATA")
 
+norm.filt.dat <- readRDS(file =  "./methylation_results/norm.filt.dat.rds")
 
+samples <- readRDS("./methylation_results/samples.RDATA")
+
+percent_meth <- readRDS("./methylation_results/percent_meth.RDATA")
