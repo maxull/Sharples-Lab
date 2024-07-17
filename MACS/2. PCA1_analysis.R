@@ -2437,11 +2437,230 @@ linc00327 <- plot_grid(c1, c2, c3, c4, nrow = 1)+
 ggsave(plot = linc00327, bg = "transparent", path = "Figures/", filename = "MACS_linc00327_transparent.png") 
 
 
+###################################################################################################################
+##################       plot up and down regulated GO pathways in bubble plot     ################################
+###################################################################################################################        
+
+# get updated go pathways
+
+go.sets <- go.gsets(species = "human", pkg.name=NULL, id.type = "EG", keep.evidence=FALSE)
 
 
+# run GSEA on hypo and hyper, MYO and MYO+INT
+
+# subset GO sets
+
+go.sets$go.sets[go.sets$go.subs$BP]
 
 
-r###################################################################################################################
+# 
+
+GO.BP_MYOINT_hypo <- gsameth(sig.cpg = DMPs_PH_vs_BH %>% 
+                               filter(p.value < 0.05,
+                                      delta_M < 0) %>% 
+                               pull(cpg),
+                       all.cpg = rownames(beta), 
+                       collection = go.sets$go.sets[go.sets$go.subs$BP],
+                       array.type = "EPIC")
+
+GO.BP_MYOINT_hyper <- gsameth(sig.cpg = DMPs_PH_vs_BH %>% 
+                                  filter(p.value < 0.05,
+                                         delta_M > 0) %>% 
+                                  pull(cpg),
+                          all.cpg = rownames(beta), 
+                          collection = go.sets$go.sets[go.sets$go.subs$BP],
+                          array.type = "EPIC")
+
+GO.BP_MYO_hypo <- gsameth(sig.cpg = DMPs_PM_vs_BM %>% 
+                                  filter(p.value < 0.05,
+                                         delta_M < 0) %>% 
+                                  pull(cpg),
+                          all.cpg = rownames(beta), 
+                          collection = go.sets$go.sets[go.sets$go.subs$BP],
+                          array.type = "EPIC")
+
+GO.BP_MYO_hyper <- gsameth(sig.cpg = DMPs_PM_vs_BM %>% 
+                                   filter(p.value < 0.05,
+                                          delta_M > 0) %>% 
+                                   pull(cpg),
+                           all.cpg = rownames(beta), 
+                           collection = go.sets$go.sets[go.sets$go.subs$BP],
+                           array.type = "EPIC")
+
+
+###################################################################################################################
+##################       try rectome.                                        ################################
+###################################################################################################################        
+
+
+BiocManager::install("signatureSearch")
+library(signatureSearch)
+
+# Convert gene symbols to Entrez Gene IDs
+entrezIDs <- mapIds(org.Hs.eg.db, keys = anno$UCSC_RefGene_Name, column = "ENTREZID", keytype = "SYMBOL", multiVals = "first")
+
+anno$entrezIDs <- entrezIDs
+
+merge(DMPs_PH_vs_BH %>% 
+              filter(p.value < 0.05,
+                     delta_M < 0),anno, by = "cpg") %>% 
+        arrange(delta_M) %>% 
+        na.omit(entrezIDs) %>% 
+        pull(entrezIDs)
+
+
+as.data.frame(entrezIDs) %>% 
+        rownames_to_column(var = "gene") %>% 
+        merge(results_df,., by = "gene") %>% 
+        filter(entrezIDs != "<NA>") -> change_df
+
+####
+#       Get reactome DB
+####
+
+getDb <- function(organism) {
+        if (organism == "worm") {
+                organism = "celegans"
+                warning("'worm' is deprecated, please use 'celegans' instead...")
+        }
+        
+        annoDb <- switch(organism,
+                         anopheles   = "org.Ag.eg.db",
+                         arabidopsis = "org.At.tair.db",
+                         bovine      = "org.Bt.eg.db",
+                         canine      = "org.Cf.eg.db",
+                         celegans    = "org.Ce.eg.db",
+                         chicken     = "org.Gg.eg.db",
+                         chimp       = "org.Pt.eg.db",
+                         coelicolor  = "org.Sco.eg.db", 
+                         ecolik12    = "org.EcK12.eg.db",
+                         ecsakai     = "org.EcSakai.eg.db",
+                         fly         = "org.Dm.eg.db",
+                         gondii      = "org.Tgondii.eg.db",
+                         human       = "org.Hs.eg.db",
+                         malaria     = "org.Pf.plasmo.db",
+                         mouse       = "org.Mm.eg.db",
+                         pig         = "org.Ss.eg.db",
+                         rat         = "org.Rn.eg.db",
+                         rhesus      = "org.Mmu.eg.db",
+                         xenopus     = "org.Xl.eg.db",
+                         yeast       = "org.Sc.sgd.db",
+                         zebrafish   = "org.Dr.eg.db",
+        )
+        return(annoDb)
+}
+
+get_Reactome_Env <- function() {
+        if (!exists(".ReactomePA_Env", envir = .GlobalEnv)) {
+                assign(".ReactomePA_Env", new.env(), .GlobalEnv)
+        }
+        get(".ReactomePA_Env", envir= .GlobalEnv)
+}
+
+getALLEG <- function(organism) {
+        annoDb <- getDb(organism)
+        require(annoDb, character.only = TRUE)
+        annoDb <- eval(parse(text=annoDb))
+        eg=keys(annoDb, keytype="ENTREZID")
+        return(eg)
+}
+
+get_Reactome_DATA <- function(organism = "human") {
+        ReactomePA_Env <- get_Reactome_Env()
+        
+        if (exists("organism", envir=ReactomePA_Env, inherits = FALSE)) {
+                org <- get("organism", envir=ReactomePA_Env)
+                if (org == organism &&
+                    exists("PATHID2EXTID", envir = ReactomePA_Env) &&
+                    exists("EXTID2PATHID", envir = ReactomePA_Env) &&
+                    exists("PATHID2NAME",  envir = ReactomePA_Env)) {
+                        
+                        ## use_cached
+                        return(ReactomePA_Env)
+                }
+        }
+        
+        ALLEG <- getALLEG(organism)
+        
+        EXTID2PATHID <- as.list(reactomeEXTID2PATHID)
+        EXTID2PATHID <- EXTID2PATHID[names(EXTID2PATHID) %in% ALLEG]
+        
+        PATHID2EXTID <- as.list(reactomePATHID2EXTID) ## also contains reactions
+        
+        PATHID2NAME <- as.list(reactomePATHID2NAME)
+        PI <- names(PATHID2NAME)
+        ## > PATHID2NAME[['68877']]
+        ## [1] "Homo sapiens: Mitotic Prometaphase" "Homo sapiens: Mitotic Prometaphase"
+        PATHID2NAME <- lapply(PATHID2NAME, function(x) x[1])
+        names(PATHID2NAME) <- PI
+        
+        PATHID2EXTID <- PATHID2EXTID[names(PATHID2EXTID) %in% names(PATHID2NAME)]
+        PATHID2EXTID <- PATHID2EXTID[names(PATHID2EXTID) %in% unique(unlist(EXTID2PATHID))]
+        PATHID2EXTID <- lapply(PATHID2EXTID, function(x) intersect(x, ALLEG))
+        
+        PATHID2NAME <- PATHID2NAME[names(PATHID2NAME) %in% names(PATHID2EXTID)]
+        
+        PATHID2NAME <- unlist(PATHID2NAME)
+        PATHID2NAME <- gsub("^\\w+\\s\\w+:\\s+", "", PATHID2NAME) # remove leading spaces
+        
+        assign("PATHID2EXTID", PATHID2EXTID, envir=ReactomePA_Env)
+        assign("EXTID2PATHID", EXTID2PATHID, envir=ReactomePA_Env)
+        assign("PATHID2NAME", PATHID2NAME, envir=ReactomePA_Env)
+        return(ReactomePA_Env)
+}
+
+# get reactome db
+Reactome_DATA <- get_Reactome_DATA("human")
+
+
+React_MYO_hyper <- gsameth(sig.cpg = DMPs_PM_vs_BM %>% 
+                                   filter(p.value < 0.05,
+                                          delta_M > 0) %>% 
+                                   pull(cpg),
+                           all.cpg = rownames(beta), 
+                           collection = Reactome_DATA$PATHID2EXTID,
+                           array.type = "EPIC")
+
+React_MYO_hypo <- gsameth(sig.cpg = DMPs_PM_vs_BM %>% 
+                                   filter(p.value < 0.05,
+                                          delta_M < 0) %>% 
+                                   pull(cpg),
+                           all.cpg = rownames(beta), 
+                           collection = Reactome_DATA$PATHID2EXTID,
+                           array.type = "EPIC")
+
+React_MYOINT_hyper <- gsameth(sig.cpg = DMPs_PH_vs_BH %>% 
+                                   filter(p.value < 0.05,
+                                          delta_M > 0) %>% 
+                                   pull(cpg),
+                           all.cpg = rownames(beta), 
+                           collection = Reactome_DATA$PATHID2EXTID,
+                           array.type = "EPIC")
+
+React_MYOINT_hypo <- gsameth(sig.cpg = DMPs_PH_vs_BH %>% 
+                                  filter(p.value < 0.05,
+                                         delta_M < 0) %>% 
+                                  pull(cpg),
+                          all.cpg = rownames(beta), 
+                          collection = Reactome_DATA$PATHID2EXTID,
+                          array.type = "EPIC")
+
+
+Reactome_names <- data_frame(ReactID = names(Reactome_DATA$PATHID2NAME), 
+                             ReactNames = "na")
+
+for (i in 1:nrow(Reactome_names)) {
+        Reactome_names$ReactNames[i] <- Reactome_DATA$PATHID2NAME[[i]]
+        print(i)
+}
+
+
+React_MYO_hyper <- merge(React_MYO_hyper %>% rownames_to_column(var = "ReactID"), Reactome_names, by = "ReactID")
+React_MYO_hypo <- merge(React_MYO_hypo %>% rownames_to_column(var = "ReactID"), Reactome_names, by = "ReactID")
+React_MYOINT_hyper <- merge(React_MYOINT_hyper %>% rownames_to_column(var = "ReactID"), Reactome_names, by = "ReactID")
+React_MYOINT_hypo <- merge(React_MYOINT_hypo %>% rownames_to_column(var = "ReactID"), Reactome_names, by = "ReactID")
+
+###################################################################################################################
 ##################       density plot of differences                 ##############################################
 ###################################################################################################################        
 
