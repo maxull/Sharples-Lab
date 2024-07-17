@@ -17,6 +17,9 @@ setwd("/Users/maxullrich/OneDrive - UGent/CrosSys")
 # Set working directory NIH pc
 setwd("D:/OneDrive - UGent/CrosSys/")
 
+# increase data loading time
+options(timeout = 600)
+
 ##########################################################################################################
 #########               get all files                          ###########################################
 ##########################################################################################################
@@ -48,15 +51,21 @@ names(samples) <- sample_names
 #########               Check that numCs + numTs = coverage       ########################################
 ##########################################################################################################
 
-for (i in 1:length(samples)) {
-        
-        samples[[i]] <- samples[[i]] %>% 
-                mutate(check = (numCs+numTs == coverage)) %>% 
-                filter(check != FALSE) %>% 
-                mutate(percent_meth = numCs/coverage) %>% 
-                dplyr::select(chr, start, end, strand, coverage, numCs, numTs, percent_meth)
-        print(i)
-}
+# load data and skip
+samples <- readRDS('methylation_results/samples.RDATA')
+# 
+# for (i in 1:length(samples)) {
+#         
+#         samples[[i]] <- samples[[i]] %>% 
+#                 mutate(check = (numCs+numTs == coverage)) %>% 
+#                 filter(check != FALSE) %>% 
+#                 mutate(percent_meth = numCs/coverage) %>% 
+#                 dplyr::select(chr, start, end, strand, coverage, numCs, numTs, percent_meth)
+#         print(i)
+# }
+# 
+# # save sample data
+# saveRDS(samples, "./methylation_results/samples.RDATA")
 
 
 ##########################################################################################################
@@ -131,27 +140,38 @@ density_df %>%
 #########               normalize                                                     ####################
 ##########################################################################################################
 
+# load data and skip
+norm.filt.dat <- readRDS('./methylation_results/norm.filt.dat.RDATA')
 
+norm.filt.dat <- read_rds("/Users/maxullrich/Library/CloudStorage/OneDrive-UGent/CrosSys/methylation_results/norm.filt.dat.RDATA")
+# Check if the file exists
+file.exists('./methylation_results/norm.filt.dat.RDATA')
 
-# Combine into a methylRawList
-# Convert data frames to methylRaw objects
-methylRawList_obj <- lapply(seq_along(samples), function(i) {
-        new("methylRaw",
-                samples[[i]],
-                sample.id = sample_names[i],
-                assembly = "hg38",
-                context = "CpG",
-                resolution = "base"
-        )
-})
+getwd()
+# 
+# # Combine into a methylRawList
+# # Convert data frames to methylRaw objects
+# methylRawList_obj <- lapply(seq_along(samples), function(i) {
+#         new("methylRaw",
+#                 samples[[i]],
+#                 sample.id = sample_names[i],
+#                 assembly = "hg38",
+#                 context = "CpG",
+#                 resolution = "base"
+#         )
+# })
+# 
+# 
+# # Combine into a methylRawList
+# methylRawList_obj <- new("methylRawList", methylRawList_obj)
+# 
+# # Normalise coverage
+# norm.filt.dat <- normalizeCoverage(methylRawList_obj)
+# 
+# # save normalized filetered data
+# saveRDS(norm.filt.dat, "./methylation_results/norm.filt.dat.RDATA")
 
-
-# Combine into a methylRawList
-methylRawList_obj <- new("methylRawList", methylRawList_obj)
-
-# Normalise coverage
-norm.filt.dat <- normalizeCoverage(methylRawList_obj)
-
+# combine for density plot
 norm_density_df <- tibble()
 
 for (i in 1:length(norm.filt.dat)) {
@@ -201,6 +221,10 @@ meth <- methylKit::unite(norm.filt.dat, destrand = F, min.per.group = minPerGrou
 # get percent methylation df
 percent_meth <- percMethylation(meth, rowids = TRUE)
 
+# save percent methylation data
+saveRDS(percent_meth, "./methylation_results/percent_meth.RDATA")
+
+
 
 # Cluster samples
 dendrogram <- clusterSamples(percent_meth,
@@ -243,10 +267,8 @@ pca.out$x[,1:2] %>%
 ##########################################################################################################
 
 
-saveRDS(percent_meth, "./methylation_results/percent_meth.RDATA")
 
-saveRDS(norm.filt.dat, "./methylation_results/norm.filt.dat.RDATA")
 
-saveRDS(samples, "./methylation_results/samples.RDATA")
+
 
 
