@@ -2489,7 +2489,7 @@ GO.BP_MYO_hyper <- gsameth(sig.cpg = DMPs_PM_vs_BM %>%
 
 
 ###################################################################################################################
-##################       try rectome.                                        ################################
+##################       REACTOME GSEA.                                            ################################
 ###################################################################################################################        
 
 
@@ -2501,18 +2501,76 @@ entrezIDs <- mapIds(org.Hs.eg.db, keys = anno$UCSC_RefGene_Name, column = "ENTRE
 
 anno$entrezIDs <- entrezIDs
 
-merge(DMPs_PH_vs_BH %>% 
+library(ReactomePA)
+
+
+# over representaion analysis with reactome
+
+MYOINT_hypo_eids <- merge(DMPs_PH_vs_BH %>% 
               filter(p.value < 0.05,
                      delta_M < 0),anno, by = "cpg") %>% 
         arrange(delta_M) %>% 
         na.omit(entrezIDs) %>% 
         pull(entrezIDs)
 
+React_MYOINT_hypo <- enrichPathway(gene = MYOINT_hypo_eids, organism = "human")
 
-as.data.frame(entrezIDs) %>% 
-        rownames_to_column(var = "gene") %>% 
-        merge(results_df,., by = "gene") %>% 
-        filter(entrezIDs != "<NA>") -> change_df
+MYOINT_hyper_eids <- merge(DMPs_PH_vs_BH %>% 
+                                  filter(p.value < 0.05,
+                                         delta_M > 0),anno, by = "cpg") %>% 
+        arrange(delta_M) %>% 
+        na.omit(entrezIDs) %>% 
+        pull(entrezIDs)
+
+React_MYOINT_hyper <- enrichPathway(gene = MYOINT_hyper_eids, organism = "human")
+
+MYO_hypo_eids <- merge(DMPs_PM_vs_BM %>% 
+                                  filter(p.value < 0.05,
+                                         delta_M < 0),anno, by = "cpg") %>% 
+        arrange(delta_M) %>% 
+        na.omit(entrezIDs) %>% 
+        pull(entrezIDs)
+
+React_MYO_hypo <- enrichPathway(gene = MYO_hypo_eids, organism = "human")
+
+MYO_hyper_eids <- merge(DMPs_PM_vs_BM %>% 
+                                  filter(p.value < 0.05,
+                                         delta_M > 0),anno, by = "cpg") %>% 
+        arrange(delta_M) %>% 
+        na.omit(entrezIDs) %>% 
+        pull(entrezIDs)
+
+React_MYO_hyper <- enrichPathway(gene = MYO_hyper_eids, organism = "human")
+
+# get the results from reactome
+
+React_MYO_hyper@result
+React_MYO_hypo@result
+React_MYOINT_hyper@result
+React_MYOINT_hypo@result
+
+
+# visualize pathway without fold change
+viewPathway(
+        "Muscle contraction",
+        organism = "human",
+        readable = TRUE,
+        foldChange = NULL,
+        keyType = "ENTREZID",
+        layout = "kk"
+)
+
+
+####
+#       add diff methylation to reactome plots
+####
+
+# calculate diff meth per gene
+
+unique(MYO_hyper_eids) %>% length()
+
+
+
 
 ####
 #       Get reactome DB
@@ -2612,53 +2670,6 @@ get_Reactome_DATA <- function(organism = "human") {
 # get reactome db
 Reactome_DATA <- get_Reactome_DATA("human")
 
-
-React_MYO_hyper <- gsameth(sig.cpg = DMPs_PM_vs_BM %>% 
-                                   filter(p.value < 0.05,
-                                          delta_M > 0) %>% 
-                                   pull(cpg),
-                           all.cpg = rownames(beta), 
-                           collection = Reactome_DATA$PATHID2EXTID,
-                           array.type = "EPIC")
-
-React_MYO_hypo <- gsameth(sig.cpg = DMPs_PM_vs_BM %>% 
-                                   filter(p.value < 0.05,
-                                          delta_M < 0) %>% 
-                                   pull(cpg),
-                           all.cpg = rownames(beta), 
-                           collection = Reactome_DATA$PATHID2EXTID,
-                           array.type = "EPIC")
-
-React_MYOINT_hyper <- gsameth(sig.cpg = DMPs_PH_vs_BH %>% 
-                                   filter(p.value < 0.05,
-                                          delta_M > 0) %>% 
-                                   pull(cpg),
-                           all.cpg = rownames(beta), 
-                           collection = Reactome_DATA$PATHID2EXTID,
-                           array.type = "EPIC")
-
-React_MYOINT_hypo <- gsameth(sig.cpg = DMPs_PH_vs_BH %>% 
-                                  filter(p.value < 0.05,
-                                         delta_M < 0) %>% 
-                                  pull(cpg),
-                          all.cpg = rownames(beta), 
-                          collection = Reactome_DATA$PATHID2EXTID,
-                          array.type = "EPIC")
-
-
-Reactome_names <- data_frame(ReactID = names(Reactome_DATA$PATHID2NAME), 
-                             ReactNames = "na")
-
-for (i in 1:nrow(Reactome_names)) {
-        Reactome_names$ReactNames[i] <- Reactome_DATA$PATHID2NAME[[i]]
-        print(i)
-}
-
-
-React_MYO_hyper <- merge(React_MYO_hyper %>% rownames_to_column(var = "ReactID"), Reactome_names, by = "ReactID")
-React_MYO_hypo <- merge(React_MYO_hypo %>% rownames_to_column(var = "ReactID"), Reactome_names, by = "ReactID")
-React_MYOINT_hyper <- merge(React_MYOINT_hyper %>% rownames_to_column(var = "ReactID"), Reactome_names, by = "ReactID")
-React_MYOINT_hypo <- merge(React_MYOINT_hypo %>% rownames_to_column(var = "ReactID"), Reactome_names, by = "ReactID")
 
 ###################################################################################################################
 ##################       density plot of differences                 ##############################################
