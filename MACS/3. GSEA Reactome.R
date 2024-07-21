@@ -111,7 +111,23 @@ React_MYOINT_hyper_readable_pairwise <- pairwise_termsim(React_MYOINT_hyper_read
 set.seed(123)
 emapplot(React_MYOINT_hyper_readable_pairwise, cex.params = list(category_label = 0.6))+ scale_fill_gradient(low = "#F5C242", high = "#353F4F")+labs(fill = "p.adjust")
 
-treeplot(React_MYOINT_hyper_readable_pairwise, hclust_method = "average", group_color = c("#5698AF", "#2F6B34", "#741B0C","#2B324F","#C3B29E" ))+ scale_color_gradient(low = "#F5C242", high = "#353F4F")+labs(color = "p.adjust")
+p <- treeplot(React_MYOINT_hyper_readable_pairwise, 
+         showCategory = 30,
+         hclust_method = "ward.D", 
+         group_color = c("#5698AF", "#2F6B34", "#741B0C","#2B324F","#C3B29E"),
+         nWords = 4,
+         offset_tiplab = 1.5,
+         offset = 80)+
+        scale_color_gradient(low = "#F5C242", high = "#353F4F")+labs(color = "p.adjust")+
+        theme(legend.position = "bottom")
+
+p$layers[[4]]$aes_params$size <- 1.5
+p$layers[[3]]$aes_params$size <- 4
+
+p$layers[[3]]$mapping$x <- 70
+p$layers[[4]]$mapping$x <- 68
+p$layers[[4]]$mapping$xend <- 68
+p
 
 ########################################################################
 # PLOTS: MYO+INT hypo
@@ -133,8 +149,23 @@ React_MYOINT_hypo_readable_pairwise <- pairwise_termsim(React_MYOINT_hypo_readab
 set.seed(125)
 emapplot(React_MYOINT_hypo_readable_pairwise, cex.params = list(category_label = 0.6))+ scale_fill_gradient(low = "#F5C242", high = "#353F4F")+labs(fill = "p.adjust")
 
-treeplot(React_MYOINT_hypo_readable_pairwise, hclust_method = "average", group_color = c("#5698AF", "#2F6B34", "#741B0C","#2B324F","#C3B29E" ))+ scale_color_gradient(low = "#F5C242", high = "#353F4F")+labs(color = "p.adjust")
+p <- treeplot(React_MYOINT_hypo_readable_pairwise, 
+              showCategory = 30,
+              hclust_method = "ward.D", 
+              group_color = c("#5698AF", "#2F6B34", "#741B0C","#2B324F","#C3B29E"),
+              nWords = 4,
+              offset_tiplab = 1.5,
+              offset = 80)+
+        scale_color_gradient(low = "#F5C242", high = "#353F4F")+labs(color = "p.adjust")+
+        theme(legend.position = "bottom")
 
+p$layers[[4]]$aes_params$size <- 1.5
+p$layers[[3]]$aes_params$size <- 4
+
+p$layers[[3]]$mapping$x <- 70
+p$layers[[4]]$mapping$x <- 68
+p$layers[[4]]$mapping$xend <- 68
+p
 ########################################################################
 # PLOTS: MYO hyper
 ########################################################################
@@ -155,8 +186,23 @@ React_MYO_hyper_readable_pairwise <- pairwise_termsim(React_MYO_hyper_readable)
 set.seed(123)
 emapplot(React_MYO_hyper_readable_pairwise, cex.params = list(category_label = 0.6))+ scale_fill_gradient(low = "#F5C242", high = "#353F4F")+labs(fill = "p.adjust")
 
-treeplot(React_MYO_hyper_readable_pairwise, hclust_method = "average", group_color = c("#5698AF", "#2F6B34", "#741B0C","#2B324F","#C3B29E" ))+ scale_color_gradient(low = "#F5C242", high = "#353F4F")+labs(color = "p.adjust")
+p <- treeplot(React_MYO_hyper_readable_pairwise, 
+              showCategory = 30,
+              hclust_method = "ward.D", 
+              group_color = c("#5698AF", "#2F6B34", "#741B0C","#2B324F","#C3B29E"),
+              nWords = 4,
+              offset_tiplab = 1.5,
+              offset = 80)+
+        scale_color_gradient(low = "#F5C242", high = "#353F4F")+labs(color = "p.adjust")+
+        theme(legend.position = "bottom")
 
+p$layers[[4]]$aes_params$size <- 1.5
+p$layers[[3]]$aes_params$size <- 4
+
+p$layers[[3]]$mapping$x <- 70
+p$layers[[4]]$mapping$x <- 68
+p$layers[[4]]$mapping$xend <- 68
+p
 ########################################################################
 # PLOTS: MYO hypo
 ########################################################################
@@ -177,8 +223,23 @@ React_MYO_hypo_readable_pairwise <- pairwise_termsim(React_MYO_hypo_readable)
 set.seed(124)
 emapplot(React_MYO_hypo_readable_pairwise, cex.params = list(category_label = 0.6))+ scale_fill_gradient(low = "#F5C242", high = "#353F4F")+labs(fill = "p.adjust")
 
-treeplot(React_MYO_hypo_readable_pairwise, hclust_method = "average", group_color = c("#5698AF", "#2F6B34", "#741B0C","#2B324F","#C3B29E" ))+ scale_color_gradient(low = "#F5C242", high = "#353F4F")+labs(color = "p.adjust")
+p <- treeplot(React_MYO_hypo_readable_pairwise, 
+              showCategory = 30,
+              hclust_method = "ward.D", 
+              group_color = c("#5698AF", "#2F6B34", "#741B0C","#2B324F","#C3B29E"),
+              nWords = 4,
+              offset_tiplab = 1.5,
+              offset = 80)+
+        scale_color_gradient(low = "#F5C242", high = "#353F4F")+labs(color = "p.adjust")+
+        theme(legend.position = "bottom")
 
+p$layers[[4]]$aes_params$size <- 1.5
+p$layers[[3]]$aes_params$size <- 4
+
+p$layers[[3]]$mapping$x <- 70
+p$layers[[4]]$mapping$x <- 68
+p$layers[[4]]$mapping$xend <- 68
+p
 
 
 
@@ -199,7 +260,7 @@ treeplot(React_MYO_hypo_readable_pairwise, hclust_method = "average", group_colo
 
 # visualize pathway without fold change
 viewPathway(
-        "Muscle contraction",
+        "MAPK family signaling cascades",
         organism = "human",
         readable = TRUE,
         foldChange = NULL,
