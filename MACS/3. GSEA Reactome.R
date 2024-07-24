@@ -245,29 +245,76 @@ p
 
 
 
+########################################################################
+# PLOTS: Pathway plot MYO
+########################################################################
 
+# calculate diff meth per gene
 
+MYO_deltaM <- merge(DMPs_PM_vs_BM %>% 
+                            filter(p.value < 0.05),anno, by = "cpg") %>% 
+        arrange(delta_M) %>% 
+        na.omit(entrezIDs) %>%
+        distinct(entrezIDs, .keep_all = TRUE) %>% 
+        pull(delta_M)
 
-
-
-
-
-
-
-
-
+names(MYO_deltaM) <- merge(DMPs_PM_vs_BM %>% 
+                                   filter(p.value < 0.05),anno, by = "cpg") %>% 
+        arrange(-abs(delta_M)) %>% 
+        na.omit(entrezIDs) %>%
+        # head(20) %>% #pull(UCSC_RefGene_Name) -> filt_genes_myo
+        distinct(entrezIDs, .keep_all = TRUE) %>% 
+        pull(entrezIDs)
 
 
 # visualize pathway without fold change
 viewPathway(
-        "MAPK family signaling cascades",
+        "Muscle contraction",
         organism = "human",
         readable = TRUE,
-        foldChange = NULL,
+        foldChange = MYO_deltaM,
         keyType = "ENTREZID",
         layout = "kk"
 )
 
+
+########################################################################
+# PLOTS: Pathway plot MYO+INT
+########################################################################
+
+# calculate diff meth per gene
+
+MYOINT_deltaM <- merge(DMPs_PH_vs_BH %>% 
+                            filter(p.value < 0.05),anno, by = "cpg") %>% 
+        arrange(delta_M) %>% 
+        na.omit(entrezIDs) %>%
+        distinct(entrezIDs, .keep_all = TRUE) %>% 
+        pull(delta_M)
+
+names(MYOINT_deltaM) <- merge(DMPs_PH_vs_BH %>% 
+                                   filter(p.value < 0.05),anno, by = "cpg") %>% 
+        arrange(-abs(delta_M)) %>% 
+        na.omit(entrezIDs) %>%
+        # head(20) %>% #pull(UCSC_RefGene_Name) -> filt_genes_myo
+        distinct(entrezIDs, .keep_all = TRUE) %>% 
+        pull(entrezIDs)
+
+
+# visualize pathway without fold change
+viewPathway(
+        "Muscle contraction",
+        organism = "human",
+        readable = TRUE,
+        foldChange = MYOINT_deltaM,
+        keyType = "ENTREZID",
+        layout = "kk"
+)
+
+
+
+
+
+names(MYO_deltaM) %>% unique() %>% length()
 # barplot
 
 barplot(React_MYO_hypo, showCategory=20)
@@ -341,20 +388,7 @@ MYO_eids <- merge(DMPs_PM_vs_BM %>%
 
 React_MYO <- enrichPathway(gene = MYO_eids, organism = "human")
 
-# calculate diff meth per gene
 
-MYO_deltaM <- merge(DMPs_PM_vs_BM %>% 
-                            filter(p.value < 0.05),anno, by = "cpg") %>% 
-        arrange(delta_M) %>% 
-        na.omit(entrezIDs) %>%
-        pull(delta_M)
-
-names(MYO_deltaM) <- merge(DMPs_PM_vs_BM %>% 
-                                   filter(p.value < 0.05),anno, by = "cpg") %>% 
-        arrange(-abs(delta_M)) %>% 
-        na.omit(entrezIDs) %>%
-        head(20) %>% #pull(UCSC_RefGene_Name) -> filt_genes_myo
-        pull(entrezIDs)
 
 React_MYO_readable <- setReadable(React_MYO, 'org.Hs.eg.db', 'ENTREZID')
 
