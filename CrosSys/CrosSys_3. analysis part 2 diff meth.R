@@ -74,7 +74,7 @@ norm.filt.dat_ASAT@treatment <- treatment_asat
 norm.filt.dat_QF@treatment <- treatment_qf
 
 ##########################################################################################################
-#########               UNITE ASAT and QF                                               ####################
+#########               UNITE ASAT and QF                                             ####################
 ##########################################################################################################
 
 
@@ -87,7 +87,7 @@ meth_ASAT <- methylKit::unite(norm.filt.dat_ASAT, destrand = F, min.per.group = 
 meth_QF <- methylKit::unite(norm.filt.dat_QF, destrand = F, min.per.group = minPerGroup)
 
 ##########################################################################################################
-#########               calculate percent methylation and run pca                                               ####################
+#########               calculate percent methylation and run pca               ##########################
 ##########################################################################################################
 
 
@@ -230,6 +230,8 @@ info_df$twin_id <- as.factor(info_df$twin_id)
 info_df$twin_status <- as.factor(info_df$twin_status)
 info_df$time_point <- as.factor(info_df$time_point)
 
+str(info_df)
+
 # Add a sample name column
 info_df$sample_name <- column_names
 
@@ -237,7 +239,7 @@ info_df$sample_name <- column_names
 percent_meth_matrix <- as.matrix(percent_meth_ASAT[, 2:36])
 
 # Create the design matrix for the model
-design <- model.matrix(~ twin_id + twin_status * time_point, data = info_df)
+design <- model.matrix(~ twin_id * twin_status * time_point, data = info_df)
 
 # View the design matrix
 print(design)
@@ -252,8 +254,6 @@ print(design)
 # Fit the linear model
 fit <- lmFit(percent_meth_matrix, design)
 
-# Apply empirical Bayes moderation
-fit <- eBayes(fit)
 
 # Adjust the design matrix with valid column names
 colnames(design) <- make.names(colnames(design))
@@ -358,8 +358,6 @@ print(design)
 # Fit the linear model
 fit <- lmFit(percent_meth_matrix, design)
 
-# Apply empirical Bayes moderation
-fit <- eBayes(fit)
 
 # Adjust the design matrix with valid column names
 colnames(design) <- make.names(colnames(design))
