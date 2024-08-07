@@ -277,6 +277,41 @@ viewPathway(
         layout = "kk"
 )
 
+# visualize pathway without fold change
+viewPathway(
+        "Protein-protein interactions at synapses",
+        organism = "human",
+        readable = TRUE,
+        foldChange = MYO_deltaM,
+        keyType = "ENTREZID",
+        layout = "kk"
+)
+
+# visualize pathway without fold change
+set.seed(123)
+viewPathway(
+        "Integration of energy metabolism",
+        organism = "human",
+        readable = TRUE,
+        foldChange = MYO_deltaM,
+        keyType = "ENTREZID",
+        layout = "kk"
+)
+
+# visualize pathway without fold change
+set.seed(123)
+viewPathway(
+        "Adipogenesis",
+        organism = "human",
+        readable = TRUE,
+        foldChange = MYOINT_deltaM,
+        keyType = "ENTREZID",
+        layout = "kk"
+)
+
+merge(DMPs_PM_vs_BM %>% filter(p.value < 0.05), anno, by = "cpg") %>% filter(UCSC_RefGene_Name == "AR")
+
+M_change[c("cg10164191","cg13873881","cg22908141"),]
 
 ########################################################################
 # PLOTS: Pathway plot MYO+INT
@@ -310,97 +345,9 @@ viewPathway(
         layout = "kk"
 )
 
-
-
-
-
-names(MYO_deltaM) %>% unique() %>% length()
-# barplot
-
-barplot(React_MYO_hypo, showCategory=20)
-
-# dotplot
-dotplot(React_MYO_hypo, showCategory=20)
-
-React_MYO_hypo_readable <- setReadable(React_MYO_hypo, 'org.Hs.eg.db', 'ENTREZID')
-cnetplot(React_MYO_hypo_readable, 
-         node_label="category", 
-         cex.params = list(category_label = 1.1), 
-         color_category = "#440154FF",
-         color_gene='steelblue')
-
-# d <- setNames(rnorm(26), letters) 
-####
-#       add diff methylation to reactome plots
-####
-
-# calculate diff meth per gene
-
-MYO_hypo_deltaM <- merge(DMPs_PM_vs_BM %>% 
-                                 filter(p.value < 0.05,
-                                        delta_M < 0),anno, by = "cpg") %>% 
-        arrange(delta_M) %>% 
-        na.omit(entrezIDs) %>%
-        pull(delta_M)
-
-names(MYO_hypo_deltaM) <- merge(DMPs_PM_vs_BM %>% 
-                                        filter(p.value < 0.05,
-                                               delta_M < 0),anno, by = "cpg") %>% 
-        arrange(delta_M) %>% 
-        na.omit(entrezIDs) %>%
-        pull(entrezIDs)
-
-cnetplot(React_MYO_hypo_readable, 
-         node_label="category", 
-         cex.params = list(category_label = 1.1), 
-         color_category = "#440154FF",
-         color_gene='steelblue', foldChange = MYO_hypo_deltaM)
-
-heatplot(React_MYO_hypo_readable, foldChange=MYO_hypo_deltaM, showCategory=5)
-
-
-# interaction plot between Reactome terms
-React_MYO_hypo_readable_pairwise <- pairwise_termsim(React_MYO_hypo_readable)
-
-set.seed(123)
-emapplot(React_MYO_hypo_readable_pairwise, cex.params = list(category_label = 0.6))
-
-treeplot(React_MYO_hypo_readable_pairwise, hclust_method = "average")
-
-# check prevalence of term in PubMed
-
-terms <- React_MYO_hypo_readable_pairwise$Description[1:10]
-
-pmcplot(terms, 2010:2023, proportion=FALSE)
-
-pmcplot(terms, 2019:2024)
-
-
-###########################################
-### run Reactome on all MYO exercise responsive DMPs
-###########################################
-
-MYO_eids <- merge(DMPs_PM_vs_BM %>% 
-                          filter(p.value < 0.05),anno, by = "cpg") %>% 
-        arrange(delta_M) %>% 
-        na.omit(entrezIDs) %>% 
-        pull(entrezIDs)
-
-React_MYO <- enrichPathway(gene = MYO_eids, organism = "human")
-
-
-
-React_MYO_readable <- setReadable(React_MYO, 'org.Hs.eg.db', 'ENTREZID')
-
-heatplot(React_MYO_readable, foldChange=MYO_deltaM, showCategory=5)
-
-
-
-
-
-####
+########################################################################
 #       Get reactome DB
-####
+########################################################################
 
 getDb <- function(organism) {
         if (organism == "worm") {
@@ -495,3 +442,101 @@ get_Reactome_DATA <- function(organism = "human") {
 
 # get reactome db
 Reactome_DATA <- get_Reactome_DATA("human")
+
+
+########################################################################
+###             Heatplot of top 20 genes in pathways
+########################################################################
+
+
+
+########################################################################
+###             betavalue pathway plot
+########################################################################
+
+# average the promoter methylation in my samples
+average_promoter.m <- constAvBetaTSS(beta.m = beta, type = "850k")      # function from EpiSCORE package to calculate average methylation across promoter probes
+
+average_promoter.m <- average_promoter.m %>% 
+        as.data.frame() %>% 
+        dplyr::select("1BH","2BH","4BH","5BH","6BH","7BH","8BH","12BH",
+                      "1BM","2BM","4BM","5BM","6BM","7BM","8BM","12BM",
+                      "1PH","2PH","4PH","5PH","6PH","7PH","8PH","12PH",
+                      "1PM","2PM","4PM","5PM","6PM","7PM","8PM","12PM") %>% 
+        mutate(BH = (`1BH`+`2BH`+`4BH`+`5BH`+`6BH`+`7BH`+`8BH`+`12BH`)/8,
+               BM = (`1BM`+`2BM`+`4BM`+`5BM`+`6BM`+`7BM`+`8BM`+`12BM`)/8,
+               PH = (`1PH`+`2PH`+`4PH`+`5PH`+`6PH`+`7PH`+`8PH`+`12PH`)/8,
+               PM = (`1PM`+`2PM`+`4PM`+`5PM`+`6PM`+`7PM`+`8PM`+`12PM`)/8) %>% 
+        # calculate change
+        mutate(BM_vs_BH = BM-BH,
+               PM_vs_PH = PM-PH,
+               PH_vs_BH = PH-BH,
+               PM_vs_BM = PM-BM)
+
+# plot baseline homogenate
+
+# visualize pathway without fold change
+
+BH <- average_promoter.m %>% pull(BH)
+
+names(BH) <- rownames(average_promoter.m)
+
+set.seed(123)
+viewPathway(
+        "Adipogenesis",
+        organism = "human",
+        readable = TRUE,
+        foldChange = BH,
+        keyType = "ENTREZID",
+        layout = "kk"
+)
+
+# plot post homogenate
+
+PH <- average_promoter.m %>% pull(PH)
+
+names(PH) <- rownames(average_promoter.m)
+
+set.seed(123)
+viewPathway(
+        "Adipogenesis",
+        organism = "human",
+        readable = TRUE,
+        foldChange = PH,
+        keyType = "ENTREZID",
+        layout = "kk"
+)
+
+# plot baseline homogenate
+
+# visualize pathway without fold change
+
+BM <- average_promoter.m %>% pull(BM)
+
+names(BM) <- rownames(average_promoter.m)
+
+set.seed(123)
+viewPathway(
+        "Adipogenesis",
+        organism = "human",
+        readable = TRUE,
+        foldChange = BM,
+        keyType = "ENTREZID",
+        layout = "kk"
+)
+
+# plot post homogenate
+
+PM <- average_promoter.m %>% pull(PM)
+
+names(PM) <- rownames(average_promoter.m)
+
+set.seed(123)
+viewPathway(
+        "Adipogenesis",
+        organism = "human",
+        readable = TRUE,
+        foldChange = PM,
+        keyType = "ENTREZID",
+        layout = "kk"
+)
